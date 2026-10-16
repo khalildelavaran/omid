@@ -339,7 +339,7 @@ render = function(){
   if(content) content.innerHTML = '<div class="card"><h2>بارگذاری صفحه با مشکل مواجه شد</h2><p class="muted">داده‌های نمایشی این مرورگر با نسخه فعلی سازگار نیستند. صفحه را یک بار بازخوانی کنید؛ اگر مشکل ادامه داشت، داده‌های محلی نسخه نمایشی را پاک‌سازی می‌کنیم.</p><button class="btn primary" type="button" onclick="location.reload()">بارگذاری دوباره</button></div>';
  }
 };
-function navigate(path){if(!path||typeof path!=="string")return;try{const target=new URL(path,location.origin);if(target.origin!==location.origin){location.href=target.href;return;}const destination=target.pathname+target.search+target.hash;if(destination===location.pathname+location.search+location.hash){render();return;}history.pushState({}, "", destination);render();window.scrollTo({top:0,behavior:"auto"});}catch(error){console.error("Omid navigation failed",error);location.href=path;}}
+function navigate(path){if(!path||typeof path!=="string")return;try{const target=new URL(path,location.origin);if(target.origin!==location.origin){location.assign(target.href);return;}const destination=target.pathname+target.search+target.hash;if(destination===location.pathname+location.search+location.hash){render();return;}location.assign(destination);}catch(error){console.error("Omid navigation failed",error);location.assign(path);}}
 function toast(message){const el=document.getElementById("toast");el.textContent=message;el.style.display="block";clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>el.style.display="none",3200);}
 document.addEventListener("click",e=>{
  const customerPick=e.target.closest("[data-action=\"select-application-customer\"]");
