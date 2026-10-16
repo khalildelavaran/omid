@@ -115,7 +115,9 @@ const pageInfo = {
 };
 let currentPage = "dashboard";
 let customerFilter = "";
+let customerTypeFilter = "";
 let applicationFilter = "";
+let applicationStatusFilter = "";
 function esc(value){return String(value).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function statusPill(status){
  let cls = status.includes("انتظار") ? "wait" : status.includes("مدرک") || status.includes("بررسی") || status.includes("نیازمند") ? "doc" : status.includes("غیرفعال") || status.includes("رد") ? "bad" : status.includes("فعال") || status.includes("تأیید شده") ? "" : "gray";
@@ -135,22 +137,22 @@ function renderDashboard(){
  '<div class="section"><div class="card"><h2>کارهای نیازمند اقدام</h2><div class="task-list">'+tasks.filter(t=>!t.done).slice(0,3).map(t=>'<div class="task"><input type="checkbox" data-task="'+tasks.indexOf(t)+'"><div>'+t.title+'<small>'+t.due+' · '+t.owner+' · اولویت '+t.priority+'</small></div></div>').join('')+'</div></div><div class="card"><h2>دسترسی سریع</h2><div class="task-list"><div class="task"><span class="k-icon">＋</span><div><a href="/customers/new" data-link>ثبت مشتری جدید</a><small>افزودن مشتری به سامانه</small></div></div><div class="task"><span class="k-icon blue">▤</span><div><a href="/applications/new" data-link>ایجاد پرونده تسهیلات</a><small>شروع درخواست جدید</small></div></div><div class="task"><span class="k-icon amber">▧</span><div><a href="/documents" data-link>بررسی اسناد</a><small>مدیریت مدارک پرونده‌ها</small></div></div></div></div></div>';
 }
 function renderCustomers(){
- setMeta("مشتریان",'<button class="btn primary" data-link="/customers/new">＋ ثبت مشتری جدید</button>');
+ setMeta("مشتریان",'<button class="btn" data-action="export-customers">⇩ خروجی CSV</button><button class="btn primary" data-link="/customers/new">＋ ثبت مشتری جدید</button>');
  if(location.pathname.endsWith("/new")) return renderCustomerForm();
- const filtered=customers.filter(c=>(c.name+" "+c.id+" "+c.phone+" "+c.manager+" "+c.email).includes(customerFilter));
- const rows=filtered.map(c=>'<tr><td class="id">'+c.id+'</td><td>'+c.name+'</td><td>'+c.type+'</td><td>'+c.phone+'</td><td>'+c.manager+'</td><td>'+statusPill(c.status)+'</td><td><button class="btn" data-action="customer-detail" data-id="'+c.id+'">جزئیات</button></td></tr>').join('');
- return '<div class="grid">'+stat("کل مشتریان",customers.length,"♙","","اطلاعات نمایشی")+stat("مشتریان حقیقی","۳","♧","blue","نمونه")+stat("مشتریان حقوقی","۲","▦","purple","نمونه")+stat("نیازمند بررسی","۱","◷","amber","نیازمند پیگیری")+'</div><div class="card table-card"><div class="card-head"><h2>فهرست مشتریان</h2><span class="muted">'+filtered.length+' رکورد</span></div><div class="table-tools"><input class="field" style="max-width:330px" id="customer-search" placeholder="نام، کد یا شماره تماس..." value="'+esc(customerFilter)+'"><select class="filter" id="customer-type"><option value="">همه انواع مشتری</option><option>حقیقی</option><option>حقوقی</option></select></div>'+table(["کد مشتری","نام / عنوان","نوع","شماره تماس","مسئول پرونده","وضعیت","عملیات"],rows||'<tr><td colspan="7" class="empty">مشتری‌ای مطابق جست‌وجو پیدا نشد.</td></tr>')+'</div>';
+ const filtered=customers.filter(c=>(c.name+" "+c.id+" "+c.phone+" "+c.manager+" "+c.email).toLowerCase().includes(customerFilter.toLowerCase())&&(!customerTypeFilter||c.type===customerTypeFilter));
+ const rows=filtered.map(c=>'<tr><td class="id">'+esc(c.id)+'</td><td>'+esc(c.name)+'</td><td>'+esc(c.type)+'</td><td>'+esc(c.phone)+'</td><td>'+esc(c.manager)+'</td><td>'+statusPill(c.status)+'</td><td><button class="btn" data-action="customer-detail" data-id="'+esc(c.id)+'">جزئیات</button></td></tr>').join('');
+ return '<div class="grid">'+stat("کل مشتریان",customers.length,"♙","","اطلاعات نمایشی")+stat("مشتریان حقیقی","۳","♧","blue","نمونه")+stat("مشتریان حقوقی","۲","▦","purple","نمونه")+stat("نیازمند بررسی","۱","◷","amber","نیازمند پیگیری")+'</div><div class="card table-card"><div class="card-head"><h2>فهرست مشتریان</h2><span class="muted">'+filtered.length+' رکورد</span></div><div class="table-tools"><input class="field" style="max-width:330px" id="customer-search" placeholder="نام، کد یا شماره تماس..." value="'+esc(customerFilter)+'"><select class="filter" id="customer-type"><option value="" '+(!customerTypeFilter?'selected':'')+'>همه انواع مشتری</option><option '+(customerTypeFilter==="حقیقی"?'selected':'')+'>حقیقی</option><option '+(customerTypeFilter==="حقوقی"?'selected':'')+'>حقوقی</option></select></div>'+table(["کد مشتری","نام / عنوان","نوع","شماره تماس","مسئول پرونده","وضعیت","عملیات"],rows||'<tr><td colspan="7" class="empty">مشتری‌ای مطابق جست‌وجو پیدا نشد.</td></tr>')+'</div>';
 }
 function renderCustomerForm(){
  setMeta("مشتریان / ثبت مشتری",'<button class="btn" data-link="/customers">← بازگشت به فهرست</button>');
  return '<div class="card"><h2>اطلاعات مشتری جدید</h2><div class="notice">اطلاعات در این نسخه فقط در حافظه همین صفحه نگهداری می‌شود و با بازخوانی صفحه پاک خواهد شد.</div><form id="customer-form"><div class="form-grid"><div class="form-row"><label>نوع مشتری *</label><select class="field" name="type" required><option value="حقیقی">حقیقی</option><option value="حقوقی">حقوقی</option></select></div><div class="form-row"><label>نام و نام خانوادگی / عنوان شرکت *</label><input class="field" name="name" required placeholder="نام کامل مشتری"></div><div class="form-row"><label>شماره تماس *</label><input class="field" name="phone" required inputmode="tel" placeholder="09... یا شماره ثابت"></div><div class="form-row"><label>پست الکترونیکی</label><input class="field" name="email" type="email" placeholder="name@example.com"></div><div class="form-row"><label>مسئول پرونده</label><select class="field" name="manager"><option>مریم رضایی</option><option>امیر کاظمی</option><option>آرمان صالحی</option></select></div><div class="form-row"><label>وضعیت</label><select class="field" name="status"><option>فعال</option><option>نیازمند بررسی</option></select></div><div class="form-row full"><label>یادداشت</label><textarea class="field" name="notes" placeholder="توضیحات تکمیلی"></textarea></div></div><div class="actions" style="margin-top:18px"><button class="btn primary" type="submit">ثبت نمایشی مشتری</button><button class="btn" type="reset">پاک کردن فرم</button></div></form></div>';
 }
 function renderApplications(){
- setMeta("درخواست‌های تسهیلات",'<button class="btn primary" data-link="/applications/new">＋ پرونده جدید</button>');
+ setMeta("درخواست‌های تسهیلات",'<button class="btn" data-action="export-applications">⇩ خروجی CSV</button><button class="btn primary" data-link="/applications/new">＋ پرونده جدید</button>');
  if(location.pathname.endsWith("/new")) return renderApplicationForm();
- const filtered=applications.filter(a=>(a.id+" "+a.customer+" "+a.type+" "+a.manager+" "+a.status).includes(applicationFilter));
- const rows=filtered.map(a=>'<tr><td class="id">'+a.id+'</td><td>'+a.customer+'</td><td>'+a.type+'</td><td>'+a.amount+'</td><td>'+a.manager+'</td><td>'+statusPill(a.status)+'</td><td><button class="btn" data-action="application-detail" data-id="'+a.id+'">مشاهده</button></td></tr>').join('');
- return '<div class="grid">'+stat("کل پرونده‌ها",applications.length,"▤","","داده نمونه")+stat("در حال بررسی","۲","↻","blue","در گردش کار")+stat("تکمیل مدارک","۱","▧","amber","اقدام مشتری لازم است")+stat("تأیید شده","۱","✓","purple","در نمونه فعلی")+'</div><div class="card table-card"><div class="card-head"><h2>فهرست درخواست‌ها</h2><span class="muted">'+filtered.length+' پرونده</span></div><div class="table-tools"><input id="application-search" class="field" style="max-width:350px" placeholder="شماره پرونده، مشتری یا نوع تسهیلات..." value="'+esc(applicationFilter)+'"><select class="filter" id="application-status"><option value="">همه وضعیت‌ها</option><option>در حال بررسی</option><option>در انتظار تأیید</option><option>تکمیل مدارک</option><option>تأیید شده</option></select></div>'+table(["شماره پرونده","مشتری","نوع تسهیلات","مبلغ درخواستی","کارشناس","وضعیت","عملیات"],rows||'<tr><td colspan="7" class="empty">پرونده‌ای پیدا نشد.</td></tr>')+'</div>';
+ const filtered=applications.filter(a=>(a.id+" "+a.customer+" "+a.type+" "+a.manager+" "+a.status).toLowerCase().includes(applicationFilter.toLowerCase())&&(!applicationStatusFilter||a.status===applicationStatusFilter));
+ const rows=filtered.map(a=>'<tr><td class="id">'+esc(a.id)+'</td><td>'+esc(a.customer)+'</td><td>'+esc(a.type)+'</td><td>'+esc(a.amount)+'</td><td>'+esc(a.manager)+'</td><td>'+statusPill(a.status)+'</td><td><button class="btn" data-action="application-detail" data-id="'+esc(a.id)+'">مشاهده</button></td></tr>').join('');
+ return '<div class="grid">'+stat("کل پرونده‌ها",applications.length,"▤","","داده نمونه")+stat("در حال بررسی","۲","↻","blue","در گردش کار")+stat("تکمیل مدارک","۱","▧","amber","اقدام مشتری لازم است")+stat("تأیید شده","۱","✓","purple","در نمونه فعلی")+'</div><div class="card table-card"><div class="card-head"><h2>فهرست درخواست‌ها</h2><span class="muted">'+filtered.length+' پرونده</span></div><div class="table-tools"><input id="application-search" class="field" style="max-width:350px" placeholder="شماره پرونده، مشتری یا نوع تسهیلات..." value="'+esc(applicationFilter)+'"><select class="filter" id="application-status"><option value="" '+(!applicationStatusFilter?'selected':'')+'>همه وضعیت‌ها</option><option '+(applicationStatusFilter==="در حال بررسی"?'selected':'')+'>در حال بررسی</option><option '+(applicationStatusFilter==="در انتظار تأیید"?'selected':'')+'>در انتظار تأیید</option><option '+(applicationStatusFilter==="تکمیل مدارک"?'selected':'')+'>تکمیل مدارک</option><option '+(applicationStatusFilter==="تأیید شده"?'selected':'')+'>تأیید شده</option><option '+(applicationStatusFilter==="رد شده"?'selected':'')+'>رد شده</option></select></div>'+table(["شماره پرونده","مشتری","نوع تسهیلات","مبلغ درخواستی","کارشناس","وضعیت","عملیات"],rows||'<tr><td colspan="7" class="empty">پرونده‌ای پیدا نشد.</td></tr>')+'</div>';
 }
 function renderApplicationForm(){
  setMeta("درخواست‌ها / پرونده جدید",'<button class="btn" data-link="/applications">← بازگشت به فهرست</button>');
@@ -181,7 +183,7 @@ function renderCustomerDetail(id){
 function renderApplicationDetail(id){
  const a=applications.find(x=>x.id===id);if(!a)return '<div class="card">پرونده پیدا نشد.</div>';
  setMeta("درخواست‌ها / جزئیات پرونده",'<button class="btn" data-link="/applications">← بازگشت</button>');
- return '<div class="card"><div class="card-head"><h2>پرونده '+a.id+'</h2>'+statusPill(a.status)+'</div><div class="form-grid"><div class="form-row"><label>مشتری</label><div>'+a.customer+'</div></div><div class="form-row"><label>نوع تسهیلات</label><div>'+a.type+'</div></div><div class="form-row"><label>مبلغ درخواستی</label><div>'+a.amount+'</div></div><div class="form-row"><label>مسئول پرونده</label><div>'+a.manager+'</div></div><div class="form-row"><label>تاریخ ثبت</label><div>'+a.date+'</div></div></div><div class="notice" style="margin-top:20px">جزئیات نمایش‌داده‌شده داده نمونه هستند. گردش واقعی تأیید و ثبت تصمیم در مرحله اتصال بک‌اند پیاده‌سازی می‌شود.</div><div class="actions"><button class="btn" data-link="/documents">مشاهده مدارک</button><button class="btn" data-link="/workflow">مشاهده گردش کار</button></div></div>';
+ return '<div class="card"><div class="card-head"><h2>پرونده '+a.id+'</h2>'+statusPill(a.status)+'</div><div class="form-grid"><div class="form-row"><label>مشتری</label><div>'+a.customer+'</div></div><div class="form-row"><label>نوع تسهیلات</label><div>'+a.type+'</div></div><div class="form-row"><label>مبلغ درخواستی</label><div>'+a.amount+'</div></div><div class="form-row"><label>مسئول پرونده</label><div>'+a.manager+'</div></div><div class="form-row"><label>تاریخ ثبت</label><div>'+a.date+'</div></div></div><div class="setting-row"><div>تغییر وضعیت پرونده<small>تغییر فقط در داده نمونه این نشست اعمال می‌شود</small></div><select class="field" id="application-detail-status" data-app-id="'+esc(a.id)+'" style="max-width:220px"><option '+(a.status==="در حال بررسی"?"selected":"")+'>در حال بررسی</option><option '+(a.status==="در انتظار تأیید"?"selected":"")+'>در انتظار تأیید</option><option '+(a.status==="تکمیل مدارک"?"selected":"")+'>تکمیل مدارک</option><option '+(a.status==="تأیید شده"?"selected":"")+'>تأیید شده</option><option '+(a.status==="رد شده"?"selected":"")+'>رد شده</option></select></div><div class="notice" style="margin-top:20px">جزئیات نمایش‌داده‌شده داده نمونه هستند. گردش واقعی تأیید و ثبت تصمیم در مرحله اتصال بک‌اند پیاده‌سازی می‌شود.</div><div class="actions"><button class="btn" data-link="/documents">مشاهده مدارک</button><button class="btn" data-link="/workflow">مشاهده گردش کار</button></div></div>';
 }
 function render(){
  const path=location.pathname.replace(/\/+$/,"")||"/";
@@ -206,7 +208,7 @@ function render(){
  document.getElementById("content").innerHTML=html;
  document.getElementById("global-search").value="";
 }
-function navigate(path){history.pushState({}, "", path);customerFilter="";applicationFilter="";render();window.scrollTo({top:0,behavior:"instant"});}
+function navigate(path){history.pushState({}, "", path);customerFilter="";applicationFilter="";if(!path.startsWith("/customers"))customerTypeFilter="";if(!path.startsWith("/applications"))applicationStatusFilter="";render();window.scrollTo({top:0,behavior:"instant"});}
 function toast(message){const el=document.getElementById("toast");el.textContent=message;el.style.display="block";clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>el.style.display="none",3200);}
 document.addEventListener("click",e=>{
  const link=e.target.closest("[data-link]");
@@ -222,9 +224,12 @@ document.addEventListener("click",e=>{
   if(act==="document-detail")toast("جزئیات مدرک "+action.dataset.id+"؛ اتصال ذخیره‌سازی در مرحله بعد انجام می‌شود.");
   if(act==="upload-demo")toast("بارگذاری فایل پس از اتصال فضای امن اسناد فعال می‌شود.");
   if(act==="save-settings")toast("ترجیحات این نسخه نمایشی ذخیره دائمی نمی‌شوند.");
-  if(act==="export-report"){
-   const csv="شماره پرونده,مشتری,نوع تسهیلات,مبلغ,وضعیت\\n"+applications.map(a=>[a.id,a.customer,a.type,a.amount,a.status].join(",")).join("\\n");
-   const blob=new Blob(["\\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="omid-report.csv";a.click();URL.revokeObjectURL(url);
+  if(act==="export-report"||act==="export-applications"||act==="export-customers"){
+   const isCustomers=act==="export-customers";
+   const headers=isCustomers?["کد مشتری","نام","نوع","تلفن","ایمیل","مسئول","وضعیت"]:["شماره پرونده","مشتری","نوع تسهیلات","مبلغ","وضعیت"];
+   const rows=isCustomers?customers.map(c=>[c.id,c.name,c.type,c.phone,c.email,c.manager,c.status]):applications.map(a=>[a.id,a.customer,a.type,a.amount,a.status]);
+   const csv=[headers,...rows].map(row=>row.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")).join("\\n");
+   const blob=new Blob(["\\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download=isCustomers?"omid-customers.csv":act==="export-applications"?"omid-applications.csv":"omid-report.csv";link.click();URL.revokeObjectURL(url);
   }
  }
 });
@@ -240,14 +245,9 @@ document.addEventListener("input",e=>{
  }
 });
 document.addEventListener("change",e=>{
- if(e.target.id==="customer-type"){
-  const q=e.target.value;
-  document.querySelectorAll("#content tbody tr").forEach(row=>row.hidden=!!q&&!row.children[2].textContent.includes(q));
- }
- if(e.target.id==="application-status"){
-  const q=e.target.value;
-  document.querySelectorAll("#content tbody tr").forEach(row=>row.hidden=!!q&&!row.children[5].textContent.includes(q));
- }
+ if(e.target.id==="customer-type"){customerTypeFilter=e.target.value;document.getElementById("content").innerHTML=renderCustomers();}
+ if(e.target.id==="application-status"){applicationStatusFilter=e.target.value;document.getElementById("content").innerHTML=renderApplications();}
+ if(e.target.id==="application-detail-status"){const item=applications.find(a=>a.id===e.target.dataset.appId);if(item){item.status=e.target.value;toast("وضعیت پرونده در داده نمونه به‌روزرسانی شد.");render();}}
  if(e.target.matches("[data-task]")){
   const t=tasks[Number(e.target.dataset.task)];if(t){t.done=e.target.checked;toast(t.done?"وظیفه در نمونه به‌عنوان انجام‌شده علامت خورد.":"وظیفه به فهرست بازگشت.");}
  }
