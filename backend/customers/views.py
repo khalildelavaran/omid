@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.audit import record_audit
 from .models import Customer
 from .permissions import IsStaffCustomerOperator
 from .serializers import CustomerSerializer
@@ -61,8 +62,29 @@ class CustomerViewSet(viewsets.ModelViewSet):
             )
         return queryset
 
+    @transaction.atomic
     def perform_create(self, serializer):
-        serializer.save(assigned_to=self.request.user)
+        customer = serializer.save(assigned_to=self.request.user)
+        record_audit(
+            self.request,
+            "customer.created",
+            actor=self.request.user,
+            entity_type="customer",
+            entity_id=str(customer.pk),
+            metadata={"customer_type": customer.customer_type},
+        )
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        customer = serializer.save()
+        record_audit(
+            self.request,
+            "customer.updated",
+            actor=self.request.user,
+            entity_type="customer",
+            entity_id=str(customer.pk),
+            metadata={"updated_fields": sorted(serializer.validated_data.keys())},
+        )
 
     @action(detail=True, methods=["post"], url_path="archive")
     @transaction.atomic
@@ -72,6 +94,13 @@ class CustomerViewSet(viewsets.ModelViewSet):
             return Response(CustomerSerializer(customer, context={"request": request}).data)
         customer.status = Customer.Status.ARCHIVED
         customer.save(update_fields=["status", "updated_at"])
+        record_audit(
+            request,
+            "customer.archived",
+            actor=request.user,
+            entity_type="customer",
+            entity_id=str(customer.pk),
+        )
         return Response(
             CustomerSerializer(customer, context={"request": request}).data,
             status=status.HTTP_200_OK,
