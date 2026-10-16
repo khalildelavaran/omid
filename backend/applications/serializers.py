@@ -29,7 +29,7 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
             "term_months", "status", "assigned_to", "purpose", "notes",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["id", "assigned_to", "created_at", "updated_at"]
+        read_only_fields = ["id", "application_number", "assigned_to", "created_at", "updated_at"]
 
     def get_customer_display_name(self, obj):
         return str(obj.customer)
