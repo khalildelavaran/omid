@@ -12,9 +12,9 @@ from rest_framework.response import Response
 
 from accounts.models import UserProfile
 from core.audit import record_audit
-from .models import WorkflowTask
+from .models import WorkflowTask, WorkflowTaskEvent
 from .permissions import IsStaffTaskOperator
-from .serializers import WorkflowTaskSerializer
+from .serializers import WorkflowTaskEventSerializer, WorkflowTaskSerializer
 
 
 class WorkflowTaskViewSet(viewsets.ModelViewSet):
@@ -79,6 +79,14 @@ class WorkflowTaskViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def perform_create(self, serializer):
         task = serializer.save(assigned_to=self.request.user, created_by=self.request.user)
+        WorkflowTaskEvent.objects.create(
+            task=task,
+            event_type=WorkflowTaskEvent.EventType.CREATED,
+            new_status=task.status,
+            new_assignee=task.assigned_to,
+            new_due_at=task.due_at,
+            actor=self.request.user,
+        )
         record_audit(
             self.request,
             "task.created",
@@ -90,7 +98,46 @@ class WorkflowTaskViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_update(self, serializer):
+        previous = serializer.instance
+        previous_status = previous.status
+        previous_due_at = previous.due_at
         task = serializer.save()
+        event_written = False
+        if task.status != previous_status:
+            WorkflowTaskEvent.objects.create(
+                task=task,
+                event_type=WorkflowTaskEvent.EventType.STATUS_CHANGED,
+                previous_status=previous_status,
+                new_status=task.status,
+                previous_assignee=task.assigned_to,
+                new_assignee=task.assigned_to,
+                previous_due_at=previous_due_at,
+                new_due_at=task.due_at,
+                actor=self.request.user,
+            )
+            event_written = True
+        if task.due_at != previous_due_at:
+            WorkflowTaskEvent.objects.create(
+                task=task,
+                event_type=WorkflowTaskEvent.EventType.DUE_DATE_CHANGED,
+                previous_status=previous_status,
+                new_status=task.status,
+                previous_assignee=task.assigned_to,
+                new_assignee=task.assigned_to,
+                previous_due_at=previous_due_at,
+                new_due_at=task.due_at,
+                actor=self.request.user,
+            )
+            event_written = True
+        if not event_written:
+            WorkflowTaskEvent.objects.create(
+                task=task,
+                event_type=WorkflowTaskEvent.EventType.UPDATED,
+                new_status=task.status,
+                new_assignee=task.assigned_to,
+                new_due_at=task.due_at,
+                actor=self.request.user,
+            )
         record_audit(
             self.request,
             "task.updated",
@@ -124,9 +171,21 @@ class WorkflowTaskViewSet(viewsets.ModelViewSet):
             raise ValidationError({"assigned_to": "کاربر داخلی فعال و دارای نقش معتبر انتخاب کنید."})
 
         task = self.get_object()
+        previous_user = task.assigned_to
         previous_assignee = task.assigned_to_id
         task.assigned_to = target
         task.save(update_fields=["assigned_to", "updated_at"])
+        WorkflowTaskEvent.objects.create(
+            task=task,
+            event_type=WorkflowTaskEvent.EventType.ASSIGNED,
+            previous_status=task.status,
+            new_status=task.status,
+            previous_assignee=previous_user,
+            new_assignee=target,
+            previous_due_at=task.due_at,
+            new_due_at=task.due_at,
+            actor=request.user,
+        )
         record_audit(
             request,
             "task.assigned",
@@ -136,6 +195,47 @@ class WorkflowTaskViewSet(viewsets.ModelViewSet):
             metadata={"previous_assignee_id": previous_assignee, "new_assignee_id": target.pk},
         )
         return Response(self.get_serializer(task).data, status=status.HTTP_200_OK)
+
+
+    @action(detail=True, methods=["get"], url_path="events")
+    def events(self, request, pk=None):
+        task = self.get_object()
+        events = task.events.select_related(
+            "actor", "previous_assignee", "new_assignee"
+        ).all()
+        return Response(WorkflowTaskEventSerializer(events, many=True).data)
+
+    @action(detail=True, methods=["post"], url_path="notes")
+    @transaction.atomic
+    def add_note(self, request, pk=None):
+        task = self.get_object()
+        note = request.data.get("note", "")
+        if not isinstance(note, str) or not note.strip():
+            raise ValidationError({"note": "متن یادداشت الزامی است."})
+        note = note.strip()
+        if len(note) > 5000:
+            raise ValidationError({"note": "یادداشت نباید بیشتر از ۵۰۰۰ نویسه باشد."})
+        event = WorkflowTaskEvent.objects.create(
+            task=task,
+            event_type=WorkflowTaskEvent.EventType.NOTE_ADDED,
+            previous_status=task.status,
+            new_status=task.status,
+            previous_assignee=task.assigned_to,
+            new_assignee=task.assigned_to,
+            previous_due_at=task.due_at,
+            new_due_at=task.due_at,
+            note=note,
+            actor=request.user,
+        )
+        record_audit(
+            request,
+            "task.note_added",
+            actor=request.user,
+            entity_type="workflow_task",
+            entity_id=str(task.pk),
+            metadata={"note_length": len(note)},
+        )
+        return Response(WorkflowTaskEventSerializer(event).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
         return Response({"detail": "حذف فیزیکی وظیفه مجاز نیست."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
