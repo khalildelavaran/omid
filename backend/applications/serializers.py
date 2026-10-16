@@ -18,6 +18,7 @@ class ApplicationEventSerializer(serializers.ModelSerializer):
 
 
 class LoanApplicationSerializer(serializers.ModelSerializer):
+    status_note = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=1000, trim_whitespace=True, default="")
     customer_number = serializers.CharField(source="customer.customer_number", read_only=True)
     customer_display_name = serializers.SerializerMethodField()
 
@@ -25,7 +26,7 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
         model = LoanApplication
         fields = [
             "id", "application_number", "customer", "customer_number",
-            "customer_display_name", "product_type", "requested_amount",
+            "customer_display_name", "product_type", "requested_amount", "status_note",
             "term_months", "status", "assigned_to", "purpose", "notes",
             "created_at", "updated_at",
         ]
@@ -61,6 +62,26 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
                         "برای ثبت پرونده، باید به مشتری انتخاب‌شده دسترسی داشته باشید."
                     )
         return value
+
+    def validate(self, attrs):
+        status_note = attrs.pop("status_note", "")
+        status_note = status_note.strip() if isinstance(status_note, str) else ""
+        requested_status = attrs.get(
+            "status",
+            getattr(self.instance, "status", LoanApplication.Status.UNDER_REVIEW),
+        )
+        current_status = getattr(self.instance, "status", None)
+
+        if self.instance is None and requested_status != LoanApplication.Status.UNDER_REVIEW:
+            raise serializers.ValidationError({
+                "status": "پرونده جدید باید با وضعیت «در حال بررسی» ثبت شود."
+            })
+        if requested_status == LoanApplication.Status.REJECTED and requested_status != current_status and not status_note:
+            raise serializers.ValidationError({
+                "status_note": "برای رد درخواست تسهیلات، ثبت دلیل تصمیم الزامی است."
+            })
+        self.context["status_note"] = status_note
+        return attrs
 
     def validate_status(self, value):
         request = self.context.get("request")
