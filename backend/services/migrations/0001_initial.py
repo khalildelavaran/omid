@@ -94,7 +94,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name="servicerecord",
-            constraint=models.CheckConstraint(condition=models.Q(("total", models.ExpressionWrapper(models.F("price") - models.F("discount"), output_field=models.DecimalField(decimal_places=0, max_digits=18)))), name="service_receipt_total_matches_price"),
+            constraint=models.CheckConstraint(condition=models.Q(("total", models.F("price") - models.F("discount"))), name="service_receipt_total_matches_price"),
         ),
         migrations.AddConstraint(
             model_name="servicerecord",
