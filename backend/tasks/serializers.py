@@ -3,7 +3,7 @@ from rest_framework import serializers
 
 from accounts.models import UserProfile
 from applications.models import LoanApplication
-from .models import WorkflowTask
+from .models import WorkflowTask, WorkflowTaskEvent
 
 
 class WorkflowTaskSerializer(serializers.ModelSerializer):
@@ -57,3 +57,19 @@ class WorkflowTaskSerializer(serializers.ModelSerializer):
         if value not in allowed.get(self.instance.status, set()):
             raise serializers.ValidationError("این تغییر وضعیت وظیفه مجاز نیست.")
         return value
+
+class WorkflowTaskEventSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source="actor.username", read_only=True, default=None)
+    previous_assignee_username = serializers.CharField(source="previous_assignee.username", read_only=True, default=None)
+    new_assignee_username = serializers.CharField(source="new_assignee.username", read_only=True, default=None)
+
+    class Meta:
+        model = WorkflowTaskEvent
+        fields = [
+            "id", "task", "event_type", "previous_status", "new_status",
+            "previous_assignee", "previous_assignee_username", "new_assignee",
+            "new_assignee_username", "previous_due_at", "new_due_at",
+            "note", "actor", "actor_username", "created_at",
+        ]
+        read_only_fields = fields
+
