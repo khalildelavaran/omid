@@ -10,10 +10,8 @@ class IsStaffCustomerOperator(BasePermission):
     def _role(self, user):
         if user.is_superuser:
             return "system_admin"
-        try:
-            return user.profile.role
-        except (AttributeError, user.__class__.profile.RelatedObjectDoesNotExist):
-            return None
+        profile = getattr(user, "profile", None)
+        return getattr(profile, "role", None)
 
     def has_permission(self, request, view):
         user = request.user
