@@ -304,6 +304,28 @@ document.addEventListener("click",e=>{
  const action=e.target.closest("[data-action]");
  if(action){
   const act=action.dataset.action;
+  if(act==="add-profile-row"){
+   const kind=action.dataset.kind;
+   const target=kind==="address"?"profile-addresses":kind==="phone"?"profile-phones":"profile-banks";
+   const container=document.getElementById(target);
+   if(container)container.insertAdjacentHTML("beforeend",profileRows([{}],kind));
+  }
+  if(act==="add-customer-doc"){
+   document.getElementById("profile-documents")?.insertAdjacentHTML("beforeend",customerDocumentRow());
+  }
+  if(act==="remove-profile-row"){
+   const row=action.closest("[data-profile-row], [data-customer-doc-row]");
+   if(row){
+    const parent=row.parentElement;
+    row.remove();
+    if(parent&&!parent.children.length){
+     if(parent.id==="profile-addresses")parent.innerHTML=profileRows([{}],"address");
+     if(parent.id==="profile-phones")parent.innerHTML=profileRows([{}],"phone");
+     if(parent.id==="profile-banks")parent.innerHTML=profileRows([{}],"bank");
+     if(parent.id==="profile-documents")parent.innerHTML=customerDocumentRow();
+    }
+   }
+  }
   if(act==="refresh"){render();toast("صفحه با داده‌های نمایشی فعلی به‌روزرسانی شد.");}
   if(act==="delete-task"){const idx=Number(action.dataset.taskId);if(Number.isInteger(idx)&&idx>=0&&idx<tasks.length){tasks.splice(idx,1);persistDemoData();document.getElementById("content").innerHTML=renderWorkflow();toast("وظیفه حذف شد و در همین مرورگر ذخیره شد.");}}
   if(act==="customer-detail")navigate("/customers/"+encodeURIComponent(action.dataset.id));
@@ -332,6 +354,15 @@ document.addEventListener("input",e=>{
  }
 });
 document.addEventListener("change",e=>{
+ if(e.target.matches('input[name="customerDocFile"]')){
+  const file=e.target.files?.[0],preview=e.target.closest("[data-customer-doc-row]")?.querySelector(".profile-doc-preview");
+  if(preview&&file){
+   if(file.size>3*1024*1024){e.target.value="";toast("هر فایل باید حداکثر ۳ مگابایت باشد.");return;}
+   if(file.type.startsWith("image/")){
+    const reader=new FileReader();reader.onload=()=>{preview.innerHTML='<img src="'+String(reader.result).replace(/"/g,"&quot;")+'" alt="پیش‌نمایش مدرک">';};reader.readAsDataURL(file);
+   }else preview.textContent="فایل انتخاب شد: "+file.name;
+  }
+ }
  if(e.target.id==="customer-type"){customerTypeFilter=e.target.value;document.getElementById("content").innerHTML=renderCustomers();}
  if(e.target.id==="application-status"){applicationStatusFilter=e.target.value;document.getElementById("content").innerHTML=renderApplications();}
  if(e.target.id==="application-detail-status"){const item=applications.find(a=>a.id===e.target.dataset.appId);if(item&&item.status!==e.target.value){const previous=item.status;item.status=e.target.value;item.activity=item.activity||[];item.activity.push({type:"تغییر وضعیت",text:"وضعیت از «"+previous+"» به «"+item.status+"» تغییر کرد.",date:new Intl.DateTimeFormat("fa-IR",{dateStyle:"short",timeStyle:"short"}).format(new Date())});persistDemoData();toast("وضعیت و تاریخچه پرونده ذخیره شد.");render();}}
@@ -340,7 +371,7 @@ document.addEventListener("change",e=>{
   const t=tasks[Number(e.target.dataset.task)];if(t){t.done=e.target.checked;persistDemoData();toast(t.done?"وظیفه انجام‌شده ذخیره شد.":"وظیفه به فهرست بازگشت و ذخیره شد.");}
  }
 });
-document.addEventListener("submit",e=>{
+document.addEventListener("submit",async e=>{
  if(e.target.id==="task-form"){
   e.preventDefault();
   const data=Object.fromEntries(new FormData(e.target).entries());
@@ -353,18 +384,59 @@ document.addEventListener("submit",e=>{
  }
  if(e.target.id==="customer-form"){
   e.preventDefault();
-  const data=Object.fromEntries(new FormData(e.target).entries());
-  const editId=e.target.dataset.editId;
+  const form=e.target;
+  const data=Object.fromEntries(new FormData(form).entries());
+  const editId=form.dataset.editId;
+  const collectRows=(selector,kind)=>{
+   return [...form.querySelectorAll(selector)].map(row=>{
+    const val=name=>String(row.querySelector('[name="'+name+'"]')?.value||"").trim();
+    if(kind==="address")return {title:val("addressTitle"),value:val("addressValue"),postalCode:val("addressPostal")};
+    if(kind==="phone")return {title:val("phoneTitle"),number:val("phoneValue")};
+    return {bank:val("bankName"),accountNumber:val("bankNumber"),title:val("bankTitle")};
+   }).filter(x=>Object.values(x).some(v=>v));
+  };
+  const documents=[];
+  for(const row of form.querySelectorAll("[data-customer-doc-row]")){
+   const type=row.querySelector('[name="customerDocType"]')?.value||"سایر";
+   const title=String(row.querySelector('[name="customerDocTitle"]')?.value||"").trim();
+   const file=row.querySelector('[name="customerDocFile"]')?.files?.[0];
+   let dataUrl=row.querySelector('[name="customerDocExistingUrl"]')?.value||"";
+   let fileName=row.querySelector('[name="customerDocExistingName"]')?.value||"";
+   if(file){
+    if(file.size>3*1024*1024){toast("هر فایل باید حداکثر ۳ مگابایت باشد.");return;}
+    dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||""));reader.onerror=reject;reader.readAsDataURL(file);});
+    fileName=file.name;
+   }
+   if(title||file||dataUrl)documents.push({type,title:title||fileName||type,fileName,dataUrl});
+  }
+  const firstName=String(data.firstName||"").trim();
+  const lastName=String(data.lastName||"").trim();
+  const name=(firstName+" "+lastName).trim();
+  if(!name){toast("نام مشتری را وارد کنید.");return;}
+  const profile={
+   name,type:data.type||"حقیقی",firstName,lastName,nationalId:String(data.nationalId||"").trim(),
+   birthDate:data.birthDate||"",fatherName:String(data.fatherName||"").trim(),occupation:String(data.occupation||"").trim(),
+   postalCode:String(data.postalCode||"").trim(),email:String(data.email||"").trim(),
+   manager:data.manager||"تعیین نشده",status:data.status||"فعال",notes:String(data.notes||"").trim(),
+   sana:form.querySelector('[name="sana"]')?.checked===true,
+   addresses:collectRows('[data-profile-row="address"]',"address"),
+   phones:collectRows('[data-profile-row="phone"]',"phone"),
+   bankAccounts:collectRows('[data-profile-row="bank"]',"bank"),
+   documents
+  };
+  profile.phone=profile.phones[0]?.number||"";
   if(editId){
    const existing=customers.find(c=>c.id===editId);
-   if(existing)Object.assign(existing,{name:data.name.trim(),type:data.type,phone:data.phone.trim(),email:data.email.trim(),status:data.status||"فعال",manager:data.manager||"تعیین نشده",notes:data.notes||""});
+   if(existing)Object.assign(existing,profile);
    persistDemoData();
-   customerFilter="";customerTypeFilter="";navigate("/customers/"+encodeURIComponent(editId));toast("تغییرات مشتری در همین مرورگر ذخیره شد.");
+   customerFilter="";customerTypeFilter="";navigate("/customers/"+encodeURIComponent(editId));
+   toast("پروفایل مشتری در همین مرورگر ذخیره شد.");
   }else{
    const id="CU-1405-"+String(313+customers.length-5).padStart(4,"0");
-   customers.unshift({id,name:data.name.trim(),type:data.type,phone:data.phone.trim(),email:data.email.trim(),status:data.status||"فعال",manager:data.manager||"تعیین نشده",notes:data.notes||""});
+   customers.unshift({id,...profile});
    persistDemoData();
-   customerFilter="";customerTypeFilter="";navigate("/customers");toast("مشتری در همین مرورگر ذخیره شد.");
+   customerFilter="";customerTypeFilter="";navigate("/customers/"+encodeURIComponent(id));
+   toast("پروفایل مشتری ایجاد و در همین مرورگر ذخیره شد.");
   }
  }
  if(e.target.id==="application-note-form"){
