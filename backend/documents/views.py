@@ -1,4 +1,4 @@
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import FileResponse, Http404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -12,6 +12,14 @@ from core.audit import record_audit
 from .models import Document
 from .permissions import IsStaffDocumentOperator
 from .serializers import DocumentReviewSerializer, DocumentSerializer, DocumentUploadSerializer
+
+
+def _delete_document_file(document):
+    if document.file and document.file.name:
+        try:
+            document.file.storage.delete(document.file.name)
+        except (OSError, ValueError):
+            pass
 
 
 class DocumentViewSet(viewsets.GenericViewSet):
@@ -66,20 +74,31 @@ class DocumentViewSet(viewsets.GenericViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        document = serializer.save()
-        record_audit(
-            request,
-            "document.uploaded",
-            actor=request.user,
-            entity_type="document",
-            entity_id=str(document.pk),
-            metadata={
-                "application_id": str(document.application_id),
-                "document_type": document.document_type,
-                "size_bytes": document.size_bytes,
-                "sha256": document.sha256,
-            },
-        )
+        try:
+            with transaction.atomic():
+                document = serializer.save()
+        except IntegrityError:
+            return Response(
+                {"detail": "تعارض در ثبت سند؛ نسخه یا شماره سند قبلاً ثبت شده است."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        try:
+            record_audit(
+                request,
+                "document.uploaded",
+                actor=request.user,
+                entity_type="document",
+                entity_id=str(document.pk),
+                metadata={
+                    "application_id": str(document.application_id),
+                    "document_type": document.document_type,
+                    "size_bytes": document.size_bytes,
+                    "sha256": document.sha256,
+                },
+            )
+        except Exception:
+            _delete_document_file(document)
+            raise
         output = DocumentSerializer(document, context=self.get_serializer_context())
         return Response(output.data, status=status.HTTP_201_CREATED)
 
@@ -159,21 +178,32 @@ class DocumentViewSet(viewsets.GenericViewSet):
             context=self.get_serializer_context(),
         )
         serializer.is_valid(raise_exception=True)
-        replacement = serializer.save()
-        record_audit(
-            request,
-            "document.replaced",
-            actor=request.user,
-            entity_type="document",
-            entity_id=str(replacement.pk),
-            metadata={
-                "previous_document_id": str(previous.pk),
-                "application_id": str(replacement.application_id),
-                "document_type": replacement.document_type,
-                "size_bytes": replacement.size_bytes,
-                "sha256": replacement.sha256,
-            },
-        )
+        try:
+            with transaction.atomic():
+                replacement = serializer.save()
+        except IntegrityError:
+            return Response(
+                {"detail": "این سند هم‌زمان توسط درخواست دیگری جایگزین شده است."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        try:
+            record_audit(
+                request,
+                "document.replaced",
+                actor=request.user,
+                entity_type="document",
+                entity_id=str(replacement.pk),
+                metadata={
+                    "previous_document_id": str(previous.pk),
+                    "application_id": str(replacement.application_id),
+                    "document_type": replacement.document_type,
+                    "size_bytes": replacement.size_bytes,
+                    "sha256": replacement.sha256,
+                },
+            )
+        except Exception:
+            _delete_document_file(replacement)
+            raise
         output = DocumentSerializer(replacement, context=self.get_serializer_context())
         return Response(output.data, status=status.HTTP_201_CREATED)
 
