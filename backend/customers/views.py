@@ -27,6 +27,18 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        user = self.request.user
+        if not user.is_superuser:
+            try:
+                role = user.profile.role
+            except (AttributeError, user.__class__.profile.RelatedObjectDoesNotExist):
+                return queryset.none()
+            if role != "system_admin":
+                if role in {"intake", "case_worker"}:
+                    queryset = queryset.filter(assigned_to=user)
+                elif role not in {"credit_approver", "finance", "auditor"}:
+                    return queryset.none()
+
         status_filter = self.request.query_params.get("status")
         customer_type = self.request.query_params.get("customer_type")
         search = normalize_digits(self.request.query_params.get("search", "")).strip()
