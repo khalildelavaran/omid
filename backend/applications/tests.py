@@ -86,6 +86,27 @@ class LoanApplicationApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_system_admin_cannot_bypass_credit_approver_role(self):
+        admin_user = User.objects.create_user(username="app-admin-no-decision", is_staff=True)
+        UserProfile.objects.create(user=admin_user, role=UserProfile.Role.SYSTEM_ADMIN)
+        self.application.status = LoanApplication.Status.AWAITING_APPROVAL
+        self.application.save(update_fields=["status"])
+        self.client.force_authenticate(admin_user)
+        response = self.client.patch(
+            f"/api/v1/applications/{self.application.pk}/",
+            {"status": "approved"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status, LoanApplication.Status.AWAITING_APPROVAL)
+        self.assertFalse(
+            ApplicationEvent.objects.filter(
+                application=self.application,
+                event_type=ApplicationEvent.EventType.STATUS_CHANGED,
+            ).exists()
+        )
+
     def test_rejection_requires_reason_and_persists_it_in_history(self):
         approver = User.objects.create_user(username="reject-approver", is_staff=True)
         UserProfile.objects.create(user=approver, role=UserProfile.Role.CREDIT_APPROVER)
