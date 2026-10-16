@@ -89,7 +89,7 @@ class DocumentUploadSerializer(serializers.Serializer):
     def create(self, validated_data):
         upload = validated_data.pop("file")
         details = self._upload_details
-        return Document.objects.create(
+        document = Document(
             **validated_data,
             file=upload,
             uploaded_by=self.context["request"].user,
@@ -98,6 +98,19 @@ class DocumentUploadSerializer(serializers.Serializer):
             size_bytes=details["size_bytes"],
             sha256=details["sha256"],
         )
+        try:
+            document.save()
+        except Exception:
+            # FileField writes bytes before the SQL INSERT; remove that file if
+            # the database rejects the row (e.g. a concurrent replacement).
+            field_file = document.file
+            if getattr(field_file, "_committed", False) and field_file.name:
+                try:
+                    field_file.storage.delete(field_file.name)
+                except (OSError, ValueError):
+                    pass
+            raise
+        return document
 
 
 class DocumentReviewSerializer(serializers.Serializer):
