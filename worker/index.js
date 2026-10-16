@@ -353,7 +353,7 @@ function printServiceReceipt(recordId){
 }
 function renderCustomerDetail(id){
  const c=customers.find(x=>x.id===id);if(!c)return '<div class="card">مشتری پیدا نشد.</div>';
- setMeta("مشتریان / پروفایل مشتری",'<button class="btn" data-link="/customers">← بازگشت به فهرست</button><button class="btn primary" data-link="/customers/'+encodeURIComponent(c.id)+'/edit">ویرایش پروفایل</button>'+'<button class="btn primary" data-link="/services/new?customerId='+encodeURIComponent(c.id)+'">＋ ثبت خدمت</button>');
+ setMeta("مشتریان / پروفایل مشتری",'<button class="btn" data-link="/customers">← بازگشت به فهرست</button><button class="btn primary" data-link="/customers/'+encodeURIComponent(c.id)+'/edit">ویرایش پروفایل</button><button class="btn primary" data-link="/applications/new?customerId='+encodeURIComponent(c.id)+'">＋ ایجاد پرونده تسهیلات</button><button class="btn" data-link="/guarantees/new?requesterId='+encodeURIComponent(c.id)+'">درخواست ضمانت</button><button class="btn" data-link="/services/new?customerId='+encodeURIComponent(c.id)+'">＋ ثبت خدمت</button>');
  const related=applications.filter(a=>a.customer===c.name);
  const addresses=Array.isArray(c.addresses)?c.addresses:[],phones=Array.isArray(c.phones)&&c.phones.length?c.phones:[{title:"شماره اصلی",number:c.phone||""}],banks=Array.isArray(c.bankAccounts)?c.bankAccounts:[],documents=Array.isArray(c.documents)?c.documents:[];
  const info=(label,value)=>'<div class="form-row"><label>'+label+'</label><div>'+esc(value||"—")+'</div></div>';
