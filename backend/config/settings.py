@@ -91,7 +91,10 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 # Never mount this private directory as a public static/media path.
-PRIVATE_DOCUMENT_ROOT = Path(env("PRIVATE_DOCUMENT_ROOT", default=str(BASE_DIR / "private_documents"))).resolve()
+PRIVATE_DOCUMENT_ROOT = Path(env("PRIVATE_DOCUMENT_ROOT", default=str(BASE_DIR / "private_documents")))
+if not PRIVATE_DOCUMENT_ROOT.is_absolute():
+    PRIVATE_DOCUMENT_ROOT = BASE_DIR / PRIVATE_DOCUMENT_ROOT
+PRIVATE_DOCUMENT_ROOT = PRIVATE_DOCUMENT_ROOT.resolve()
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
