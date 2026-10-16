@@ -31,6 +31,6 @@ class AuditEventViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(entity_id=entity_id[:80])
         if outcome in {"success", "failure", "denied"}:
             queryset = queryset.filter(outcome=outcome)
-        if actor_id.isdigit():
+        if actor_id.isdigit() and len(actor_id) <= 20:
             queryset = queryset.filter(actor_id=int(actor_id))
         return queryset
