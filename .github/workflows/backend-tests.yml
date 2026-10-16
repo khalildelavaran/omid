@@ -42,4 +42,4 @@ jobs:
         env:
           DJANGO_SECRET_KEY: ci-only-not-a-real-secret
           DJANGO_DEBUG: "True"
-        run: python backend/manage.py test
+        run: python backend/manage.py test core accounts customers applications tasks documents
