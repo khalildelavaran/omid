@@ -3,6 +3,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserProfile
+from core.models import AuditEvent
 from .models import Customer
 
 User = get_user_model()
@@ -66,6 +67,18 @@ class CustomerApiTests(TestCase):
         response = self.client.delete(f"/api/v1/customers/{self.customer.pk}/")
         self.assertEqual(response.status_code, 405)
         self.assertTrue(Customer.objects.filter(pk=self.customer.pk).exists())
+
+    def test_customer_update_creates_audit_event_without_record_values(self):
+        self.client.force_authenticate(self.staff_user)
+        response = self.client.patch(
+            f"/api/v1/customers/{self.customer.pk}/",
+            {"notes": "اطلاعات حساس نباید در audit کپی شود"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        event = AuditEvent.objects.get(action="customer.updated", entity_id=str(self.customer.pk))
+        self.assertIn("notes", event.metadata["updated_fields"])
+        self.assertNotIn("اطلاعات حساس نباید در audit کپی شود", str(event.metadata))
 
     def test_case_worker_cannot_read_another_workers_customer(self):
         other = User.objects.create_user(username="other", is_staff=True)
