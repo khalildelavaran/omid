@@ -44,3 +44,23 @@ class CustomerApiTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_search_supports_persian_digits_and_customer_name(self):
+        self.client.force_authenticate(self.staff_user)
+        response = self.client.get("/api/v1/customers/?search=OM-۰۰۰۰۰۱")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+
+    def test_customer_can_be_archived_without_deletion(self):
+        self.client.force_authenticate(self.staff_user)
+        response = self.client.post(f"/api/v1/customers/{self.customer.pk}/archive/")
+        self.assertEqual(response.status_code, 200)
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.status, Customer.Status.ARCHIVED)
+        self.assertTrue(Customer.objects.filter(pk=self.customer.pk).exists())
+
+    def test_customer_hard_delete_is_disabled(self):
+        self.client.force_authenticate(self.staff_user)
+        response = self.client.delete(f"/api/v1/customers/{self.customer.pk}/")
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(Customer.objects.filter(pk=self.customer.pk).exists())
