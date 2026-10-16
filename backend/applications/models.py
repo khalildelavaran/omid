@@ -2,6 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class LoanApplication(models.Model):
@@ -20,7 +21,7 @@ class LoanApplication(models.Model):
         CANCELLED = "cancelled", "لغو شده"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    application_number = models.CharField(max_length=32, unique=True, db_index=True)
+    application_number = models.CharField(max_length=32, unique=True, db_index=True, blank=True, default="")
     customer = models.ForeignKey("customers.Customer", on_delete=models.PROTECT, related_name="loan_applications")
     product_type = models.CharField(max_length=24, choices=ProductType.choices)
     requested_amount = models.DecimalField(max_digits=18, decimal_places=0)
@@ -38,6 +39,11 @@ class LoanApplication(models.Model):
             models.Index(fields=["status", "created_at"], name="apps_status_created_idx"),
             models.Index(fields=["assigned_to", "status"], name="apps_owner_status_idx"),
         ]
+
+    def save(self, *args, **kwargs):
+        if not self.application_number:
+            self.application_number = f"APP-{timezone.localdate():%Y%m%d}-{uuid.uuid4().hex[:8].upper()}"
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return self.application_number
