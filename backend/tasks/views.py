@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import transaction
 from django.db.models import Q
 from rest_framework import status, viewsets
@@ -33,7 +35,11 @@ class WorkflowTaskViewSet(viewsets.ModelViewSet):
         if priority in WorkflowTask.Priority.values:
             queryset = queryset.filter(priority=priority)
         if application:
-            queryset = queryset.filter(application_id=application)
+            try:
+                application_id = uuid.UUID(application)
+            except (ValueError, TypeError, AttributeError):
+                return queryset.none()
+            queryset = queryset.filter(application_id=application_id)
         return queryset
 
     @transaction.atomic
