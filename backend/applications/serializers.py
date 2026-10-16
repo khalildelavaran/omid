@@ -63,6 +63,19 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
         return value
 
     def validate_status(self, value):
+        request = self.context.get("request")
+        role = getattr(getattr(request.user, "profile", None), "role", None) if request else None
+        if request and request.user.is_superuser:
+            role = UserProfile.Role.SYSTEM_ADMIN
+        if role == UserProfile.Role.CREDIT_APPROVER:
+            if value not in {LoanApplication.Status.APPROVED, LoanApplication.Status.REJECTED}:
+                raise serializers.ValidationError("تأییدکننده اعتباری فقط می‌تواند تصمیم نهایی ثبت کند.")
+            if not self.instance or self.instance.status != LoanApplication.Status.AWAITING_APPROVAL:
+                raise serializers.ValidationError("تصمیم نهایی فقط برای پرونده در انتظار تأیید مجاز است.")
+        elif role in {UserProfile.Role.INTAKE, UserProfile.Role.CASE_WORKER}:
+            if value in {LoanApplication.Status.APPROVED, LoanApplication.Status.REJECTED}:
+                raise serializers.ValidationError("ثبت تصمیم نهایی اعتباری در اختیار تأییدکننده اعتباری است.")
+
         if not self.instance or value == self.instance.status:
             return value
         allowed = {
