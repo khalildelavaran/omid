@@ -118,6 +118,7 @@ let customerFilter = "";
 let customerTypeFilter = "";
 let applicationFilter = "";
 let applicationStatusFilter = "";
+let documentFilter = "";
 function esc(value){return String(value).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function statusPill(status){
  let cls = status.includes("انتظار") ? "wait" : status.includes("مدرک") || status.includes("بررسی") || status.includes("نیازمند") ? "doc" : status.includes("غیرفعال") || status.includes("رد") ? "bad" : status.includes("فعال") || status.includes("تأیید شده") ? "" : "gray";
@@ -139,13 +140,17 @@ function renderDashboard(){
 function renderCustomers(){
  setMeta("مشتریان",'<button class="btn" data-action="export-customers">⇩ خروجی CSV</button><button class="btn primary" data-link="/customers/new">＋ ثبت مشتری جدید</button>');
  if(location.pathname.endsWith("/new")) return renderCustomerForm();
+ const editMatch=location.pathname.match(/^\/customers\/([^/]+)\/edit$/);
+ if(editMatch) return renderCustomerForm(customers.find(c=>c.id===decodeURIComponent(editMatch[1]))||null);
  const filtered=customers.filter(c=>(c.name+" "+c.id+" "+c.phone+" "+c.manager+" "+c.email).toLowerCase().includes(customerFilter.toLowerCase())&&(!customerTypeFilter||c.type===customerTypeFilter));
  const rows=filtered.map(c=>'<tr><td class="id">'+esc(c.id)+'</td><td>'+esc(c.name)+'</td><td>'+esc(c.type)+'</td><td>'+esc(c.phone)+'</td><td>'+esc(c.manager)+'</td><td>'+statusPill(c.status)+'</td><td><button class="btn" data-action="customer-detail" data-id="'+esc(c.id)+'">جزئیات</button></td></tr>').join('');
- return '<div class="grid">'+stat("کل مشتریان",customers.length,"♙","","اطلاعات نمایشی")+stat("مشتریان حقیقی","۳","♧","blue","نمونه")+stat("مشتریان حقوقی","۲","▦","purple","نمونه")+stat("نیازمند بررسی","۱","◷","amber","نیازمند پیگیری")+'</div><div class="card table-card"><div class="card-head"><h2>فهرست مشتریان</h2><span class="muted">'+filtered.length+' رکورد</span></div><div class="table-tools"><input class="field" style="max-width:330px" id="customer-search" placeholder="نام، کد یا شماره تماس..." value="'+esc(customerFilter)+'"><select class="filter" id="customer-type"><option value="" '+(!customerTypeFilter?'selected':'')+'>همه انواع مشتری</option><option '+(customerTypeFilter==="حقیقی"?'selected':'')+'>حقیقی</option><option '+(customerTypeFilter==="حقوقی"?'selected':'')+'>حقوقی</option></select></div>'+table(["کد مشتری","نام / عنوان","نوع","شماره تماس","مسئول پرونده","وضعیت","عملیات"],rows||'<tr><td colspan="7" class="empty">مشتری‌ای مطابق جست‌وجو پیدا نشد.</td></tr>')+'</div>';
+ const realCount=customers.filter(c=>c.type==="حقیقی").length,legalCount=customers.filter(c=>c.type==="حقوقی").length,reviewCount=customers.filter(c=>c.status==="نیازمند بررسی").length;
+ return '<div class="grid">'+stat("کل مشتریان",customers.length,"♙","","داده‌های نمایشی")+stat("مشتریان حقیقی",realCount,"♧","blue","بر اساس فهرست")+stat("مشتریان حقوقی",legalCount,"▦","purple","بر اساس فهرست")+stat("نیازمند بررسی",reviewCount,"◷","amber","نیازمند پیگیری")+'</div><div class="card table-card"><div class="card-head"><h2>فهرست مشتریان</h2><span class="muted">'+filtered.length+' رکورد از '+customers.length+'</span></div><div class="table-tools"><input class="field" style="max-width:330px" id="customer-search" placeholder="نام، کد یا شماره تماس..." value="'+esc(customerFilter)+'"><select class="filter" id="customer-type"><option value="" '+(!customerTypeFilter?'selected':'')+'>همه انواع مشتری</option><option '+(customerTypeFilter==="حقیقی"?'selected':'')+'>حقیقی</option><option '+(customerTypeFilter==="حقوقی"?'selected':'')+'>حقوقی</option></select></div>'+table(["کد مشتری","نام / عنوان","نوع","شماره تماس","مسئول پرونده","وضعیت","عملیات"],rows||'<tr><td colspan="7" class="empty">مشتری‌ای مطابق جست‌وجو پیدا نشد.</td></tr>')+'</div>';
 }
-function renderCustomerForm(){
- setMeta("مشتریان / ثبت مشتری",'<button class="btn" data-link="/customers">← بازگشت به فهرست</button>');
- return '<div class="card"><h2>اطلاعات مشتری جدید</h2><div class="notice">اطلاعات در این نسخه فقط در حافظه همین صفحه نگهداری می‌شود و با بازخوانی صفحه پاک خواهد شد.</div><form id="customer-form"><div class="form-grid"><div class="form-row"><label>نوع مشتری *</label><select class="field" name="type" required><option value="حقیقی">حقیقی</option><option value="حقوقی">حقوقی</option></select></div><div class="form-row"><label>نام و نام خانوادگی / عنوان شرکت *</label><input class="field" name="name" required placeholder="نام کامل مشتری"></div><div class="form-row"><label>شماره تماس *</label><input class="field" name="phone" required inputmode="tel" placeholder="09... یا شماره ثابت"></div><div class="form-row"><label>پست الکترونیکی</label><input class="field" name="email" type="email" placeholder="name@example.com"></div><div class="form-row"><label>مسئول پرونده</label><select class="field" name="manager"><option>مریم رضایی</option><option>امیر کاظمی</option><option>آرمان صالحی</option></select></div><div class="form-row"><label>وضعیت</label><select class="field" name="status"><option>فعال</option><option>نیازمند بررسی</option></select></div><div class="form-row full"><label>یادداشت</label><textarea class="field" name="notes" placeholder="توضیحات تکمیلی"></textarea></div></div><div class="actions" style="margin-top:18px"><button class="btn primary" type="submit">ثبت نمایشی مشتری</button><button class="btn" type="reset">پاک کردن فرم</button></div></form></div>';
+function renderCustomerForm(customer=null){
+ const editing=!!customer;
+ setMeta(editing?"مشتریان / ویرایش مشتری":"مشتریان / ثبت مشتری",'<button class="btn" data-link="/customers">← بازگشت به فهرست</button>');
+ return '<div class="card"><h2>'+(editing?"ویرایش اطلاعات مشتری":"اطلاعات مشتری جدید")+'</h2><div class="notice">'+(editing?"تغییرات فقط در داده‌های نمونه همین نشست اعمال می‌شوند.":"اطلاعات در این نسخه فقط در حافظه همین صفحه نگهداری می‌شود و با بازخوانی صفحه پاک خواهد شد.")+'</div><form id="customer-form" data-edit-id="'+(editing?esc(customer.id):"")+'"><div class="form-grid"><div class="form-row"><label>نوع مشتری *</label><select class="field" name="type" required><option value="حقیقی" '+(customer?.type==="حقیقی"?"selected":"")+'>حقیقی</option><option value="حقوقی" '+(customer?.type==="حقوقی"?"selected":"")+'>حقوقی</option></select></div><div class="form-row"><label>نام و نام خانوادگی / عنوان شرکت *</label><input class="field" name="name" required value="'+esc(customer?.name||"")+'" placeholder="نام کامل مشتری"></div><div class="form-row"><label>شماره تماس *</label><input class="field" name="phone" required inputmode="tel" value="'+esc(customer?.phone||"")+'" placeholder="09... یا شماره ثابت"></div><div class="form-row"><label>پست الکترونیکی</label><input class="field" name="email" type="email" value="'+esc(customer?.email||"")+'" placeholder="name@example.com"></div><div class="form-row"><label>مسئول پرونده</label><select class="field" name="manager"><option '+(customer?.manager==="مریم رضایی"?"selected":"")+'>مریم رضایی</option><option '+(customer?.manager==="امیر کاظمی"?"selected":"")+'>امیر کاظمی</option><option '+(customer?.manager==="آرمان صالحی"?"selected":"")+'>آرمان صالحی</option></select></div><div class="form-row"><label>وضعیت</label><select class="field" name="status"><option '+(!customer||customer.status==="فعال"?"selected":"")+'>فعال</option><option '+(customer?.status==="نیازمند بررسی"?"selected":"")+'>نیازمند بررسی</option><option '+(customer?.status==="غیرفعال"?"selected":"")+'>غیرفعال</option></select></div><div class="form-row full"><label>یادداشت</label><textarea class="field" name="notes" placeholder="توضیحات تکمیلی">'+esc(customer?.notes||"")+'</textarea></div></div><div class="actions" style="margin-top:18px"><button class="btn primary" type="submit">'+(editing?"ذخیره تغییرات":"ثبت نمایشی مشتری")+'</button><button class="btn" type="reset">پاک کردن فرم</button></div></form></div>';
 }
 function renderApplications(){
  setMeta("درخواست‌های تسهیلات",'<button class="btn" data-action="export-applications">⇩ خروجی CSV</button><button class="btn primary" data-link="/applications/new">＋ پرونده جدید</button>');
@@ -164,8 +169,9 @@ function renderWorkflow(){
 }
 function renderDocuments(){
  setMeta("اسناد و مدارک",'<button class="btn primary" data-action="upload-demo">＋ افزودن مدرک</button>');
- const rows=docs.map(d=>'<tr><td>'+d.name+'</td><td class="id">'+d.case+'</td><td>'+d.type+'</td><td>'+statusPill(d.status)+'</td><td>'+d.date+'</td><td><button class="btn" data-action="document-detail" data-id="'+d.case+'">جزئیات</button></td></tr>').join('');
- return '<div class="grid">'+stat("کل مدارک","۲۴۶","▧","","شاخص نمونه")+stat("تأیید شده","۱۸۹","✓","","مدارک کنترل‌شده")+stat("در انتظار بررسی","۳۸","◷","amber","نیازمند بررسی کارشناسی")+stat("نیازمند تکمیل","۱۹","!","purple","پیگیری از مشتری")+'</div><div class="card table-card"><div class="card-head"><h2>فهرست مدارک اخیر</h2><span class="muted">اطلاعات نمایشی</span></div><div class="table-tools"><input class="field" id="document-search" style="max-width:350px" placeholder="جست‌وجوی نام مدرک یا شماره پرونده"></div>'+table(["عنوان مدرک","شماره پرونده","دسته‌بندی","وضعیت","تاریخ ثبت","عملیات"],rows)+'</div><div class="notice" style="margin-top:15px">بارگذاری فایل، اسکن بدافزار، سطح دسترسی و نگهداری امن اسناد پس از اتصال سرویس ذخیره‌سازی پیاده‌سازی می‌شود. فعلاً هیچ فایلی بارگذاری نمی‌شود.</div>';
+ const filtered=docs.filter(d=>(d.name+" "+d.case+" "+d.type+" "+d.status).toLowerCase().includes(documentFilter.toLowerCase()));
+ const rows=filtered.map(d=>'<tr><td>'+esc(d.name)+'</td><td class="id">'+esc(d.case)+'</td><td>'+esc(d.type)+'</td><td>'+statusPill(d.status)+'</td><td>'+esc(d.date)+'</td><td><button class="btn" data-action="document-detail" data-id="'+esc(d.case)+'">جزئیات</button></td></tr>').join('');
+ return '<div class="grid">'+stat("کل مدارک",docs.length,"▧","","داده‌های نمایشی")+stat("تأیید شده",docs.filter(d=>d.status==="تأیید شده").length,"✓","","بر اساس فهرست")+stat("در انتظار بررسی",docs.filter(d=>d.status==="در انتظار بررسی").length,"◷","amber","نیازمند بررسی کارشناسی")+stat("نیازمند تکمیل",docs.filter(d=>d.status==="نیازمند تکمیل").length,"!","purple","پیگیری از مشتری")+'</div><div class="card table-card"><div class="card-head"><h2>فهرست مدارک اخیر</h2><span class="muted">اطلاعات نمایشی</span></div><div class="table-tools"><input class="field" id="document-search" style="max-width:350px" placeholder="جست‌وجوی نام مدرک یا شماره پرونده" value="'+esc(documentFilter)+'"></div>'+table(["عنوان مدرک","شماره پرونده","دسته‌بندی","وضعیت","تاریخ ثبت","عملیات"],rows)+'</div><div class="notice" style="margin-top:15px">بارگذاری فایل، اسکن بدافزار، سطح دسترسی و نگهداری امن اسناد پس از اتصال سرویس ذخیره‌سازی پیاده‌سازی می‌شود. فعلاً هیچ فایلی بارگذاری نمی‌شود.</div>';
 }
 function renderReports(){
  setMeta("گزارش‌ها",'<button class="btn" data-action="export-report">⇩ خروجی CSV</button>');
@@ -196,7 +202,8 @@ function render(){
  document.querySelectorAll(".menu a").forEach(a=>a.classList.toggle("active",a.dataset.page===page));
  document.getElementById("global-search").placeholder=page==="customers"?"جست‌وجوی مشتری...":page==="applications"?"جست‌وجوی پرونده...":"جست‌وجو در صفحه...";
  let html="";
- if(path.startsWith("/customers/")&&!path.endsWith("/new")) html=renderCustomerDetail(decodeURIComponent(path.split("/")[2]||""));
+ if(path.startsWith("/customers/")&&path.endsWith("/edit")) html=renderCustomers();
+ else if(path.startsWith("/customers/")&&!path.endsWith("/new")) html=renderCustomerDetail(decodeURIComponent(path.split("/")[2]||""));
  else if(path.startsWith("/applications/")&&!path.endsWith("/new")) html=renderApplicationDetail(decodeURIComponent(path.split("/")[2]||""));
  else if(page==="dashboard")html=renderDashboard();
  else if(page==="customers")html=renderCustomers();
@@ -208,7 +215,7 @@ function render(){
  document.getElementById("content").innerHTML=html;
  document.getElementById("global-search").value="";
 }
-function navigate(path){history.pushState({}, "", path);customerFilter="";applicationFilter="";if(!path.startsWith("/customers"))customerTypeFilter="";if(!path.startsWith("/applications"))applicationStatusFilter="";render();window.scrollTo({top:0,behavior:"instant"});}
+function navigate(path){history.pushState({}, "", path);customerFilter="";applicationFilter="";if(!path.startsWith("/customers"))customerTypeFilter="";if(!path.startsWith("/applications"))applicationStatusFilter="";if(!path.startsWith("/documents"))documentFilter="";render();window.scrollTo({top:0,behavior:"instant"});}
 function toast(message){const el=document.getElementById("toast");el.textContent=message;el.style.display="block";clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>el.style.display="none",3200);}
 document.addEventListener("click",e=>{
  const link=e.target.closest("[data-link]");
@@ -236,7 +243,7 @@ document.addEventListener("click",e=>{
 document.addEventListener("input",e=>{
  if(e.target.id==="customer-search"){customerFilter=e.target.value;const pos=e.target.selectionStart;const html=renderCustomers();document.getElementById("content").innerHTML=html;const next=document.getElementById("customer-search");next.focus();next.setSelectionRange(pos,pos);}
  if(e.target.id==="application-search"){applicationFilter=e.target.value;const pos=e.target.selectionStart;const html=renderApplications();document.getElementById("content").innerHTML=html;const next=document.getElementById("application-search");next.focus();next.setSelectionRange(pos,pos);}
- if(e.target.id==="document-search"){const q=e.target.value;document.querySelectorAll("#content tbody tr").forEach(row=>row.hidden=!row.textContent.includes(q));}
+ if(e.target.id==="document-search"){documentFilter=e.target.value;const pos=e.target.selectionStart;document.getElementById("content").innerHTML=renderDocuments();const next=document.getElementById("document-search");next.focus();next.setSelectionRange(pos,pos);}
  if(e.target.id==="global-search"){
   const q=e.target.value.trim();
   if(currentPage==="customers"){customerFilter=q;document.getElementById("content").innerHTML=renderCustomers();}
@@ -256,9 +263,16 @@ document.addEventListener("submit",e=>{
  if(e.target.id==="customer-form"){
   e.preventDefault();
   const data=Object.fromEntries(new FormData(e.target).entries());
-  const id="CU-1405-"+String(313+customers.length-5).padStart(4,"0");
-  customers.unshift({id,name:data.name.trim(),type:data.type,phone:data.phone.trim(),email:data.email.trim(),status:data.status||"فعال",manager:data.manager||"تعیین نشده"});
-  customerFilter="";navigate("/customers");toast("مشتری به فهرست نمایشی اضافه شد؛ ثبت دائمی نیست.");
+  const editId=e.target.dataset.editId;
+  if(editId){
+   const existing=customers.find(c=>c.id===editId);
+   if(existing)Object.assign(existing,{name:data.name.trim(),type:data.type,phone:data.phone.trim(),email:data.email.trim(),status:data.status||"فعال",manager:data.manager||"تعیین نشده",notes:data.notes||""});
+   customerFilter="";customerTypeFilter="";navigate("/customers/"+encodeURIComponent(editId));toast("تغییرات مشتری در داده نمونه اعمال شد؛ ثبت دائمی نیست.");
+  }else{
+   const id="CU-1405-"+String(313+customers.length-5).padStart(4,"0");
+   customers.unshift({id,name:data.name.trim(),type:data.type,phone:data.phone.trim(),email:data.email.trim(),status:data.status||"فعال",manager:data.manager||"تعیین نشده",notes:data.notes||""});
+   customerFilter="";customerTypeFilter="";navigate("/customers");toast("مشتری به فهرست نمایشی اضافه شد؛ ثبت دائمی نیست.");
+  }
  }
  if(e.target.id==="application-form"){
   e.preventDefault();
