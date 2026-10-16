@@ -48,7 +48,7 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_update(self, serializer):
-        previous_status = self.get_object().status
+        previous_status = serializer.instance.status
         application = serializer.save()
         if application.status != previous_status:
             ApplicationEvent.objects.create(
