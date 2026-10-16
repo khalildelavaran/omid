@@ -23,6 +23,14 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        # Status-changing updates select the row for update. The update action
+        # is wrapped in a transaction below so concurrent credit decisions
+        # validate against the committed status, not a stale pre-read.
+        if (
+            self.request.method in {"PUT", "PATCH"}
+            and "status" in self.request.data
+        ):
+            queryset = queryset.select_for_update()
         user = self.request.user
         if not user.is_superuser:
             try:
@@ -57,6 +65,14 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
                 | Q(customer__organization_name__icontains=search)
             )
         return queryset
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+
+    @transaction.atomic
+    def partial_update(self, request, *args, **kwargs):
+        return super().partial_update(request, *args, **kwargs)
 
     @transaction.atomic
     def perform_create(self, serializer):
