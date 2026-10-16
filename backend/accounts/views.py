@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 
 from core.audit import record_audit
 from .models import UserProfile
-from .throttles import LoginRateThrottle
+from .throttles import LoginIPRateThrottle, LoginRateThrottle
 
 
 INTERNAL_ROLES = {
@@ -52,7 +52,7 @@ def csrf_token(request):
 class LoginView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
-    throttle_classes = [LoginRateThrottle]
+    throttle_classes = [LoginRateThrottle, LoginIPRateThrottle]
 
     def post(self, request):
         username = request.data.get("username")
