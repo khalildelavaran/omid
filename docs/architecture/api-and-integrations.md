@@ -35,7 +35,7 @@
 | پرونده‌ها | `/api/v1/cases/`, `/api/v1/cases/{id}/` |
 | تسهیلات | `/api/v1/applications/`, `/api/v1/applications/{id}/events/`, `/api/v1/applications/{id}/notes/` |
 | وظایف | `/api/v1/tasks/`, `/api/v1/tasks/{id}/`, `/api/v1/tasks/{id}/assign/` (واگذاری فقط برای مدیر سامانه) |
-| اسناد | `/api/v1/documents/`, `/api/v1/documents/{id}/download/`, `/api/v1/documents/{id}/review/` (فایل خصوصی، PDF/JPEG/PNG، حداکثر ۱۰ مگابایت) |
+| اسناد | `/api/v1/documents/`, `/api/v1/documents/{id}/download/`, `/api/v1/documents/{id}/review/`, `/api/v1/documents/{id}/replace/` (فایل خصوصی، PDF/JPEG/PNG، حداکثر ۱۰ مگابایت؛ جایگزینی نسخه بدون حذف سابقه) |
 | ممیزی | `/api/v1/audit-events/` (فقط‌خواندنی برای مدیر سامانه و حسابرس) |
 | گزارش | `/api/v1/reports/operations/` (هنوز پیاده‌سازی نشده) |
 
