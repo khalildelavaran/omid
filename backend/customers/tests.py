@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
 
+from accounts.models import UserProfile
 from .models import Customer
 
 User = get_user_model()
@@ -13,6 +14,7 @@ class CustomerApiTests(TestCase):
         self.staff_user = User.objects.create_user(
             username="operator", password="a-test-password-123", is_staff=True
         )
+        UserProfile.objects.create(user=self.staff_user, role=UserProfile.Role.CASE_WORKER)
         self.customer = Customer.objects.create(
             customer_number="OM-000001",
             customer_type=Customer.CustomerType.INDIVIDUAL,
@@ -25,7 +27,7 @@ class CustomerApiTests(TestCase):
         response = self.client.get("/api/v1/customers/")
         self.assertEqual(response.status_code, 403)
 
-    def test_staff_user_can_list_customers(self):
+    def test_staff_user_can_list_assigned_customers(self):
         self.client.force_authenticate(self.staff_user)
         response = self.client.get("/api/v1/customers/")
         self.assertEqual(response.status_code, 200)
@@ -64,3 +66,27 @@ class CustomerApiTests(TestCase):
         response = self.client.delete(f"/api/v1/customers/{self.customer.pk}/")
         self.assertEqual(response.status_code, 405)
         self.assertTrue(Customer.objects.filter(pk=self.customer.pk).exists())
+
+    def test_case_worker_cannot_read_another_workers_customer(self):
+        other = User.objects.create_user(username="other", is_staff=True)
+        UserProfile.objects.create(user=other, role=UserProfile.Role.CASE_WORKER)
+        self.client.force_authenticate(other)
+        response = self.client.get(f"/api/v1/customers/{self.customer.pk}/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_auditor_can_read_but_cannot_modify_customers(self):
+        auditor = User.objects.create_user(username="auditor", is_staff=True)
+        UserProfile.objects.create(user=auditor, role=UserProfile.Role.AUDITOR)
+        self.client.force_authenticate(auditor)
+        self.assertEqual(self.client.get("/api/v1/customers/").status_code, 200)
+        response = self.client.patch(
+            f"/api/v1/customers/{self.customer.pk}/",
+            {"notes": "unauthorized edit"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_user_without_business_role_is_denied(self):
+        unassigned = User.objects.create_user(username="unassigned", is_staff=True)
+        self.client.force_authenticate(unassigned)
+        self.assertEqual(self.client.get("/api/v1/customers/").status_code, 403)
