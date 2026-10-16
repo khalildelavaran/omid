@@ -163,6 +163,105 @@ class DocumentApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_rejected_document_can_be_replaced_without_deleting_history(self):
+        uploaded = self.upload_document()
+        previous_id = uploaded.data["id"]
+        rejected = self.client.post(
+            f"/api/v1/documents/{previous_id}/review/",
+            {"status": Document.Status.REJECTED, "note": "نسخه قبلی ناخوانا بود"},
+            format="json",
+        )
+        self.assertEqual(rejected.status_code, 200)
+
+        replacement_file = SimpleUploadedFile(
+            "new-identity.pdf", b"%PDF-1.7\\nCorrected document\\n%%EOF",
+            content_type="application/pdf",
+        )
+        response = self.client.post(
+            f"/api/v1/documents/{previous_id}/replace/",
+            {"file": replacement_file},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["replaces_document"], previous_id)
+        self.assertEqual(response.data["status"], Document.Status.PENDING_REVIEW)
+        self.assertEqual(response.data["application"], str(self.application.pk))
+        self.assertTrue(Document.objects.filter(pk=previous_id).exists())
+        old = Document.objects.get(pk=previous_id)
+        new = Document.objects.get(pk=response.data["id"])
+        self.assertEqual(old.status, Document.Status.REJECTED)
+        self.assertEqual(new.replaces_document_id, old.pk)
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action="document.replaced",
+                entity_id=str(new.pk),
+                actor=self.staff,
+                metadata__previous_document_id=str(old.pk),
+            ).exists()
+        )
+
+    def test_only_rejected_documents_can_be_replaced(self):
+        uploaded = self.upload_document()
+        replacement_file = SimpleUploadedFile(
+            "new-identity.pdf", VALID_PDF, content_type="application/pdf"
+        )
+        response = self.client.post(
+            f"/api/v1/documents/{uploaded.data['id']}/replace/",
+            {"file": replacement_file},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(Document.objects.count(), 1)
+
+    def test_superseded_document_cannot_be_replaced_twice(self):
+        uploaded = self.upload_document()
+        previous_id = uploaded.data["id"]
+        self.client.post(
+            f"/api/v1/documents/{previous_id}/review/",
+            {"status": Document.Status.REJECTED, "note": "نیازمند اصلاح"},
+            format="json",
+        )
+        first = self.client.post(
+            f"/api/v1/documents/{previous_id}/replace/",
+            {"file": SimpleUploadedFile("v2.pdf", VALID_PDF, content_type="application/pdf")},
+            format="multipart",
+        )
+        self.assertEqual(first.status_code, 201, first.data)
+
+        self.client.post(
+            f"/api/v1/documents/{first.data['id']}/review/",
+            {"status": Document.Status.REJECTED, "note": "باز هم نیازمند اصلاح"},
+            format="json",
+        )
+        second = self.client.post(
+            f"/api/v1/documents/{previous_id}/replace/",
+            {"file": SimpleUploadedFile("v3.pdf", VALID_PDF, content_type="application/pdf")},
+            format="multipart",
+        )
+        self.assertEqual(second.status_code, 409)
+
+    def test_worker_cannot_replace_another_workers_document(self):
+        uploaded = self.upload_document()
+        previous_id = uploaded.data["id"]
+        self.client.post(
+            f"/api/v1/documents/{previous_id}/review/",
+            {"status": Document.Status.REJECTED, "note": "نیازمند اصلاح"},
+            format="json",
+        )
+        other = User.objects.create_user(
+            username="document-replacement-outsider",
+            password="test-password-123",
+            is_staff=True,
+        )
+        UserProfile.objects.create(user=other, role=UserProfile.Role.CASE_WORKER)
+        self.client.force_authenticate(other)
+        response = self.client.post(
+            f"/api/v1/documents/{previous_id}/replace/",
+            {"file": SimpleUploadedFile("attempt.pdf", VALID_PDF, content_type="application/pdf")},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 404)
+
     def test_finance_role_can_read_but_cannot_review_documents(self):
         uploaded = self.upload_document()
         finance = User.objects.create_user(
