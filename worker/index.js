@@ -3,7 +3,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/favicon.ico") return new Response(null, { status: 204 });
 
-    const html = \`<!doctype html>
+    const html = `<!doctype html>
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -320,7 +320,7 @@ window.addEventListener("popstate",render);
 render();
 </script>
 </body>
-</html>\`;
+</html>`;
 
     return new Response(html, {
       headers: {
