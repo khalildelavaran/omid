@@ -105,6 +105,7 @@ const staff = [
  {name:"فرنوش شهبازی",role:"قراردادها",phone:"",status:"فعال"},
  {name:"ظریفه بساک",role:"پذیرش",phone:"",status:"فعال"}
 ];
+const bankCatalog = ["بانک رسالت","بانک ملی ایران","بانک سپه"];
 const docs = [
  {name:"فرم درخواست تسهیلات",case:"OM-1405-0248",type:"فرم",status:"تأیید شده",date:"۱۴۰۵/۰۷/۲۴"},
  {name:"تصویر کارت ملی",case:"OM-1405-0247",type:"هویتی",status:"در انتظار بررسی",date:"۱۴۰۵/۰۷/۲۳"},
@@ -122,11 +123,12 @@ function restoreDemoData(){
   if(Array.isArray(saved.tasks)){tasks.splice(0,tasks.length,...saved.tasks);}
   if(Array.isArray(saved.docs)){docs.splice(0,docs.length,...saved.docs);}
   if(Array.isArray(saved.staff)){staff.splice(0,staff.length,...saved.staff);}
+  if(Array.isArray(saved.bankCatalog)){bankCatalog.splice(0,bankCatalog.length,...saved.bankCatalog);}
  }catch(error){console.warn("Omid demo data could not be restored",error);}
 }
 function persistDemoData(){
  try{
-  localStorage.setItem(DEMO_STORAGE_KEY,JSON.stringify({customers,applications,tasks,docs,staff}));
+  localStorage.setItem(DEMO_STORAGE_KEY,JSON.stringify({customers,applications,tasks,docs,staff,bankCatalog}));
  }catch(error){console.warn("Omid demo data could not be saved",error);toast("ذخیره محلی در این مرورگر در دسترس نیست.");}
 }
 restoreDemoData();
@@ -180,7 +182,7 @@ function profileRows(items,kind){
   const remove='<button type="button" class="btn danger" data-action="remove-profile-row" aria-label="حذف ردیف">حذف</button>';
   if(kind==="address")return '<div class="profile-repeat-row" data-profile-row="address"><div class="form-row"><label>عنوان آدرس</label><input class="field" name="addressTitle" value="'+esc(item.title||"")+'" placeholder="خانه، محل کار..."></div><div class="form-row"><label>آدرس کامل</label><textarea class="field" name="addressValue" rows="2" placeholder="استان، شهر، خیابان، پلاک...">'+esc(item.value||"")+'</textarea></div><div class="form-row"><label>کدپستی</label><input class="field" name="addressPostal" inputmode="numeric" value="'+esc(item.postalCode||"")+'" placeholder="کدپستی این آدرس"></div>'+remove+'</div>';
   if(kind==="phone")return '<div class="profile-repeat-row phone-row" data-profile-row="phone"><div class="form-row"><label>عنوان شماره</label><input class="field" name="phoneTitle" value="'+esc(item.title||"")+'" placeholder="موبایل اصلی، منزل..."></div><div class="form-row"><label>شماره تماس</label><input class="field" name="phoneValue" inputmode="tel" value="'+esc(item.number||"")+'" placeholder="شماره تماس"></div>'+remove+'</div>';
-  return '<div class="profile-repeat-row" data-profile-row="bank"><div class="form-row"><label>نام بانک</label><input class="field" name="bankName" value="'+esc(item.bank||"")+'" placeholder="نام بانک"></div><div class="form-row"><label>شماره حساب</label><input class="field" name="bankNumber" inputmode="numeric" value="'+esc(item.accountNumber||"")+'" placeholder="شماره حساب"></div><div class="form-row"><label>عنوان حساب (اختیاری)</label><input class="field" name="bankTitle" value="'+esc(item.title||"")+'" placeholder="مثلاً حساب تسهیلات"></div>'+remove+'</div>';
+  const knownBank=bankCatalog.includes(item.bank||""); const bankOptions=bankCatalog.map(b=>'<option value="'+esc(b)+'" '+(item.bank===b?"selected":"")+' >'+esc(b)+'</option>').join(""); const legacyBank=item.bank&&!knownBank?'<option selected value="'+esc(item.bank)+'">'+esc(item.bank)+' (ثبت قبلی)</option>':""; return '<div class="profile-repeat-row" data-profile-row="bank"><div class="form-row"><label>نام بانک</label><select class="field" name="bankName" required><option value="">انتخاب بانک</option>'+bankOptions+legacyBank+'</select></div><div class="form-row"><label>شماره حساب</label><input class="field" name="bankNumber" inputmode="numeric" value="'+esc(item.accountNumber||"")+'" placeholder="شماره حساب"></div><div class="form-row"><label>عنوان حساب (اختیاری)</label><input class="field" name="bankTitle" value="'+esc(item.title||"")+'" placeholder="مثلاً حساب تسهیلات"></div>'+remove+'</div>';
  }).join("");
 }
 function customerDocumentRow(doc={}){
@@ -243,9 +245,10 @@ function renderReports(){
 }
 function renderSettings(){
  const roleOptions=["مدیر","معاون","قراردادها","پذیرش"];
+ const bankRows=bankCatalog.map((bank,index)=>'<tr><td>'+esc(bank)+'</td><td><button type="button" class="btn danger" data-action="delete-bank" data-bank-index="'+index+'">حذف</button></td></tr>').join("");
  const staffRows=staff.map((person,index)=>'<tr><td>'+esc(person.name)+'</td><td><span class="pill">'+esc(person.role)+'</span></td><td>'+esc(person.phone||"—")+'</td><td>'+esc(person.status||"فعال")+'</td><td><button type="button" class="btn danger" data-action="delete-staff" data-staff-index="'+index+'">حذف</button></td></tr>').join("");
  setMeta("تنظیمات",'<button class="btn primary" data-action="save-settings">ذخیره ترجیحات</button>');
- return '<div class="section" style="margin-top:0"><div class="card"><div class="card-head"><h2>کارمندان و نقش‌ها</h2><span class="muted">'+staff.length+' کارمند</span></div><div class="notice">در این بخش می‌توانید فهرست کارکنان و نقش سازمانی آن‌ها را مدیریت کنید. این نقش‌ها فعلاً برای دسته‌بندی و نمایش هستند و هنوز مجوزهای واقعی دسترسی را کنترل نمی‌کنند.</div><div class="table-wrap">'+table(["نام کارمند","نقش","شماره تماس","وضعیت","عملیات"],staffRows)+'</div><section class="profile-section"><h2>افزودن کارمند</h2><form id="staff-form"><div class="form-grid"><div class="form-row"><label>نام و نام خانوادگی *</label><input class="field" name="staffName" required placeholder="نام کامل کارمند"></div><div class="form-row"><label>نقش سازمانی *</label><select class="field" name="staffRole" required>'+roleOptions.map(r=>'<option>'+r+'</option>').join("")+'</select></div><div class="form-row"><label>شماره تماس (اختیاری)</label><input class="field" name="staffPhone" inputmode="tel" placeholder="شماره تماس"></div><div class="form-row"><label>وضعیت</label><select class="field" name="staffStatus"><option>فعال</option><option>غیرفعال</option></select></div></div><div class="actions" style="margin-top:14px"><button class="btn primary" type="submit">＋ ثبت کارمند</button></div></form></section></div><div class="card"><h2>تنظیمات عمومی</h2><div class="setting-row"><div>عنوان سامانه<small>نامی که در پنل نمایش داده می‌شود</small></div><input class="field" style="max-width:220px" value="سامانه امید"></div><div class="setting-row"><div>زبان رابط کاربری<small>زبان نمایش پنل</small></div><select class="field" style="max-width:180px"><option>فارسی</option></select></div><div class="setting-row"><div>منطقه زمانی<small>زمان نمایش رویدادها</small></div><select class="field" style="max-width:180px"><option>Asia/Tehran</option></select></div></div><div class="card"><h2>وضعیت اتصال</h2><div class="setting-row"><div>رابط برنامه‌نویسی (API)<small>اتصال به بک‌اند Django</small></div>'+statusPill("هنوز متصل نیست")+'</div><div class="setting-row"><div>پایگاه داده<small>PostgreSQL</small></div>'+statusPill("در انتظار اتصال")+'</div><div class="setting-row"><div>درگاه پیامک<small>قابل تنظیم در مرحله بعد</small></div>'+statusPill("پیکربندی نشده")+'</div></div></div><div class="card" style="margin-top:15px"><h2>امنیت و دسترسی</h2><div class="notice">قبل از استفاده عملیاتی، ورود امن، نقش‌ها و مجوزها، ثبت رویدادهای ممیزی و مدیریت اسرار محیط باید تکمیل و آزموده شوند.</div><div class="setting-row"><div>احراز هویت کاربران<small>ورود و نشست امن</small></div><span class="pill wait">در حال توسعه</span></div><div class="setting-row"><div>ثبت رویدادهای ممیزی<small>ردیابی تغییرات پرونده‌ها</small></div><span class="pill wait">در حال توسعه</span></div></div>';
+ return '<div class="section" style="margin-top:0"><div class="card"><div class="card-head"><h2>بانک‌های قابل انتخاب</h2><span class="muted">'+bankCatalog.length+' بانک</span></div><p class="muted">بانک‌های این فهرست در بخش حساب‌های بانکی پروفایل مشتری قابل انتخاب هستند.</p><div class="table-wrap">'+table(["نام بانک","عملیات"],bankRows)+'</div><section class="profile-section"><h2>افزودن بانک</h2><form id="bank-catalog-form"><div class="form-grid"><div class="form-row"><label>نام بانک *</label><input class="field" name="bankCatalogName" required maxlength="100" placeholder="مثلاً بانک تجارت"></div></div><div class="actions" style="margin-top:14px"><button class="btn primary" type="submit">＋ افزودن بانک</button></div></form></section></div><div class="card"><div class="card-head"><h2>کارمندان و نقش‌ها</h2><span class="muted">'+staff.length+' کارمند</span></div><div class="notice">در این بخش می‌توانید فهرست کارکنان و نقش سازمانی آن‌ها را مدیریت کنید. این نقش‌ها فعلاً برای دسته‌بندی و نمایش هستند و هنوز مجوزهای واقعی دسترسی را کنترل نمی‌کنند.</div><div class="table-wrap">'+table(["نام کارمند","نقش","شماره تماس","وضعیت","عملیات"],staffRows)+'</div><section class="profile-section"><h2>افزودن کارمند</h2><form id="staff-form"><div class="form-grid"><div class="form-row"><label>نام و نام خانوادگی *</label><input class="field" name="staffName" required placeholder="نام کامل کارمند"></div><div class="form-row"><label>نقش سازمانی *</label><select class="field" name="staffRole" required>'+roleOptions.map(r=>'<option>'+r+'</option>').join("")+'</select></div><div class="form-row"><label>شماره تماس (اختیاری)</label><input class="field" name="staffPhone" inputmode="tel" placeholder="شماره تماس"></div><div class="form-row"><label>وضعیت</label><select class="field" name="staffStatus"><option>فعال</option><option>غیرفعال</option></select></div></div><div class="actions" style="margin-top:14px"><button class="btn primary" type="submit">＋ ثبت کارمند</button></div></form></section></div><div class="card"><h2>تنظیمات عمومی</h2><div class="setting-row"><div>عنوان سامانه<small>نامی که در پنل نمایش داده می‌شود</small></div><input class="field" style="max-width:220px" value="سامانه امید"></div><div class="setting-row"><div>زبان رابط کاربری<small>زبان نمایش پنل</small></div><select class="field" style="max-width:180px"><option>فارسی</option></select></div><div class="setting-row"><div>منطقه زمانی<small>زمان نمایش رویدادها</small></div><select class="field" style="max-width:180px"><option>Asia/Tehran</option></select></div></div><div class="card"><h2>وضعیت اتصال</h2><div class="setting-row"><div>رابط برنامه‌نویسی (API)<small>اتصال به بک‌اند Django</small></div>'+statusPill("هنوز متصل نیست")+'</div><div class="setting-row"><div>پایگاه داده<small>PostgreSQL</small></div>'+statusPill("در انتظار اتصال")+'</div><div class="setting-row"><div>درگاه پیامک<small>قابل تنظیم در مرحله بعد</small></div>'+statusPill("پیکربندی نشده")+'</div></div></div><div class="card" style="margin-top:15px"><h2>امنیت و دسترسی</h2><div class="notice">قبل از استفاده عملیاتی، ورود امن، نقش‌ها و مجوزها، ثبت رویدادهای ممیزی و مدیریت اسرار محیط باید تکمیل و آزموده شوند.</div><div class="setting-row"><div>احراز هویت کاربران<small>ورود و نشست امن</small></div><span class="pill wait">در حال توسعه</span></div><div class="setting-row"><div>ثبت رویدادهای ممیزی<small>ردیابی تغییرات پرونده‌ها</small></div><span class="pill wait">در حال توسعه</span></div></div>';
 }
 function renderCustomerDetail(id){
  const c=customers.find(x=>x.id===id);if(!c)return '<div class="card">مشتری پیدا نشد.</div>';
@@ -335,6 +338,10 @@ document.addEventListener("click",e=>{
     }
    }
   }
+  if(act==="delete-bank"){
+   const idx=Number(action.dataset.bankIndex);
+   if(Number.isInteger(idx)&&idx>=0&&idx<bankCatalog.length){const removed=bankCatalog.splice(idx,1)[0];persistDemoData();document.getElementById("content").innerHTML=renderSettings();toast("بانک از فهرست انتخاب حذف شد. حساب‌های قبلی مشتریان تغییر نمی‌کنند.");}
+  }
   if(act==="delete-staff"){
    const idx=Number(action.dataset.staffIndex);
    if(Number.isInteger(idx)&&idx>=0&&idx<staff.length){
@@ -391,6 +398,14 @@ document.addEventListener("change",e=>{
  }
 });
 document.addEventListener("submit",async e=>{
+ if(e.target.id==="bank-catalog-form"){
+  e.preventDefault();
+  const data=Object.fromEntries(new FormData(e.target).entries());
+  const name=String(data.bankCatalogName||"").trim();
+  if(!name)return;
+  if(bankCatalog.some(b=>b.toLocaleLowerCase("fa")===name.toLocaleLowerCase("fa"))){toast("این بانک قبلاً در فهرست ثبت شده است.");return;}
+  bankCatalog.push(name);persistDemoData();document.getElementById("content").innerHTML=renderSettings();toast("بانک جدید به فهرست انتخاب اضافه شد.");
+ }
  if(e.target.id==="staff-form"){
   e.preventDefault();
   const data=Object.fromEntries(new FormData(e.target).entries());
