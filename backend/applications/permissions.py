@@ -20,7 +20,15 @@ class IsStaffApplicationOperator(BasePermission):
         role = self._role(user)
         if role not in self.read_roles:
             return False
-        return request.method in SAFE_METHODS or role in self.write_roles
+        if request.method in SAFE_METHODS or role in self.write_roles:
+            return True
+        # Credit approvers may submit a narrowly-scoped decision only.
+        return (
+            role == "credit_approver"
+            and request.method == "PATCH"
+            and set(request.data.keys()).issubset({"status", "status_note"})
+            and "status" in request.data
+        )
 
     def has_object_permission(self, request, view, obj):
         role = self._role(request.user)
@@ -28,4 +36,13 @@ class IsStaffApplicationOperator(BasePermission):
             return True
         if role in {"intake", "case_worker"}:
             return obj.assigned_to_id == request.user.id
+        if role == "credit_approver":
+            return (
+                request.method in SAFE_METHODS
+                or (
+                    request.method == "PATCH"
+                    and set(request.data.keys()).issubset({"status", "status_note"})
+                    and "status" in request.data
+                )
+            )
         return request.method in SAFE_METHODS
