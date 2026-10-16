@@ -53,25 +53,34 @@ tbody tr[hidden]{display:none}
 @media(max-width:650px){.table-card{padding:12px}.table-tools>*{flex:1 1 100%;max-width:none!important}.actions .btn{flex:1}.setting-row{align-items:flex-start;flex-wrap:wrap}.setting-row .field{max-width:100%!important}}
 
 
-/* پروفایل مشتری: فرم فشرده و خوانا برای کاهش اسکرول */
-.customer-profile-edit-card{padding:14px 16px}
-.customer-profile-edit-card>.notice{padding:7px 10px;margin-bottom:9px;font-size:12px;line-height:1.55}
-.customer-profile-form .profile-section{padding-top:10px;margin-top:11px}
-.customer-profile-form .profile-section>h2,.customer-profile-form .profile-section-head h2{font-size:16px;margin-bottom:9px}
-.customer-profile-form .form-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:9px 12px}
-.customer-profile-form .form-row{gap:4px;min-width:0}
-.customer-profile-form .form-row label{font-size:13px;line-height:1.45;color:#43556d}
-.customer-profile-form .field{font-size:13px;padding:7px 9px;min-height:35px;border-radius:7px}
-.customer-profile-form textarea.field{min-height:55px}
+/* پروفایل مشتری: چیدمان چندستونه، خوانا و کم‌اسکرول برای کار روزمره */
+.customer-profile-edit-card{padding:12px 14px}
+.customer-profile-edit-card>.card-head{margin-bottom:8px}
+.customer-profile-edit-card>.notice{padding:6px 9px;margin-bottom:7px;font-size:12px;line-height:1.45}
+.customer-profile-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px;row-gap:0;align-items:start}
+.customer-profile-form>.profile-section:first-child{grid-column:1/-1}
+.customer-profile-form .profile-section{padding-top:8px;margin-top:8px;min-width:0}
+.customer-profile-form .profile-section>h2,.customer-profile-form .profile-section-head h2{font-size:17px;line-height:1.4;margin-bottom:7px}
+.customer-profile-form .form-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:7px 10px}
+.customer-profile-form .form-row{gap:3px;min-width:0}
+.customer-profile-form .form-row label{font-size:14px;line-height:1.4;color:#354a63}
+.customer-profile-form .field{font-size:14px;padding:6px 9px;min-height:37px;border-radius:7px}
+.customer-profile-form textarea.field{min-height:48px}
 .customer-profile-form .form-row.full{grid-column:1/-1}
-.customer-profile-form .profile-repeat-list{gap:7px}
-.customer-profile-form .profile-repeat-row,.customer-profile-form .profile-doc-row{padding:8px;gap:8px}
-.customer-profile-form .profile-section-head{margin-bottom:8px}
-.customer-profile-form .check-line{min-height:35px;font-size:13px}
-.customer-profile-form>.actions{margin-top:12px!important}
+.customer-profile-form .profile-repeat-list{gap:6px}
+.customer-profile-form .profile-repeat-row,.customer-profile-form .profile-doc-row{padding:7px;gap:7px}
+.customer-profile-form .profile-section-head{margin-bottom:6px}
+.customer-profile-form .profile-section-head .btn{padding:7px 9px;font-size:12px}
+.customer-profile-form .check-line{min-height:34px;font-size:14px}
+.customer-profile-form .profile-doc-list{gap:7px}
+.customer-profile-form .profile-doc-row{grid-template-columns:1fr 1fr;align-items:end}
+.customer-profile-form .profile-doc-row .profile-doc-preview{grid-column:1/-1}
+.customer-profile-form>.actions{grid-column:1/-1;margin-top:10px!important;position:sticky;bottom:0;z-index:4;background:#ffffffed;backdrop-filter:blur(8px);padding:8px 0;border-top:1px solid #edf1f6}
+.customer-profile-form .muted{font-size:11px}
 @media(max-width:1200px){.customer-profile-form .form-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:1000px){.customer-profile-form{grid-template-columns:1fr}.customer-profile-form>.profile-section:first-child{grid-column:auto}.customer-profile-form .form-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:850px){.customer-profile-form .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:650px){.customer-profile-edit-card{padding:12px}.customer-profile-form .form-grid{grid-template-columns:1fr}.customer-profile-form .form-row.full{grid-column:auto}.customer-profile-form .profile-repeat-row,.customer-profile-form .profile-repeat-row.phone-row,.customer-profile-form .profile-doc-row{grid-template-columns:1fr}}
+@media(max-width:650px){.customer-profile-edit-card{padding:12px}.customer-profile-form .form-grid{grid-template-columns:1fr}.customer-profile-form .form-row.full{grid-column:auto}.customer-profile-form .profile-repeat-row,.customer-profile-form .profile-repeat-row.phone-row,.customer-profile-form .profile-doc-row{grid-template-columns:1fr}.customer-profile-form .profile-doc-row .profile-doc-preview{grid-column:auto}.customer-profile-form>.actions{position:static;background:transparent;backdrop-filter:none}}
 </style>
 </head>
 <body>
