@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import transaction
 from django.db.models import Q
 from rest_framework import status, viewsets
@@ -41,7 +43,11 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
         if status_filter:
             queryset = queryset.filter(status=status_filter)
         if customer:
-            queryset = queryset.filter(customer_id=customer)
+            try:
+                customer_id = uuid.UUID(customer)
+            except (ValueError, TypeError, AttributeError):
+                return queryset.none()
+            queryset = queryset.filter(customer_id=customer_id)
         if search:
             queryset = queryset.filter(
                 Q(application_number__icontains=search)
