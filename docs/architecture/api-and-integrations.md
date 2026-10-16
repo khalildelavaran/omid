@@ -35,11 +35,11 @@
 | پرونده‌ها | `/api/v1/cases/`, `/api/v1/cases/{id}/` |
 | تسهیلات | `/api/v1/applications/`, `/api/v1/applications/{id}/events/`, `/api/v1/applications/{id}/notes/` |
 | وظایف | `/api/v1/tasks/`, `/api/v1/tasks/{id}/`, `/api/v1/tasks/{id}/assign/` (واگذاری فقط برای مدیر سامانه) |
-| اسناد | `/api/v1/documents/`, `/api/v1/documents/{id}/download/` |
+| اسناد | `/api/v1/documents/`, `/api/v1/documents/{id}/download/`, `/api/v1/documents/{id}/review/` (فایل خصوصی، PDF/JPEG/PNG، حداکثر ۱۰ مگابایت) |
 | ممیزی | `/api/v1/audit-events/` (فقط‌خواندنی برای مدیر سامانه و حسابرس) |
 | گزارش | `/api/v1/reports/operations/` (هنوز پیاده‌سازی نشده) |
 
-مسیرهای هویت، مشتریان، تسهیلات، وظایف و ممیزی در backend فعلی پیاده‌سازی شده‌اند؛ مسیرهای اسناد و گزارش هنوز پیشنهادی‌اند.
+مسیرهای هویت، مشتریان، تسهیلات، وظایف، ممیزی و API اولیه اسناد در backend فعلی پیاده‌سازی شده‌اند؛ مسیرهای گزارش هنوز پیشنهادی‌اند.
 
 ## 3. یکپارچه‌سازی پیامک
 
