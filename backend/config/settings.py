@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "customers",
     "applications",
     "tasks",
+    "documents",
 ]
 
 MIDDLEWARE = [
@@ -89,6 +90,8 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+# Never mount this private directory as a public static/media path.
+PRIVATE_DOCUMENT_ROOT = Path(env("PRIVATE_DOCUMENT_ROOT", default=str(BASE_DIR / "private_documents"))).resolve()
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
