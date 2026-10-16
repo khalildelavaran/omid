@@ -183,7 +183,7 @@ class DocumentApiTests(TestCase):
             format="multipart",
         )
         self.assertEqual(response.status_code, 201, response.data)
-        self.assertEqual(response.data["replaces_document"], previous_id)
+        self.assertEqual(str(response.data["replaces_document"]), previous_id)
         self.assertEqual(response.data["status"], Document.Status.PENDING_REVIEW)
         self.assertEqual(response.data["application"], str(self.application.pk))
         self.assertTrue(Document.objects.filter(pk=previous_id).exists())
