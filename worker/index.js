@@ -33,6 +33,22 @@ header{display:flex;justify-content:space-between;align-items:center;gap:16px;ma
 footer{text-align:center;padding:24px 0 8px;color:#a0acbb;font-size:10px}
 @media(max-width:1100px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.section{grid-template-columns:1fr}}
 @media(max-width:650px){.app{display:block}aside{width:100%;min-height:0;padding:14px}.brand{padding:0 8px 14px}.menu{display:flex;overflow-x:auto}.menu a{white-space:nowrap;padding:10px 12px}.side-foot{display:none}main{padding:20px 12px}h1{font-size:21px}.grid{gap:9px}.card{padding:14px}.k-value{font-size:24px}.k-icon{width:32px;height:32px}.top{width:100%}.search{width:100%;flex:1}.form-grid{grid-template-columns:1fr}.form-row.full{grid-column:auto}.page-meta{align-items:flex-start}}
+/* تکمیل تجربه کاربری */
+:root{scroll-behavior:smooth}
+.card{transition:box-shadow .18s ease,border-color .18s ease}
+.card:hover{border-color:#dce6ef;box-shadow:0 8px 24px #172d4609}
+.btn{transition:transform .15s ease,background .15s ease,border-color .15s ease}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible,.menu a:focus-visible,.icon-btn:focus-visible{outline:3px solid #52d6c477;outline-offset:2px}
+input,select,textarea{color:#243850}
+input::placeholder,textarea::placeholder{color:#a1adbc}
+.table-wrap{border-radius:10px}
+tbody tr[hidden]{display:none}
+.empty-state{padding:34px 18px;text-align:center;color:#8795a8}
+.empty-state strong{display:block;color:#52657c;font-size:13px;margin-bottom:6px}
+.toast{max-width:min(420px,calc(100vw - 32px));line-height:1.8}
+@media(max-width:650px){.table-card{padding:12px}.table-tools>*{flex:1 1 100%;max-width:none!important}.actions .btn{flex:1}.setting-row{align-items:flex-start;flex-wrap:wrap}.setting-row .field{max-width:100%!important}}
+
 </style>
 </head>
 <body>
@@ -102,7 +118,7 @@ let customerFilter = "";
 let applicationFilter = "";
 function esc(value){return String(value).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function statusPill(status){
- let cls = status.includes("انتظار") ? "wait" : status.includes("مدرک") || status.includes("بررسی") ? "doc" : status.includes("غیرفعال") || status.includes("رد") ? "bad" : status.includes("فعال") || status.includes("تأیید شده") ? "" : "gray";
+ let cls = status.includes("انتظار") ? "wait" : status.includes("مدرک") || status.includes("بررسی") || status.includes("نیازمند") ? "doc" : status.includes("غیرفعال") || status.includes("رد") ? "bad" : status.includes("فعال") || status.includes("تأیید شده") ? "" : "gray";
  return '<span class="pill '+cls+'">'+esc(status)+'</span>';
 }
 function setMeta(text,button){
@@ -127,7 +143,7 @@ function renderCustomers(){
 }
 function renderCustomerForm(){
  setMeta("مشتریان / ثبت مشتری",'<button class="btn" data-link="/customers">← بازگشت به فهرست</button>');
- return '<div class="card"><h2>اطلاعات مشتری جدید</h2><div class="notice">این فرم در نسخه فعلی نمایشی است. پس از اتصال API، اطلاعات در پایگاه داده ثبت خواهد شد.</div><form id="customer-form"><div class="form-grid"><div class="form-row"><label>نوع مشتری *</label><select class="field" name="type" required><option value="حقیقی">حقیقی</option><option value="حقوقی">حقوقی</option></select></div><div class="form-row"><label>نام و نام خانوادگی / عنوان شرکت *</label><input class="field" name="name" required placeholder="نام کامل مشتری"></div><div class="form-row"><label>شماره تماس *</label><input class="field" name="phone" required inputmode="tel" placeholder="09... یا شماره ثابت"></div><div class="form-row"><label>پست الکترونیکی</label><input class="field" name="email" type="email" placeholder="name@example.com"></div><div class="form-row"><label>مسئول پرونده</label><select class="field" name="manager"><option>مریم رضایی</option><option>امیر کاظمی</option><option>آرمان صالحی</option></select></div><div class="form-row"><label>وضعیت</label><select class="field" name="status"><option>فعال</option><option>نیازمند بررسی</option></select></div><div class="form-row full"><label>یادداشت</label><textarea class="field" name="notes" placeholder="توضیحات تکمیلی"></textarea></div></div><div class="actions" style="margin-top:18px"><button class="btn primary" type="submit">ثبت نمایشی مشتری</button><button class="btn" type="reset">پاک کردن فرم</button></div></form></div>';
+ return '<div class="card"><h2>اطلاعات مشتری جدید</h2><div class="notice">اطلاعات در این نسخه فقط در حافظه همین صفحه نگهداری می‌شود و با بازخوانی صفحه پاک خواهد شد.</div><form id="customer-form"><div class="form-grid"><div class="form-row"><label>نوع مشتری *</label><select class="field" name="type" required><option value="حقیقی">حقیقی</option><option value="حقوقی">حقوقی</option></select></div><div class="form-row"><label>نام و نام خانوادگی / عنوان شرکت *</label><input class="field" name="name" required placeholder="نام کامل مشتری"></div><div class="form-row"><label>شماره تماس *</label><input class="field" name="phone" required inputmode="tel" placeholder="09... یا شماره ثابت"></div><div class="form-row"><label>پست الکترونیکی</label><input class="field" name="email" type="email" placeholder="name@example.com"></div><div class="form-row"><label>مسئول پرونده</label><select class="field" name="manager"><option>مریم رضایی</option><option>امیر کاظمی</option><option>آرمان صالحی</option></select></div><div class="form-row"><label>وضعیت</label><select class="field" name="status"><option>فعال</option><option>نیازمند بررسی</option></select></div><div class="form-row full"><label>یادداشت</label><textarea class="field" name="notes" placeholder="توضیحات تکمیلی"></textarea></div></div><div class="actions" style="margin-top:18px"><button class="btn primary" type="submit">ثبت نمایشی مشتری</button><button class="btn" type="reset">پاک کردن فرم</button></div></form></div>';
 }
 function renderApplications(){
  setMeta("درخواست‌های تسهیلات",'<button class="btn primary" data-link="/applications/new">＋ پرونده جدید</button>');
@@ -138,7 +154,7 @@ function renderApplications(){
 }
 function renderApplicationForm(){
  setMeta("درخواست‌ها / پرونده جدید",'<button class="btn" data-link="/applications">← بازگشت به فهرست</button>');
- return '<div class="card"><h2>ایجاد پرونده تسهیلات</h2><div class="notice">فرم اولیه جهت طراحی گردش ثبت درخواست است؛ ارسال اطلاعات تا زمان اتصال API انجام نمی‌شود.</div><form id="application-form"><div class="form-grid"><div class="form-row"><label>مشتری *</label><select class="field" name="customer" required><option value="">انتخاب مشتری</option>'+customers.map(c=>'<option>'+c.name+'</option>').join('')+'</select></div><div class="form-row"><label>نوع تسهیلات *</label><select class="field" name="type" required><option>سرمایه در گردش</option><option>تسهیلات شخصی</option><option>اعتباری شرکتی</option><option>خرید تجهیزات</option></select></div><div class="form-row"><label>مبلغ درخواستی (تومان) *</label><input class="field" name="amount" type="number" min="1" required placeholder="مثلاً 250000000"></div><div class="form-row"><label>مدت بازپرداخت (ماه)</label><input class="field" name="term" type="number" min="1" max="240" placeholder="مثلاً 36"></div><div class="form-row"><label>مسئول پرونده</label><select class="field" name="manager"><option>مریم رضایی</option><option>امیر کاظمی</option><option>آرمان صالحی</option></select></div><div class="form-row"><label>وضعیت اولیه</label><select class="field" name="status"><option>در حال بررسی</option><option>تکمیل مدارک</option></select></div><div class="form-row full"><label>توضیحات / هدف تسهیلات</label><textarea class="field" name="notes" placeholder="شرح مختصر درخواست"></textarea></div></div><div class="actions" style="margin-top:18px"><button class="btn primary" type="submit">ثبت نمایشی پرونده</button><button class="btn" type="reset">پاک کردن فرم</button></div></form></div>';
+ return '<div class="card"><h2>ایجاد پرونده تسهیلات</h2><div class="notice">ثبت آزمایشی در همین صفحه انجام می‌شود؛ داده‌ها هنوز به سرور یا پایگاه داده ارسال نمی‌شوند.</div><form id="application-form"><div class="form-grid"><div class="form-row"><label>مشتری *</label><select class="field" name="customer" required><option value="">انتخاب مشتری</option>'+customers.map(c=>'<option>'+c.name+'</option>').join('')+'</select></div><div class="form-row"><label>نوع تسهیلات *</label><select class="field" name="type" required><option>سرمایه در گردش</option><option>تسهیلات شخصی</option><option>اعتباری شرکتی</option><option>خرید تجهیزات</option></select></div><div class="form-row"><label>مبلغ درخواستی (تومان) *</label><input class="field" name="amount" type="number" min="1" required placeholder="مثلاً 250000000"></div><div class="form-row"><label>مدت بازپرداخت (ماه)</label><input class="field" name="term" type="number" min="1" max="240" placeholder="مثلاً 36"></div><div class="form-row"><label>مسئول پرونده</label><select class="field" name="manager"><option>مریم رضایی</option><option>امیر کاظمی</option><option>آرمان صالحی</option></select></div><div class="form-row"><label>وضعیت اولیه</label><select class="field" name="status"><option>در حال بررسی</option><option>تکمیل مدارک</option></select></div><div class="form-row full"><label>توضیحات / هدف تسهیلات</label><textarea class="field" name="notes" placeholder="شرح مختصر درخواست"></textarea></div></div><div class="actions" style="margin-top:18px"><button class="btn primary" type="submit">ثبت نمایشی پرونده</button><button class="btn" type="reset">پاک کردن فرم</button></div></form></div>';
 }
 function renderWorkflow(){
  setMeta("گردش کار",'<button class="btn" data-action="refresh">↻ به‌روزرسانی</button>');
@@ -238,11 +254,18 @@ document.addEventListener("change",e=>{
 });
 document.addEventListener("submit",e=>{
  if(e.target.id==="customer-form"){
-  e.preventDefault();const data=Object.fromEntries(new FormData(e.target).entries());
-  toast("فرم مشتری بررسی شد؛ برای ثبت دائمی باید API متصل شود.");e.target.reset();
+  e.preventDefault();
+  const data=Object.fromEntries(new FormData(e.target).entries());
+  const id="CU-1405-"+String(313+customers.length-5).padStart(4,"0");
+  customers.unshift({id,name:data.name.trim(),type:data.type,phone:data.phone.trim(),email:data.email.trim(),status:data.status||"فعال",manager:data.manager||"تعیین نشده"});
+  customerFilter="";navigate("/customers");toast("مشتری به فهرست نمایشی اضافه شد؛ ثبت دائمی نیست.");
  }
  if(e.target.id==="application-form"){
-  e.preventDefault();toast("فرم پرونده بررسی شد؛ هنوز در پایگاه داده ثبت نمی‌شود.");e.target.reset();
+  e.preventDefault();
+  const data=Object.fromEntries(new FormData(e.target).entries());
+  const id="OM-1405-"+String(249+applications.length-5).padStart(4,"0");
+  applications.unshift({id,customer:data.customer,type:data.type,amount:Number(data.amount).toLocaleString("fa-IR")+" تومان",status:data.status||"در حال بررسی",manager:data.manager||"تعیین نشده",date:new Intl.DateTimeFormat("fa-IR").format(new Date())});
+  applicationFilter="";navigate("/applications");toast("پرونده به فهرست نمایشی اضافه شد؛ ثبت دائمی نیست.");
  }
 });
 document.getElementById("notifications").addEventListener("click",()=>toast("اعلان جدیدی در نسخه نمایشی وجود ندارد."));
