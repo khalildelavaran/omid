@@ -3,6 +3,7 @@ import uuid
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
+import documents.models
 import documents.storage
 
 
@@ -21,7 +22,7 @@ class Migration(migrations.Migration):
                 ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ("document_number", models.CharField(blank=True, default="", max_length=32, unique=True)),
                 ("document_type", models.CharField(choices=[("identity", "مدرک هویتی"), ("address", "مدرک نشانی"), ("income", "مدرک درآمد"), ("bank_statement", "گردش حساب"), ("contract", "قرارداد"), ("other", "سایر مدارک")], max_length=24)),
-                ("file", models.FileField(storage=documents.storage.PrivateDocumentStorage(), upload_to="documents.models.private_document_path")),
+                ("file", models.FileField(storage=documents.storage.PrivateDocumentStorage(), upload_to=documents.models.private_document_path)),
                 ("original_filename", models.CharField(max_length=255)),
                 ("content_type", models.CharField(max_length=100)),
                 ("size_bytes", models.PositiveBigIntegerField()),
