@@ -3,7 +3,9 @@ import uuid
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import status, viewsets
+from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -44,7 +46,36 @@ class WorkflowTaskViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError, AttributeError):
                 return queryset.none()
             queryset = queryset.filter(application_id=application_id)
+
+        overdue_filter = self.request.query_params.get("overdue", "").strip().lower()
+        if overdue_filter not in {"", "true", "false"}:
+            raise ValidationError({"overdue": "مقدار مجاز برای overdue برابر true یا false است."})
+        terminal_statuses = [WorkflowTask.Status.COMPLETED, WorkflowTask.Status.CANCELLED]
+        now = timezone.now()
+        if overdue_filter == "true":
+            queryset = queryset.filter(due_at__lt=now).exclude(status__in=terminal_statuses)
+        elif overdue_filter == "false":
+            queryset = queryset.filter(
+                Q(due_at__isnull=True)
+                | Q(due_at__gte=now)
+                | Q(status__in=terminal_statuses)
+            )
         return queryset
+
+    @action(detail=False, methods=["get"], url_path="summary")
+    def summary(self, request):
+        queryset = self.get_queryset()
+        now = timezone.now()
+        terminal_statuses = [WorkflowTask.Status.COMPLETED, WorkflowTask.Status.CANCELLED]
+        return Response({
+            "total": queryset.count(),
+            "open": queryset.filter(status=WorkflowTask.Status.OPEN).count(),
+            "in_progress": queryset.filter(status=WorkflowTask.Status.IN_PROGRESS).count(),
+            "completed": queryset.filter(status=WorkflowTask.Status.COMPLETED).count(),
+            "cancelled": queryset.filter(status=WorkflowTask.Status.CANCELLED).count(),
+            "overdue": queryset.filter(due_at__lt=now).exclude(status__in=terminal_statuses).count(),
+            "due_today": queryset.filter(due_at__date=timezone.localdate()).exclude(status__in=terminal_statuses).count(),
+        })
 
     @transaction.atomic
     def perform_create(self, serializer):
