@@ -136,6 +136,36 @@ class AccountEndpointTests(TestCase):
         with self.assertRaises(ValueError):
             event.delete()
 
+
+    @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"password_change": "1/minute"}})
+    def test_password_change_is_rate_limited_and_failed_attempt_is_audited(self):
+        cache.clear()
+        self.client.force_login(self.user)
+        token = self.csrf()
+        payload = {"current_password": "incorrect", "new_password": "Another-12345-Strong!"}
+        first = self.client.post(
+            "/api/v1/auth/change-password/",
+            payload,
+            format="json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(first.status_code, 400)
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action="auth.password_change",
+                outcome="failure",
+                actor=self.user,
+            ).exists()
+        )
+        second = self.client.post(
+            "/api/v1/auth/change-password/",
+            payload,
+            format="json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(second.status_code, 429)
+        cache.clear()
+
     @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"login": "2/minute", "login_ip": "20/minute"}})
     def test_login_is_rate_limited(self):
         cache.clear()
