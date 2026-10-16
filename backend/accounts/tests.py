@@ -136,7 +136,7 @@ class AccountEndpointTests(TestCase):
         with self.assertRaises(ValueError):
             event.delete()
 
-    @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"login": "2/minute"}})
+    @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"login": "2/minute", "login_ip": "20/minute"}})
     def test_login_is_rate_limited(self):
         cache.clear()
         token = self.csrf()
