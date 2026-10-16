@@ -5,6 +5,11 @@ from django.db import models
 from django.utils import timezone
 
 
+class GuaranteeRequestQuerySet(models.QuerySet):
+    def delete(self):
+        raise ValueError("Guarantee requests cannot be physically deleted.")
+
+
 class GuaranteeRequest(models.Model):
     class Status(models.TextChoices):
         REGISTERED = "registered", "ثبت‌شده"
@@ -13,6 +18,8 @@ class GuaranteeRequest(models.Model):
         REJECTED = "rejected", "رد شده"
         FULFILLED = "fulfilled", "انجام‌شده"
         CANCELLED = "cancelled", "لغو شده"
+
+    objects = GuaranteeRequestQuerySet.as_manager()
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     request_number = models.CharField(max_length=32, unique=True, blank=True, default="")
