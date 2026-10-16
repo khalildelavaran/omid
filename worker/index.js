@@ -1,84 +1,38 @@
 export default {
   async fetch(request) {
     const url = new URL(request.url);
-    if (url.pathname === "/favicon.ico") {
-      return new Response(null, { status: 204 });
-    }
+    if (url.pathname === "/favicon.ico") return new Response(null, { status: 204 });
 
-    const html = `<!doctype html>
+    const html = \`<!doctype html>
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#12243a">
-<meta name="description" content="داشبورد مدیریتی سامانه امید برای مدیریت مشتریان و پرونده‌های تسهیلات">
-<title>سامانه امید | داشبورد مدیریتی</title>
+<meta name="description" content="سامانه مدیریت مشتریان و پرونده‌های تسهیلات امید">
+<title>سامانه امید</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{font-family:Vazirmatn,Tahoma,sans-serif;color:#192b45;background:#f4f7fb;font-synthesis:none;text-rendering:optimizeLegibility}
-*{box-sizing:border-box}
-body{margin:0;min-height:100vh}
-button,input{font:inherit}
-.app{min-height:100vh;display:flex}
-aside{width:248px;background:#12243a;color:#d3deec;padding:27px 17px;flex-shrink:0;display:flex;flex-direction:column}
-.brand{font-size:25px;font-weight:800;color:#fff;padding:0 12px 31px;display:flex;align-items:center;gap:10px}
-.brand-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;background:#52d6c4;color:#12243a;font-size:20px}
-.brand span{color:#52d6c4}
-.menu{display:grid;gap:7px}
-.menu a{padding:13px 15px;border-radius:10px;color:#c6d2e2;text-decoration:none;font-size:13px;transition:background .15s}
-.menu a.active,.menu a:hover{background:#203d56;color:#fff}
-.menu a.active{border-right:3px solid #52d6c4}
+*{box-sizing:border-box}body{margin:0;min-height:100vh}button,input,select,textarea{font:inherit}button,a{ -webkit-tap-highlight-color:transparent}
+.app{min-height:100vh;display:flex}aside{width:245px;background:#12243a;color:#d3deec;padding:25px 16px;flex-shrink:0;display:flex;flex-direction:column;min-height:100vh}
+.brand{font-size:25px;font-weight:800;color:#fff;padding:0 12px 28px;display:flex;align-items:center;gap:10px}.brand-mark{width:35px;height:35px;display:grid;place-items:center;border-radius:11px;background:#52d6c4;color:#12243a;font-size:20px}.brand span{color:#52d6c4}
+.menu{display:grid;gap:6px}.menu a{padding:12px 14px;border-radius:10px;color:#c6d2e2;text-decoration:none;font-size:13px;transition:background .15s}.menu a.active,.menu a:hover{background:#203d56;color:#fff}.menu a.active{border-right:3px solid #52d6c4}
 .side-foot{margin-top:auto;padding:22px 12px 5px;font-size:11px;color:#8ea1b8;line-height:2}
-main{flex:1;min-width:0;padding:30px clamp(16px,3vw,42px);max-width:1700px;margin-inline:auto}
-header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:29px;flex-wrap:wrap}
-h1{font-size:25px;margin:0 0 7px;font-weight:800;letter-spacing:-.5px}
-.sub{color:#8492a6;font-size:12px}
-.top{display:flex;align-items:center;gap:12px}
-.search-wrap{position:relative}
-.search{border:1px solid #e1e8f0;background:#fff;padding:12px 15px;border-radius:11px;width:min(290px,65vw);font-size:12px;outline:none}
-.search:focus{border-color:#52bfae;box-shadow:0 0 0 3px #52d6c422}
-.icon-btn{border:1px solid #e1e8f0;background:#fff;border-radius:11px;width:42px;height:42px;cursor:pointer;color:#60728a}
-.avatar{background:#d9f5ef;color:#167d70;border-radius:50%;width:42px;height:42px;display:grid;place-items:center;font-weight:700;font-size:15px}
-.date{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid #e6ecf3;padding:9px 12px;border-radius:10px;color:#65758b;font-size:11px;margin-bottom:22px}
-.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px}
-.card{background:#fff;border:1px solid #e8edf4;border-radius:16px;padding:20px;box-shadow:0 4px 15px #172d4605;min-width:0}
-.k-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.k-label{color:#75849a;font-size:12px}
-.k-icon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:#e8f8f5;color:#168b7a;font-size:18px}
-.k-icon.blue{background:#edf1ff;color:#6578d6}.k-icon.amber{background:#fff4e2;color:#b77a16}.k-icon.purple{background:#f3edff;color:#8866c7}
-.k-value{font-size:29px;font-weight:800;margin:13px 0 8px;letter-spacing:-1px}
-.trend{font-size:10px;color:#15977e}.muted{font-size:10px;color:#98a4b5}
-.section{display:grid;grid-template-columns:1.45fr 1fr;gap:15px;margin-top:18px}
-h2{font-size:14px;margin:0 0 20px;font-weight:700}
-.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.select{font-size:11px;color:#728198;border:1px solid #e5ebf2;background:#fff;border-radius:8px;padding:7px 10px}
-.bars{height:145px;display:flex;align-items:end;justify-content:space-around;gap:12px;border-bottom:1px solid #e8edf4;padding:0 5px}
-.bar{width:10%;max-width:43px;border-radius:7px 7px 2px 2px;background:linear-gradient(180deg,#54d8c5,#279f9e);position:relative}
-.bar:hover{filter:brightness(.95)}
-.months{display:flex;justify-content:space-around;color:#8a97a9;font-size:10px;padding-top:10px;gap:3px}
-.status-row{display:flex;justify-content:space-between;align-items:center;margin:16px 0;font-size:12px}
-.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-left:8px}
-.progress{height:7px;background:#edf1f6;border-radius:10px;overflow:hidden}
-.progress span{display:block;height:100%;border-radius:10px}
-.table-card{margin-top:18px}
-.table-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:11px}
-th{text-align:right;color:#8492a6;font-weight:500;background:#f8fafc}
-td,th{padding:14px 12px;border-bottom:1px solid #edf1f6}
-tbody tr:last-child td{border-bottom:0}
-tbody tr:hover{background:#fbfcfe}
-.pill{display:inline-block;border-radius:20px;padding:6px 10px;font-size:10px;background:#e6f7f3;color:#14816f}
-.pill.wait{background:#fff3dc;color:#a76a0b}.pill.doc{background:#edf1ff;color:#586cc0}
-.case-id{font-weight:700;color:#425b78}
-.tasks{display:grid;gap:14px}
-.task{display:flex;align-items:flex-start;gap:10px;font-size:12px;line-height:1.8}
-.task-check{width:17px;height:17px;border:1px solid #cdd8e5;border-radius:5px;flex-shrink:0;margin-top:2px}
-.task small{display:block;color:#91a0b3;font-size:10px}
+main{flex:1;min-width:0;padding:28px clamp(15px,3vw,40px);max-width:1750px;margin-inline:auto;width:100%}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:25px;flex-wrap:wrap}h1{font-size:24px;margin:0 0 6px;font-weight:800;letter-spacing:-.4px}.sub{color:#8492a6;font-size:12px}.top{display:flex;align-items:center;gap:10px}.search{border:1px solid #e1e8f0;background:#fff;padding:11px 14px;border-radius:11px;width:min(280px,60vw);font-size:12px;outline:none}.search:focus,input:focus,select:focus,textarea:focus{border-color:#52bfae;box-shadow:0 0 0 3px #52d6c422;outline:none}.icon-btn{border:1px solid #e1e8f0;background:#fff;border-radius:11px;width:41px;height:41px;cursor:pointer;color:#60728a}.avatar{background:#d9f5ef;color:#167d70;border-radius:50%;width:41px;height:41px;display:grid;place-items:center;font-weight:700;font-size:15px}
+.page-meta{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}.crumb{font-size:11px;color:#94a0b0}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid #dfe7ef;background:#fff;color:#52657c;border-radius:9px;padding:9px 13px;font-size:11px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}.btn:hover{background:#f8fbfd}.btn.primary{background:#168d7d;color:#fff;border-color:#168d7d}.btn.primary:hover{background:#117969}.btn.danger{color:#b64d4d}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card{background:#fff;border:1px solid #e8edf4;border-radius:15px;padding:19px;box-shadow:0 4px 15px #172d4605;min-width:0}.k-head{display:flex;justify-content:space-between;align-items:center;gap:8px}.k-label{color:#75849a;font-size:12px}.k-icon{width:37px;height:37px;border-radius:12px;display:grid;place-items:center;background:#e8f8f5;color:#168b7a;font-size:17px}.k-icon.blue{background:#edf1ff;color:#6578d6}.k-icon.amber{background:#fff4e2;color:#b77a16}.k-icon.purple{background:#f3edff;color:#8866c7}.k-value{font-size:27px;font-weight:800;margin:12px 0 7px;letter-spacing:-.5px}.trend{font-size:10px;color:#15977e}.muted{font-size:10px;color:#98a4b5}
+.section{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-top:16px}h2{font-size:14px;margin:0 0 17px;font-weight:700}.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px}.card-head h2{margin:0}.table-card{margin-top:16px}.table-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}.field,.filter{border:1px solid #e1e8f0;background:#fff;border-radius:9px;padding:10px 12px;font-size:11px;color:#42556e;min-width:0}.field{width:100%}.filter{min-width:145px}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:11px}th{text-align:right;color:#8492a6;font-weight:500;background:#f8fafc}td,th{padding:13px 12px;border-bottom:1px solid #edf1f6}tbody tr:last-child td{border-bottom:0}tbody tr:hover{background:#fbfcfe}.pill{display:inline-block;border-radius:20px;padding:5px 9px;font-size:10px;background:#e6f7f3;color:#14816f}.pill.wait{background:#fff3dc;color:#a76a0b}.pill.doc{background:#edf1ff;color:#586cc0}.pill.bad{background:#fdecec;color:#b34444}.pill.gray{background:#eef1f5;color:#64748b}.id{font-weight:700;color:#425b78}.empty{padding:28px;text-align:center;color:#8a97a9;font-size:12px}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.form-row{display:grid;gap:7px}.form-row label{font-size:11px;color:#60718a}.form-row.full{grid-column:1/-1}textarea.field{resize:vertical;min-height:85px}.notice{padding:12px 14px;background:#f0faf8;border:1px solid #d5f0ea;color:#277b70;border-radius:10px;font-size:11px;line-height:1.9;margin-bottom:16px}
+.bars{height:145px;display:flex;align-items:end;justify-content:space-around;gap:12px;border-bottom:1px solid #e8edf4;padding:0 5px}.bar{width:10%;max-width:43px;border-radius:7px 7px 2px 2px;background:linear-gradient(180deg,#54d8c5,#279f9e)}.months{display:flex;justify-content:space-around;color:#8a97a9;font-size:10px;padding-top:10px;gap:3px}.status-row{display:flex;justify-content:space-between;align-items:center;margin:15px 0;font-size:12px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-left:8px}.progress{height:7px;background:#edf1f6;border-radius:10px;overflow:hidden}.progress span{display:block;height:100%;border-radius:10px}
+.task-list{display:grid;gap:0}.task{display:flex;align-items:flex-start;gap:10px;padding:13px 0;border-bottom:1px solid #edf1f6;font-size:12px;line-height:1.8}.task:last-child{border:0}.task input{margin-top:5px;accent-color:#168d7d}.task small{display:block;color:#91a0b3;font-size:10px}
+.setting-row{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:15px 0;border-bottom:1px solid #edf1f6;font-size:12px}.setting-row:last-child{border:0}.setting-row small{display:block;color:#91a0b3;margin-top:4px;font-size:10px}
+.toast{position:fixed;bottom:22px;left:22px;background:#12243a;color:white;border-radius:10px;padding:12px 16px;font-size:12px;box-shadow:0 8px 25px #12243a33;z-index:20;display:none}
 footer{text-align:center;padding:24px 0 8px;color:#a0acbb;font-size:10px}
 @media(max-width:1100px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.section{grid-template-columns:1fr}}
-@media(max-width:650px){.app{display:block}aside{width:100%;padding:15px}.brand{padding:0 8px 15px}.menu{display:flex;overflow-x:auto}.menu a{white-space:nowrap;padding:10px 12px}.side-foot{display:none}main{padding:22px 13px}h1{font-size:21px}.grid{gap:10px}.card{padding:15px}.k-value{font-size:25px}.k-icon{width:32px;height:32px}.top{width:100%}.search-wrap{flex:1}.search{width:100%}.date{margin-bottom:16px}}
+@media(max-width:650px){.app{display:block}aside{width:100%;min-height:0;padding:14px}.brand{padding:0 8px 14px}.menu{display:flex;overflow-x:auto}.menu a{white-space:nowrap;padding:10px 12px}.side-foot{display:none}main{padding:20px 12px}h1{font-size:21px}.grid{gap:9px}.card{padding:14px}.k-value{font-size:24px}.k-icon{width:32px;height:32px}.top{width:100%}.search{width:100%;flex:1}.form-grid{grid-template-columns:1fr}.form-row.full{grid-column:auto}.page-meta{align-items:flex-start}}
 </style>
 </head>
 <body>
@@ -86,100 +40,223 @@ footer{text-align:center;padding:24px 0 8px;color:#a0acbb;font-size:10px}
 <aside>
   <div class="brand"><div class="brand-mark">ا</div><div>امید<span> .</span></div></div>
   <nav class="menu" aria-label="منوی اصلی">
-    <a class="active" href="#dashboard">▦ &nbsp; داشبورد</a>
-    <a href="#customers">♙ &nbsp; مشتریان</a>
-    <a href="#cases">▤ &nbsp; درخواست‌های تسهیلات</a>
-    <a href="#tasks">↻ &nbsp; گردش کار</a>
-    <a href="#cases">▧ &nbsp; اسناد و مدارک</a>
-    <a href="#reports">▥ &nbsp; گزارش‌ها</a>
-    <a href="#settings">⚙ &nbsp; تنظیمات</a>
+    <a href="/" data-page="dashboard">▦ &nbsp; داشبورد</a>
+    <a href="/customers" data-page="customers">♙ &nbsp; مشتریان</a>
+    <a href="/applications" data-page="applications">▤ &nbsp; درخواست‌های تسهیلات</a>
+    <a href="/workflow" data-page="workflow">↻ &nbsp; گردش کار</a>
+    <a href="/documents" data-page="documents">▧ &nbsp; اسناد و مدارک</a>
+    <a href="/reports" data-page="reports">▥ &nbsp; گزارش‌ها</a>
+    <a href="/settings" data-page="settings">⚙ &nbsp; تنظیمات</a>
   </nav>
   <div class="side-foot">سامانه مدیریت مشتریان<br>نسخه نمایشی · ۱۴۰۵</div>
 </aside>
-<main id="dashboard">
+<main>
 <header>
-  <div><h1>داشبورد مدیریتی</h1><div class="sub">سلام، به سامانه امید خوش آمدید</div></div>
-  <div class="top">
-    <div class="search-wrap"><input id="search" class="search" placeholder="جست‌وجوی مشتری یا پرونده..." aria-label="جست‌وجو"></div>
-    <button class="icon-btn" type="button" aria-label="اعلان‌ها" title="اعلان‌ها">♧</button>
-    <div class="avatar" title="مدیر سامانه">ا</div>
-  </div>
+  <div><h1 id="page-title">داشبورد مدیریتی</h1><div class="sub" id="page-subtitle">نمای کلی وضعیت مشتریان و پرونده‌های تسهیلات</div></div>
+  <div class="top"><input id="global-search" class="search" placeholder="جست‌وجو در صفحه..." aria-label="جست‌وجو در صفحه"><button class="icon-btn" type="button" aria-label="اعلان‌ها" title="اعلان‌ها" id="notifications">♧</button><div class="avatar" title="مدیر سامانه">ا</div></div>
 </header>
-<div class="date">◷ &nbsp; امروز، ۲۴ مهر ۱۴۰۵</div>
-<div class="grid">
-  <div class="card"><div class="k-head"><span class="k-label">مشتریان ثبت‌شده</span><span class="k-icon">♙</span></div><div class="k-value">۲٬۴۸۶</div><div class="trend">↗ ۱۲٪ <span class="muted">نسبت به ماه قبل</span></div></div>
-  <div class="card"><div class="k-head"><span class="k-label">پرونده‌های در جریان</span><span class="k-icon blue">▤</span></div><div class="k-value">۳۲۸</div><div class="trend">↗ ۲۴ پرونده جدید <span class="muted">این هفته</span></div></div>
-  <div class="card"><div class="k-head"><span class="k-label">در انتظار تأیید</span><span class="k-icon amber">◷</span></div><div class="k-value">۴۷</div><div class="muted">نیازمند بررسی کارشناسی</div></div>
-  <div class="card"><div class="k-head"><span class="k-label">تکمیل مدارک</span><span class="k-icon purple">✓</span></div><div class="k-value">۸۶٪</div><div class="trend">↗ ۴٪ <span class="muted">نسبت به ماه قبل</span></div></div>
-</div>
-<div class="section" id="reports">
-  <div class="card">
-    <div class="card-head"><h2>روند درخواست‌های تسهیلات</h2><span class="select">شش ماه اخیر⌄</span></div>
-    <div class="bars" aria-label="نمودار نمایشی درخواست‌ها">
-      <div class="bar" style="height:38%"></div><div class="bar" style="height:55%"></div><div class="bar" style="height:45%"></div><div class="bar" style="height:72%"></div><div class="bar" style="height:63%"></div><div class="bar" style="height:91%"></div>
-    </div>
-    <div class="months"><span>اردیبهشت</span><span>خرداد</span><span>تیر</span><span>مرداد</span><span>شهریور</span><span>مهر</span></div>
-  </div>
-  <div class="card">
-    <h2>وضعیت پرونده‌ها</h2>
-    <div class="status-row"><span><i class="dot" style="background:#35b9a5"></i>در حال بررسی</span><b>۴۸٪</b></div>
-    <div class="progress"><span style="width:48%;background:#35b9a5"></span></div>
-    <div class="status-row"><span><i class="dot" style="background:#f2bb5b"></i>نیازمند مدرک</span><b>۲۵٪</b></div>
-    <div class="progress"><span style="width:25%;background:#f2bb5b"></span></div>
-    <div class="status-row"><span><i class="dot" style="background:#7589e8"></i>تأیید شده</span><b>۲۷٪</b></div>
-    <div class="progress"><span style="width:27%;background:#7589e8"></span></div>
-  </div>
-</div>
-<div class="card table-card" id="cases">
-  <div class="card-head"><h2>آخرین پرونده‌ها</h2><span class="sub">۴ پرونده اخیر</span></div>
-  <div class="table-wrap"><table id="case-table">
-    <thead><tr><th>شماره پرونده</th><th>نام مشتری</th><th>نوع تسهیلات</th><th>مبلغ درخواستی</th><th>وضعیت</th></tr></thead>
-    <tbody>
-      <tr><td class="case-id">OM-1405-0248</td><td>علی محمدی</td><td>سرمایه در گردش</td><td>۸۰۰ میلیون تومان</td><td><span class="pill">در حال بررسی</span></td></tr>
-      <tr><td class="case-id">OM-1405-0247</td><td>سارا احمدی</td><td>تسهیلات شخصی</td><td>۲۵۰ میلیون تومان</td><td><span class="pill wait">در انتظار تأیید</span></td></tr>
-      <tr><td class="case-id">OM-1405-0246</td><td>رضا کریمی</td><td>اعتباری شرکتی</td><td>۱٫۲ میلیارد تومان</td><td><span class="pill doc">تکمیل مدارک</span></td></tr>
-      <tr><td class="case-id">OM-1405-0245</td><td>مریم حسینی</td><td>سرمایه در گردش</td><td>۵۰۰ میلیون تومان</td><td><span class="pill">در حال بررسی</span></td></tr>
-    </tbody>
-  </table></div>
-</div>
-<div class="section" id="tasks">
-  <div class="card">
-    <h2>کارهای نیازمند اقدام</h2>
-    <div class="tasks">
-      <div class="task"><span class="task-check"></span><div>بررسی مدارک پرونده OM-1405-0247<small>امروز · اولویت بالا</small></div></div>
-      <div class="task"><span class="task-check"></span><div>پیگیری تکمیل مدارک مشتری<small>امروز · اولویت متوسط</small></div></div>
-      <div class="task"><span class="task-check"></span><div>بازبینی درخواست‌های در انتظار تأیید<small>فردا · اولویت متوسط</small></div></div>
-    </div>
-  </div>
-  <div class="card" id="customers">
-    <h2>دسترسی سریع</h2>
-    <div class="tasks">
-      <div class="task"><span class="k-icon">＋</span><div>ثبت مشتری جدید<small>افزودن به فهرست مشتریان</small></div></div>
-      <div class="task"><span class="k-icon blue">▤</span><div>ایجاد پرونده تسهیلات<small>شروع درخواست جدید</small></div></div>
-      <div class="task"><span class="k-icon amber">▧</span><div>بررسی اسناد<small>مدیریت مدارک پرونده‌ها</small></div></div>
-    </div>
-  </div>
-</div>
-<footer>سامانه امید · نسخه نمایشی · اطلاعات این داشبورد نمونه هستند</footer>
+<div id="page-meta" class="page-meta"></div>
+<div id="content"></div>
+<footer>سامانه امید · نسخه نمایشی · داده‌های این نسخه نمونه هستند</footer>
 </main>
 </div>
+<div id="toast" class="toast" role="status"></div>
 <script>
-const search = document.getElementById("search");
-const rows = [...document.querySelectorAll("#case-table tbody tr")];
-search.addEventListener("input", () => {
-  const query = search.value.trim().toLocaleLowerCase("fa");
-  rows.forEach(row => {
-    row.hidden = !row.textContent.toLocaleLowerCase("fa").includes(query);
-  });
+const customers = [
+ {id:"CU-1405-0312",name:"علی محمدی",type:"حقیقی",phone:"09121234567",email:"ali@example.com",status:"فعال",manager:"مریم رضایی"},
+ {id:"CU-1405-0311",name:"شرکت پارس تجارت",type:"حقوقی",phone:"02188776655",email:"info@pars.example",status:"فعال",manager:"امیر کاظمی"},
+ {id:"CU-1405-0310",name:"سارا احمدی",type:"حقیقی",phone:"09129876543",email:"sara@example.com",status:"نیازمند بررسی",manager:"مریم رضایی"},
+ {id:"CU-1405-0309",name:"رضا کریمی",type:"حقیقی",phone:"09351234567",email:"reza@example.com",status:"فعال",manager:"آرمان صالحی"},
+ {id:"CU-1405-0308",name:"گروه بازرگانی آریا",type:"حقوقی",phone:"02144556677",email:"contact@arya.example",status:"غیرفعال",manager:"امیر کاظمی"}
+];
+const applications = [
+ {id:"OM-1405-0248",customer:"علی محمدی",type:"سرمایه در گردش",amount:"۸۰۰ میلیون تومان",status:"در حال بررسی",manager:"مریم رضایی",date:"۱۴۰۵/۰۷/۲۴"},
+ {id:"OM-1405-0247",customer:"سارا احمدی",type:"تسهیلات شخصی",amount:"۲۵۰ میلیون تومان",status:"در انتظار تأیید",manager:"آرمان صالحی",date:"۱۴۰۵/۰۷/۲۳"},
+ {id:"OM-1405-0246",customer:"شرکت پارس تجارت",type:"اعتباری شرکتی",amount:"۱٫۲ میلیارد تومان",status:"تکمیل مدارک",manager:"امیر کاظمی",date:"۱۴۰۵/۰۷/۲۲"},
+ {id:"OM-1405-0245",customer:"مریم حسینی",type:"سرمایه در گردش",amount:"۵۰۰ میلیون تومان",status:"در حال بررسی",manager:"مریم رضایی",date:"۱۴۰۵/۰۷/۲۱"},
+ {id:"OM-1405-0244",customer:"رضا کریمی",type:"تسهیلات شخصی",amount:"۱۵۰ میلیون تومان",status:"تأیید شده",manager:"آرمان صالحی",date:"۱۴۰۵/۰۷/۲۰"}
+];
+const tasks = [
+ {title:"بررسی مدارک پرونده OM-1405-0247",owner:"آرمان صالحی",due:"امروز",priority:"بالا",done:false},
+ {title:"پیگیری تکمیل مدارک شرکت پارس تجارت",owner:"امیر کاظمی",due:"امروز",priority:"متوسط",done:false},
+ {title:"بازبینی درخواست‌های در انتظار تأیید",owner:"مدیر سامانه",due:"فردا",priority:"متوسط",done:false},
+ {title:"ثبت نتیجه تماس با مشتری",owner:"مریم رضایی",due:"پس‌فردا",priority:"عادی",done:true}
+];
+const docs = [
+ {name:"فرم درخواست تسهیلات",case:"OM-1405-0248",type:"فرم",status:"تأیید شده",date:"۱۴۰۵/۰۷/۲۴"},
+ {name:"تصویر کارت ملی",case:"OM-1405-0247",type:"هویتی",status:"در انتظار بررسی",date:"۱۴۰۵/۰۷/۲۳"},
+ {name:"صورت‌های مالی شرکت",case:"OM-1405-0246",type:"مالی",status:"نیازمند تکمیل",date:"۱۴۰۵/۰۷/۲۲"},
+ {name:"گواهی محل سکونت",case:"OM-1405-0245",type:"پشتیبان",status:"تأیید شده",date:"۱۴۰۵/۰۷/۲۱"}
+];
+const pageInfo = {
+ dashboard:["داشبورد مدیریتی","نمای کلی وضعیت مشتریان و پرونده‌های تسهیلات"],
+ customers:["مدیریت مشتریان","ثبت، جست‌وجو و پیگیری اطلاعات مشتریان"],
+ applications:["درخواست‌های تسهیلات","مدیریت پرونده‌های اعتباری از ثبت تا تصمیم نهایی"],
+ workflow:["گردش کار","وظایف، ارجاع‌ها و اقدام‌های در انتظار"],
+ documents:["اسناد و مدارک","پیگیری وضعیت مدارک مرتبط با پرونده‌ها"],
+ reports:["گزارش‌های مدیریتی","نمای کلی عملکرد و وضعیت پرونده‌ها"],
+ settings:["تنظیمات سامانه","تنظیمات پایه و ترجیحات محیط کار"]
+};
+let currentPage = "dashboard";
+let customerFilter = "";
+let applicationFilter = "";
+function esc(value){return String(value).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function statusPill(status){
+ let cls = status.includes("انتظار") ? "wait" : status.includes("مدرک") || status.includes("بررسی") ? "doc" : status.includes("غیرفعال") || status.includes("رد") ? "bad" : status.includes("فعال") || status.includes("تأیید شده") ? "" : "gray";
+ return '<span class="pill '+cls+'">'+esc(status)+'</span>';
+}
+function setMeta(text,button){
+ document.getElementById("page-meta").innerHTML = '<div class="crumb">سامانه امید / '+text+'</div><div class="actions">'+(button||"")+'</div>';
+}
+function stat(label,value,icon,kind,caption){return '<div class="card"><div class="k-head"><span class="k-label">'+label+'</span><span class="k-icon '+(kind||'')+'">'+icon+'</span></div><div class="k-value">'+value+'</div><div class="muted">'+caption+'</div></div>';}
+function table(headers,rows){return '<div class="table-wrap"><table><thead><tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>';}
+function renderDashboard(){
+ setMeta("داشبورد",'<button class="btn" data-action="refresh">↻ به‌روزرسانی</button>');
+ const recent = applications.slice(0,4).map(a=>'<tr><td class="id">'+a.id+'</td><td>'+a.customer+'</td><td>'+a.type+'</td><td>'+a.amount+'</td><td>'+statusPill(a.status)+'</td></tr>').join('');
+ return '<div class="grid">'+stat("مشتریان ثبت‌شده","۲٬۴۸۶","♙","","نمونه آماری داشبورد")+stat("پرونده‌های در جریان","۳۲۸","▤","blue","در حال پیگیری")+stat("در انتظار تأیید","۴۷","◷","amber","نیازمند بررسی")+stat("تکمیل مدارک","۸۶٪","✓","purple","شاخص نمونه")+'</div>'+
+ '<div class="section"><div class="card"><div class="card-head"><h2>روند درخواست‌های تسهیلات</h2><span class="muted">شش ماه اخیر · نمونه</span></div><div class="bars"><div class="bar" style="height:38%"></div><div class="bar" style="height:55%"></div><div class="bar" style="height:45%"></div><div class="bar" style="height:72%"></div><div class="bar" style="height:63%"></div><div class="bar" style="height:91%"></div></div><div class="months"><span>اردیبهشت</span><span>خرداد</span><span>تیر</span><span>مرداد</span><span>شهریور</span><span>مهر</span></div></div><div class="card"><h2>وضعیت پرونده‌ها</h2><div class="status-row"><span><i class="dot" style="background:#35b9a5"></i>در حال بررسی</span><b>۴۸٪</b></div><div class="progress"><span style="width:48%;background:#35b9a5"></span></div><div class="status-row"><span><i class="dot" style="background:#f2bb5b"></i>نیازمند مدرک</span><b>۲۵٪</b></div><div class="progress"><span style="width:25%;background:#f2bb5b"></span></div><div class="status-row"><span><i class="dot" style="background:#7589e8"></i>تأیید شده</span><b>۲۷٪</b></div><div class="progress"><span style="width:27%;background:#7589e8"></span></div></div></div>'+
+ '<div class="card table-card"><div class="card-head"><h2>آخرین پرونده‌ها</h2><a class="btn" href="/applications" data-link>مشاهده همه ←</a></div>'+table(["شماره پرونده","نام مشتری","نوع تسهیلات","مبلغ درخواستی","وضعیت"],recent)+'</div>'+
+ '<div class="section"><div class="card"><h2>کارهای نیازمند اقدام</h2><div class="task-list">'+tasks.filter(t=>!t.done).slice(0,3).map(t=>'<div class="task"><input type="checkbox" data-task="'+tasks.indexOf(t)+'"><div>'+t.title+'<small>'+t.due+' · '+t.owner+' · اولویت '+t.priority+'</small></div></div>').join('')+'</div></div><div class="card"><h2>دسترسی سریع</h2><div class="task-list"><div class="task"><span class="k-icon">＋</span><div><a href="/customers/new" data-link>ثبت مشتری جدید</a><small>افزودن مشتری به سامانه</small></div></div><div class="task"><span class="k-icon blue">▤</span><div><a href="/applications/new" data-link>ایجاد پرونده تسهیلات</a><small>شروع درخواست جدید</small></div></div><div class="task"><span class="k-icon amber">▧</span><div><a href="/documents" data-link>بررسی اسناد</a><small>مدیریت مدارک پرونده‌ها</small></div></div></div></div></div>';
+}
+function renderCustomers(){
+ setMeta("مشتریان",'<button class="btn primary" data-link="/customers/new">＋ ثبت مشتری جدید</button>');
+ if(location.pathname.endsWith("/new")) return renderCustomerForm();
+ const filtered=customers.filter(c=>(c.name+" "+c.id+" "+c.phone+" "+c.manager+" "+c.email).includes(customerFilter));
+ const rows=filtered.map(c=>'<tr><td class="id">'+c.id+'</td><td>'+c.name+'</td><td>'+c.type+'</td><td>'+c.phone+'</td><td>'+c.manager+'</td><td>'+statusPill(c.status)+'</td><td><button class="btn" data-action="customer-detail" data-id="'+c.id+'">جزئیات</button></td></tr>').join('');
+ return '<div class="grid">'+stat("کل مشتریان",customers.length,"♙","","اطلاعات نمایشی")+stat("مشتریان حقیقی","۳","♧","blue","نمونه")+stat("مشتریان حقوقی","۲","▦","purple","نمونه")+stat("نیازمند بررسی","۱","◷","amber","نیازمند پیگیری")+'</div><div class="card table-card"><div class="card-head"><h2>فهرست مشتریان</h2><span class="muted">'+filtered.length+' رکورد</span></div><div class="table-tools"><input class="field" style="max-width:330px" id="customer-search" placeholder="نام، کد یا شماره تماس..." value="'+esc(customerFilter)+'"><select class="filter" id="customer-type"><option value="">همه انواع مشتری</option><option>حقیقی</option><option>حقوقی</option></select></div>'+table(["کد مشتری","نام / عنوان","نوع","شماره تماس","مسئول پرونده","وضعیت","عملیات"],rows||'<tr><td colspan="7" class="empty">مشتری‌ای مطابق جست‌وجو پیدا نشد.</td></tr>')+'</div>';
+}
+function renderCustomerForm(){
+ setMeta("مشتریان / ثبت مشتری",'<button class="btn" data-link="/customers">← بازگشت به فهرست</button>');
+ return '<div class="card"><h2>اطلاعات مشتری جدید</h2><div class="notice">این فرم در نسخه فعلی نمایشی است. پس از اتصال API، اطلاعات در پایگاه داده ثبت خواهد شد.</div><form id="customer-form"><div class="form-grid"><div class="form-row"><label>نوع مشتری *</label><select class="field" name="type" required><option value="حقیقی">حقیقی</option><option value="حقوقی">حقوقی</option></select></div><div class="form-row"><label>نام و نام خانوادگی / عنوان شرکت *</label><input class="field" name="name" required placeholder="نام کامل مشتری"></div><div class="form-row"><label>شماره تماس *</label><input class="field" name="phone" required inputmode="tel" placeholder="09... یا شماره ثابت"></div><div class="form-row"><label>پست الکترونیکی</label><input class="field" name="email" type="email" placeholder="name@example.com"></div><div class="form-row"><label>مسئول پرونده</label><select class="field" name="manager"><option>مریم رضایی</option><option>امیر کاظمی</option><option>آرمان صالحی</option></select></div><div class="form-row"><label>وضعیت</label><select class="field" name="status"><option>فعال</option><option>نیازمند بررسی</option></select></div><div class="form-row full"><label>یادداشت</label><textarea class="field" name="notes" placeholder="توضیحات تکمیلی"></textarea></div></div><div class="actions" style="margin-top:18px"><button class="btn primary" type="submit">ثبت نمایشی مشتری</button><button class="btn" type="reset">پاک کردن فرم</button></div></form></div>';
+}
+function renderApplications(){
+ setMeta("درخواست‌های تسهیلات",'<button class="btn primary" data-link="/applications/new">＋ پرونده جدید</button>');
+ if(location.pathname.endsWith("/new")) return renderApplicationForm();
+ const filtered=applications.filter(a=>(a.id+" "+a.customer+" "+a.type+" "+a.manager+" "+a.status).includes(applicationFilter));
+ const rows=filtered.map(a=>'<tr><td class="id">'+a.id+'</td><td>'+a.customer+'</td><td>'+a.type+'</td><td>'+a.amount+'</td><td>'+a.manager+'</td><td>'+statusPill(a.status)+'</td><td><button class="btn" data-action="application-detail" data-id="'+a.id+'">مشاهده</button></td></tr>').join('');
+ return '<div class="grid">'+stat("کل پرونده‌ها",applications.length,"▤","","داده نمونه")+stat("در حال بررسی","۲","↻","blue","در گردش کار")+stat("تکمیل مدارک","۱","▧","amber","اقدام مشتری لازم است")+stat("تأیید شده","۱","✓","purple","در نمونه فعلی")+'</div><div class="card table-card"><div class="card-head"><h2>فهرست درخواست‌ها</h2><span class="muted">'+filtered.length+' پرونده</span></div><div class="table-tools"><input id="application-search" class="field" style="max-width:350px" placeholder="شماره پرونده، مشتری یا نوع تسهیلات..." value="'+esc(applicationFilter)+'"><select class="filter" id="application-status"><option value="">همه وضعیت‌ها</option><option>در حال بررسی</option><option>در انتظار تأیید</option><option>تکمیل مدارک</option><option>تأیید شده</option></select></div>'+table(["شماره پرونده","مشتری","نوع تسهیلات","مبلغ درخواستی","کارشناس","وضعیت","عملیات"],rows||'<tr><td colspan="7" class="empty">پرونده‌ای پیدا نشد.</td></tr>')+'</div>';
+}
+function renderApplicationForm(){
+ setMeta("درخواست‌ها / پرونده جدید",'<button class="btn" data-link="/applications">← بازگشت به فهرست</button>');
+ return '<div class="card"><h2>ایجاد پرونده تسهیلات</h2><div class="notice">فرم اولیه جهت طراحی گردش ثبت درخواست است؛ ارسال اطلاعات تا زمان اتصال API انجام نمی‌شود.</div><form id="application-form"><div class="form-grid"><div class="form-row"><label>مشتری *</label><select class="field" name="customer" required><option value="">انتخاب مشتری</option>'+customers.map(c=>'<option>'+c.name+'</option>').join('')+'</select></div><div class="form-row"><label>نوع تسهیلات *</label><select class="field" name="type" required><option>سرمایه در گردش</option><option>تسهیلات شخصی</option><option>اعتباری شرکتی</option><option>خرید تجهیزات</option></select></div><div class="form-row"><label>مبلغ درخواستی (تومان) *</label><input class="field" name="amount" type="number" min="1" required placeholder="مثلاً 250000000"></div><div class="form-row"><label>مدت بازپرداخت (ماه)</label><input class="field" name="term" type="number" min="1" max="240" placeholder="مثلاً 36"></div><div class="form-row"><label>مسئول پرونده</label><select class="field" name="manager"><option>مریم رضایی</option><option>امیر کاظمی</option><option>آرمان صالحی</option></select></div><div class="form-row"><label>وضعیت اولیه</label><select class="field" name="status"><option>در حال بررسی</option><option>تکمیل مدارک</option></select></div><div class="form-row full"><label>توضیحات / هدف تسهیلات</label><textarea class="field" name="notes" placeholder="شرح مختصر درخواست"></textarea></div></div><div class="actions" style="margin-top:18px"><button class="btn primary" type="submit">ثبت نمایشی پرونده</button><button class="btn" type="reset">پاک کردن فرم</button></div></form></div>';
+}
+function renderWorkflow(){
+ setMeta("گردش کار",'<button class="btn" data-action="refresh">↻ به‌روزرسانی</button>');
+ return '<div class="grid">'+stat("کل وظایف",tasks.length,"↻","","فهرست نمونه")+stat("باز","۳","◷","amber","در انتظار اقدام")+stat("انجام‌شده","۱","✓","blue","تکمیل‌شده در نمونه")+stat("اولویت بالا","۱","!","purple","نیازمند توجه")+'</div><div class="card table-card"><div class="card-head"><h2>وظایف و پیگیری‌ها</h2><span class="muted">برای تکمیل هر وظیفه، تیک آن را بزنید</span></div><div class="task-list">'+tasks.map((t,i)=>'<div class="task"><input type="checkbox" data-task="'+i+'" '+(t.done?'checked':'')+'><div style="flex:1;'+(t.done?'text-decoration:line-through;color:#8b99aa':'')+'">'+t.title+'<small>مسئول: '+t.owner+' · سررسید: '+t.due+'</small></div>'+statusPill(t.priority)+'</div>').join('')+'</div></div><div class="section"><div class="card"><h2>مراحل معمول پرونده</h2><div class="task-list"><div class="task"><span class="k-icon">۱</span><div>ثبت درخواست<small>ایجاد پرونده و مشخصات اولیه</small></div></div><div class="task"><span class="k-icon blue">۲</span><div>بررسی مدارک<small>کنترل مدارک هویتی و مالی</small></div></div><div class="task"><span class="k-icon amber">۳</span><div>ارزیابی و تأیید<small>ارجاع به مسئول مجاز</small></div></div><div class="task"><span class="k-icon purple">۴</span><div>نتیجه و بایگانی<small>ثبت تصمیم و اطلاع‌رسانی</small></div></div></div></div><div class="card"><h2>یادآوری</h2><div class="notice">در نسخه نهایی، گردش کار بر اساس نقش کاربر، سطح دسترسی و رویدادهای واقعی پرونده مدیریت خواهد شد.</div></div></div>';
+}
+function renderDocuments(){
+ setMeta("اسناد و مدارک",'<button class="btn primary" data-action="upload-demo">＋ افزودن مدرک</button>');
+ const rows=docs.map(d=>'<tr><td>'+d.name+'</td><td class="id">'+d.case+'</td><td>'+d.type+'</td><td>'+statusPill(d.status)+'</td><td>'+d.date+'</td><td><button class="btn" data-action="document-detail" data-id="'+d.case+'">جزئیات</button></td></tr>').join('');
+ return '<div class="grid">'+stat("کل مدارک","۲۴۶","▧","","شاخص نمونه")+stat("تأیید شده","۱۸۹","✓","","مدارک کنترل‌شده")+stat("در انتظار بررسی","۳۸","◷","amber","نیازمند بررسی کارشناسی")+stat("نیازمند تکمیل","۱۹","!","purple","پیگیری از مشتری")+'</div><div class="card table-card"><div class="card-head"><h2>فهرست مدارک اخیر</h2><span class="muted">اطلاعات نمایشی</span></div><div class="table-tools"><input class="field" id="document-search" style="max-width:350px" placeholder="جست‌وجوی نام مدرک یا شماره پرونده"></div>'+table(["عنوان مدرک","شماره پرونده","دسته‌بندی","وضعیت","تاریخ ثبت","عملیات"],rows)+'</div><div class="notice" style="margin-top:15px">بارگذاری فایل، اسکن بدافزار، سطح دسترسی و نگهداری امن اسناد پس از اتصال سرویس ذخیره‌سازی پیاده‌سازی می‌شود. فعلاً هیچ فایلی بارگذاری نمی‌شود.</div>';
+}
+function renderReports(){
+ setMeta("گزارش‌ها",'<button class="btn" data-action="export-report">⇩ خروجی CSV</button>');
+ return '<div class="grid">'+stat("پرونده‌های ثبت‌شده","۳۲۸","▤","","عدد نمونه")+stat("مجموع مبلغ درخواستی","۸۷٫۵ میلیارد","↗","blue","تومان · نمونه")+stat("میانگین تکمیل مدارک","۸۶٪","✓","purple","شاخص نمونه")+stat("در انتظار تصمیم","۴۷","◷","amber","نیازمند پیگیری")+'</div><div class="section"><div class="card"><h2>درخواست‌ها در شش ماه اخیر</h2><div class="bars"><div class="bar" style="height:38%"></div><div class="bar" style="height:55%"></div><div class="bar" style="height:45%"></div><div class="bar" style="height:72%"></div><div class="bar" style="height:63%"></div><div class="bar" style="height:91%"></div></div><div class="months"><span>اردیبهشت</span><span>خرداد</span><span>تیر</span><span>مرداد</span><span>شهریور</span><span>مهر</span></div></div><div class="card"><h2>تفکیک وضعیت پرونده‌ها</h2><div class="status-row"><span>در حال بررسی</span><b>۴۸٪</b></div><div class="progress"><span style="width:48%;background:#35b9a5"></span></div><div class="status-row"><span>نیازمند مدرک</span><b>۲۵٪</b></div><div class="progress"><span style="width:25%;background:#f2bb5b"></span></div><div class="status-row"><span>تأیید شده</span><b>۲۷٪</b></div><div class="progress"><span style="width:27%;background:#7589e8"></span></div></div></div><div class="card table-card"><h2>خلاصه درخواست‌ها</h2>'+table(["وضعیت","تعداد نمونه","اقدام پیشنهادی"],'<tr><td>'+statusPill("در حال بررسی")+'</td><td>۱۵۷</td><td>پیگیری کارشناسی</td></tr><tr><td>'+statusPill("تکمیل مدارک")+'</td><td>۸۲</td><td>اطلاع‌رسانی به مشتری</td></tr><tr><td>'+statusPill("در انتظار تأیید")+'</td><td>۴۷</td><td>ارجاع به تأییدکننده</td></tr><tr><td>'+statusPill("تأیید شده")+'</td><td>۴۲</td><td>آماده مرحله بعد</td></tr>')+'</div>';
+}
+function renderSettings(){
+ setMeta("تنظیمات",'<button class="btn primary" data-action="save-settings">ذخیره ترجیحات</button>');
+ return '<div class="section" style="margin-top:0"><div class="card"><h2>تنظیمات عمومی</h2><div class="setting-row"><div>عنوان سامانه<small>نامی که در پنل نمایش داده می‌شود</small></div><input class="field" style="max-width:220px" value="سامانه امید"></div><div class="setting-row"><div>زبان رابط کاربری<small>زبان نمایش پنل</small></div><select class="field" style="max-width:180px"><option>فارسی</option></select></div><div class="setting-row"><div>منطقه زمانی<small>زمان نمایش رویدادها</small></div><select class="field" style="max-width:180px"><option>Asia/Tehran</option></select></div></div><div class="card"><h2>وضعیت اتصال</h2><div class="setting-row"><div>رابط برنامه‌نویسی (API)<small>اتصال به بک‌اند Django</small></div>'+statusPill("هنوز متصل نیست")+'</div><div class="setting-row"><div>پایگاه داده<small>PostgreSQL</small></div>'+statusPill("در انتظار اتصال")+'</div><div class="setting-row"><div>درگاه پیامک<small>قابل تنظیم در مرحله بعد</small></div>'+statusPill("پیکربندی نشده")+'</div></div></div><div class="card" style="margin-top:15px"><h2>امنیت و دسترسی</h2><div class="notice">قبل از استفاده عملیاتی، ورود امن، نقش‌ها و مجوزها، ثبت رویدادهای ممیزی و مدیریت اسرار محیط باید تکمیل و آزموده شوند.</div><div class="setting-row"><div>احراز هویت کاربران<small>ورود و نشست امن</small></div><span class="pill wait">در حال توسعه</span></div><div class="setting-row"><div>ثبت رویدادهای ممیزی<small>ردیابی تغییرات پرونده‌ها</small></div><span class="pill wait">در حال توسعه</span></div></div>';
+}
+function renderCustomerDetail(id){
+ const c=customers.find(x=>x.id===id);if(!c)return '<div class="card">مشتری پیدا نشد.</div>';
+ setMeta("مشتریان / جزئیات",'<button class="btn" data-link="/customers">← بازگشت</button>');
+ return '<div class="card"><div class="card-head"><h2>'+esc(c.name)+'</h2>'+statusPill(c.status)+'</div><div class="form-grid"><div class="form-row"><label>کد مشتری</label><div>'+c.id+'</div></div><div class="form-row"><label>نوع مشتری</label><div>'+c.type+'</div></div><div class="form-row"><label>شماره تماس</label><div>'+c.phone+'</div></div><div class="form-row"><label>ایمیل</label><div>'+c.email+'</div></div><div class="form-row"><label>مسئول پرونده</label><div>'+c.manager+'</div></div></div><div class="actions" style="margin-top:22px"><button class="btn primary" data-link="/applications">مشاهده درخواست‌های تسهیلات</button></div></div>';
+}
+function renderApplicationDetail(id){
+ const a=applications.find(x=>x.id===id);if(!a)return '<div class="card">پرونده پیدا نشد.</div>';
+ setMeta("درخواست‌ها / جزئیات پرونده",'<button class="btn" data-link="/applications">← بازگشت</button>');
+ return '<div class="card"><div class="card-head"><h2>پرونده '+a.id+'</h2>'+statusPill(a.status)+'</div><div class="form-grid"><div class="form-row"><label>مشتری</label><div>'+a.customer+'</div></div><div class="form-row"><label>نوع تسهیلات</label><div>'+a.type+'</div></div><div class="form-row"><label>مبلغ درخواستی</label><div>'+a.amount+'</div></div><div class="form-row"><label>مسئول پرونده</label><div>'+a.manager+'</div></div><div class="form-row"><label>تاریخ ثبت</label><div>'+a.date+'</div></div></div><div class="notice" style="margin-top:20px">جزئیات نمایش‌داده‌شده داده نمونه هستند. گردش واقعی تأیید و ثبت تصمیم در مرحله اتصال بک‌اند پیاده‌سازی می‌شود.</div><div class="actions"><button class="btn" data-link="/documents">مشاهده مدارک</button><button class="btn" data-link="/workflow">مشاهده گردش کار</button></div></div>';
+}
+function render(){
+ const path=location.pathname.replace(/\/+$/,"")||"/";
+ let page=path.split("/")[1]||"dashboard";
+ if(page==="new")page=path.split("/")[0]==="customers"?"customers":"applications";
+ if(!pageInfo[page])page="dashboard";
+ currentPage=page;
+ document.getElementById("page-title").textContent=pageInfo[page][0];
+ document.getElementById("page-subtitle").textContent=pageInfo[page][1];
+ document.querySelectorAll(".menu a").forEach(a=>a.classList.toggle("active",a.dataset.page===page));
+ document.getElementById("global-search").placeholder=page==="customers"?"جست‌وجوی مشتری...":page==="applications"?"جست‌وجوی پرونده...":"جست‌وجو در صفحه...";
+ let html="";
+ if(path.startsWith("/customers/")&&!path.endsWith("/new")) html=renderCustomerDetail(decodeURIComponent(path.split("/")[2]||""));
+ else if(path.startsWith("/applications/")&&!path.endsWith("/new")) html=renderApplicationDetail(decodeURIComponent(path.split("/")[2]||""));
+ else if(page==="dashboard")html=renderDashboard();
+ else if(page==="customers")html=renderCustomers();
+ else if(page==="applications")html=renderApplications();
+ else if(page==="workflow")html=renderWorkflow();
+ else if(page==="documents")html=renderDocuments();
+ else if(page==="reports")html=renderReports();
+ else if(page==="settings")html=renderSettings();
+ document.getElementById("content").innerHTML=html;
+ document.getElementById("global-search").value="";
+}
+function navigate(path){history.pushState({}, "", path);customerFilter="";applicationFilter="";render();window.scrollTo({top:0,behavior:"instant"});}
+function toast(message){const el=document.getElementById("toast");el.textContent=message;el.style.display="block";clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>el.style.display="none",3200);}
+document.addEventListener("click",e=>{
+ const link=e.target.closest("[data-link]");
+ if(link){e.preventDefault();navigate(link.dataset.link||link.getAttribute("href"));return;}
+ const anchor=e.target.closest("a[data-page]");
+ if(anchor){e.preventDefault();navigate(anchor.getAttribute("href"));return;}
+ const action=e.target.closest("[data-action]");
+ if(action){
+  const act=action.dataset.action;
+  if(act==="refresh")toast("صفحه به‌روزرسانی شد؛ داده‌ها همچنان نمونه هستند.");
+  if(act==="customer-detail")navigate("/customers/"+encodeURIComponent(action.dataset.id));
+  if(act==="application-detail")navigate("/applications/"+encodeURIComponent(action.dataset.id));
+  if(act==="document-detail")toast("جزئیات مدرک "+action.dataset.id+"؛ اتصال ذخیره‌سازی در مرحله بعد انجام می‌شود.");
+  if(act==="upload-demo")toast("بارگذاری فایل پس از اتصال فضای امن اسناد فعال می‌شود.");
+  if(act==="save-settings")toast("ترجیحات این نسخه نمایشی ذخیره دائمی نمی‌شوند.");
+  if(act==="export-report"){
+   const csv="شماره پرونده,مشتری,نوع تسهیلات,مبلغ,وضعیت\\n"+applications.map(a=>[a.id,a.customer,a.type,a.amount,a.status].join(",")).join("\\n");
+   const blob=new Blob(["\\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="omid-report.csv";a.click();URL.revokeObjectURL(url);
+  }
+ }
 });
+document.addEventListener("input",e=>{
+ if(e.target.id==="customer-search"){customerFilter=e.target.value;const pos=e.target.selectionStart;const html=renderCustomers();document.getElementById("content").innerHTML=html;const next=document.getElementById("customer-search");next.focus();next.setSelectionRange(pos,pos);}
+ if(e.target.id==="application-search"){applicationFilter=e.target.value;const pos=e.target.selectionStart;const html=renderApplications();document.getElementById("content").innerHTML=html;const next=document.getElementById("application-search");next.focus();next.setSelectionRange(pos,pos);}
+ if(e.target.id==="document-search"){const q=e.target.value;document.querySelectorAll("#content tbody tr").forEach(row=>row.hidden=!row.textContent.includes(q));}
+ if(e.target.id==="global-search"){
+  const q=e.target.value.trim();
+  if(currentPage==="customers"){customerFilter=q;document.getElementById("content").innerHTML=renderCustomers();}
+  else if(currentPage==="applications"){applicationFilter=q;document.getElementById("content").innerHTML=renderApplications();}
+  else if(q){document.querySelectorAll("#content tr, #content .task").forEach(el=>el.hidden=!el.textContent.includes(q));}
+ }
+});
+document.addEventListener("change",e=>{
+ if(e.target.id==="customer-type"){
+  const q=e.target.value;
+  document.querySelectorAll("#content tbody tr").forEach(row=>row.hidden=!!q&&!row.children[2].textContent.includes(q));
+ }
+ if(e.target.id==="application-status"){
+  const q=e.target.value;
+  document.querySelectorAll("#content tbody tr").forEach(row=>row.hidden=!!q&&!row.children[5].textContent.includes(q));
+ }
+ if(e.target.matches("[data-task]")){
+  const t=tasks[Number(e.target.dataset.task)];if(t){t.done=e.target.checked;toast(t.done?"وظیفه در نمونه به‌عنوان انجام‌شده علامت خورد.":"وظیفه به فهرست بازگشت.");}
+ }
+});
+document.addEventListener("submit",e=>{
+ if(e.target.id==="customer-form"){
+  e.preventDefault();const data=Object.fromEntries(new FormData(e.target).entries());
+  toast("فرم مشتری بررسی شد؛ برای ثبت دائمی باید API متصل شود.");e.target.reset();
+ }
+ if(e.target.id==="application-form"){
+  e.preventDefault();toast("فرم پرونده بررسی شد؛ هنوز در پایگاه داده ثبت نمی‌شود.");e.target.reset();
+ }
+});
+document.getElementById("notifications").addEventListener("click",()=>toast("اعلان جدیدی در نسخه نمایشی وجود ندارد."));
+window.addEventListener("popstate",render);
+render();
 </script>
 </body>
-</html>`;
+</html>\`;
 
     return new Response(html, {
       headers: {
         "content-type": "text/html; charset=UTF-8",
-        "cache-control": "no-store"
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff"
       }
     });
   }
