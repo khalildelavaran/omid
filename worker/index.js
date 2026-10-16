@@ -105,6 +105,24 @@ const docs = [
  {name:"صورت‌های مالی شرکت",case:"OM-1405-0246",type:"مالی",status:"نیازمند تکمیل",date:"۱۴۰۵/۰۷/۲۲"},
  {name:"گواهی محل سکونت",case:"OM-1405-0245",type:"پشتیبان",status:"تأیید شده",date:"۱۴۰۵/۰۷/۲۱"}
 ];
+// نگهداری داده‌های نمایشی در همین مرورگر؛ این ذخیره‌سازی جایگزین بک‌اند نیست.
+const DEMO_STORAGE_KEY = "omid-demo-v1";
+function restoreDemoData(){
+ try{
+  const saved=JSON.parse(localStorage.getItem(DEMO_STORAGE_KEY)||"null");
+  if(!saved||typeof saved!=="object")return;
+  if(Array.isArray(saved.customers)){customers.splice(0,customers.length,...saved.customers);}
+  if(Array.isArray(saved.applications)){applications.splice(0,applications.length,...saved.applications);}
+  if(Array.isArray(saved.tasks)){tasks.splice(0,tasks.length,...saved.tasks);}
+  if(Array.isArray(saved.docs)){docs.splice(0,docs.length,...saved.docs);}
+ }catch(error){console.warn("Omid demo data could not be restored",error);}
+}
+function persistDemoData(){
+ try{
+  localStorage.setItem(DEMO_STORAGE_KEY,JSON.stringify({customers,applications,tasks,docs}));
+ }catch(error){console.warn("Omid demo data could not be saved",error);toast("ذخیره محلی در این مرورگر در دسترس نیست.");}
+}
+restoreDemoData();
 const pageInfo = {
  dashboard:["داشبورد مدیریتی","نمای کلی وضعیت مشتریان و پرونده‌های تسهیلات"],
  customers:["مدیریت مشتریان","ثبت، جست‌وجو و پیگیری اطلاعات مشتریان"],
@@ -238,12 +256,12 @@ document.addEventListener("click",e=>{
  if(action){
   const act=action.dataset.action;
   if(act==="refresh"){render();toast("صفحه با داده‌های نمایشی فعلی به‌روزرسانی شد.");}
-  if(act==="delete-task"){const idx=Number(action.dataset.taskId);if(Number.isInteger(idx)&&idx>=0&&idx<tasks.length){tasks.splice(idx,1);document.getElementById("content").innerHTML=renderWorkflow();toast("وظیفه از فهرست نمایشی حذف شد.");}}
+  if(act==="delete-task"){const idx=Number(action.dataset.taskId);if(Number.isInteger(idx)&&idx>=0&&idx<tasks.length){tasks.splice(idx,1);persistDemoData();document.getElementById("content").innerHTML=renderWorkflow();toast("وظیفه حذف شد و در همین مرورگر ذخیره شد.");}}
   if(act==="customer-detail")navigate("/customers/"+encodeURIComponent(action.dataset.id));
   if(act==="application-detail")navigate("/applications/"+encodeURIComponent(action.dataset.id));
   if(act==="document-detail")toast("جزئیات مدرک "+action.dataset.id+"؛ اتصال ذخیره‌سازی در مرحله بعد انجام می‌شود.");
   if(act==="upload-demo")toast("بارگذاری فایل پس از اتصال فضای امن اسناد فعال می‌شود.");
-  if(act==="save-settings")toast("ترجیحات این نسخه نمایشی ذخیره دائمی نمی‌شوند.");
+  if(act==="save-settings")try{localStorage.setItem("omid-ui-preferences",JSON.stringify({title:"سامانه امید",language:"fa",timezone:"Asia/Tehran"}));toast("ترجیحات رابط در همین مرورگر ذخیره شد.");}catch(error){toast("ذخیره ترجیحات در این مرورگر ممکن نیست.");}
   if(act==="export-report"||act==="export-applications"||act==="export-customers"){
    const isCustomers=act==="export-customers";
    const headers=isCustomers?["کد مشتری","نام","نوع","تلفن","ایمیل","مسئول","وضعیت"]:["شماره پرونده","مشتری","نوع تسهیلات","مبلغ","وضعیت"];
@@ -267,10 +285,10 @@ document.addEventListener("input",e=>{
 document.addEventListener("change",e=>{
  if(e.target.id==="customer-type"){customerTypeFilter=e.target.value;document.getElementById("content").innerHTML=renderCustomers();}
  if(e.target.id==="application-status"){applicationStatusFilter=e.target.value;document.getElementById("content").innerHTML=renderApplications();}
- if(e.target.id==="application-detail-status"){const item=applications.find(a=>a.id===e.target.dataset.appId);if(item&&item.status!==e.target.value){const previous=item.status;item.status=e.target.value;item.activity=item.activity||[];item.activity.push({type:"تغییر وضعیت",text:"وضعیت از «"+previous+"» به «"+item.status+"» تغییر کرد.",date:new Intl.DateTimeFormat("fa-IR",{dateStyle:"short",timeStyle:"short"}).format(new Date())});toast("وضعیت و تاریخچه پرونده به‌روزرسانی شد.");render();}}
- if(e.target.matches("[data-document-status]")){const doc=docs.find(d=>d.case===e.target.dataset.docCase);if(doc){doc.status=e.target.value;document.getElementById("content").innerHTML=renderDocuments();toast("وضعیت مدرک در فهرست نمایشی تغییر کرد؛ ثبت دائمی نیست.");}}
+ if(e.target.id==="application-detail-status"){const item=applications.find(a=>a.id===e.target.dataset.appId);if(item&&item.status!==e.target.value){const previous=item.status;item.status=e.target.value;item.activity=item.activity||[];item.activity.push({type:"تغییر وضعیت",text:"وضعیت از «"+previous+"» به «"+item.status+"» تغییر کرد.",date:new Intl.DateTimeFormat("fa-IR",{dateStyle:"short",timeStyle:"short"}).format(new Date())});persistDemoData();toast("وضعیت و تاریخچه پرونده ذخیره شد.");render();}}
+ if(e.target.matches("[data-document-status]")){const doc=docs.find(d=>d.case===e.target.dataset.docCase);if(doc){doc.status=e.target.value;persistDemoData();document.getElementById("content").innerHTML=renderDocuments();toast("وضعیت مدرک در همین مرورگر ذخیره شد.");}}
  if(e.target.matches("[data-task]")){
-  const t=tasks[Number(e.target.dataset.task)];if(t){t.done=e.target.checked;toast(t.done?"وظیفه در نمونه به‌عنوان انجام‌شده علامت خورد.":"وظیفه به فهرست بازگشت.");}
+  const t=tasks[Number(e.target.dataset.task)];if(t){t.done=e.target.checked;persistDemoData();toast(t.done?"وظیفه انجام‌شده ذخیره شد.":"وظیفه به فهرست بازگشت و ذخیره شد.");}
  }
 });
 document.addEventListener("submit",e=>{
@@ -280,6 +298,7 @@ document.addEventListener("submit",e=>{
   const title=String(data.title||"").trim();
   if(!title)return;
   tasks.unshift({title,owner:data.owner||"تعیین نشده",due:data.due||"بدون سررسید",priority:data.priority||"عادی",done:false});
+  persistDemoData();
   document.getElementById("content").innerHTML=renderWorkflow();
   toast("وظیفه به فهرست نمایشی اضافه شد؛ ذخیره دائمی نیست.");
  }
@@ -290,10 +309,12 @@ document.addEventListener("submit",e=>{
   if(editId){
    const existing=customers.find(c=>c.id===editId);
    if(existing)Object.assign(existing,{name:data.name.trim(),type:data.type,phone:data.phone.trim(),email:data.email.trim(),status:data.status||"فعال",manager:data.manager||"تعیین نشده",notes:data.notes||""});
+   persistDemoData();
    customerFilter="";customerTypeFilter="";navigate("/customers/"+encodeURIComponent(editId));toast("تغییرات مشتری در داده نمونه اعمال شد؛ ثبت دائمی نیست.");
   }else{
    const id="CU-1405-"+String(313+customers.length-5).padStart(4,"0");
    customers.unshift({id,name:data.name.trim(),type:data.type,phone:data.phone.trim(),email:data.email.trim(),status:data.status||"فعال",manager:data.manager||"تعیین نشده",notes:data.notes||""});
+   persistDemoData();
    customerFilter="";customerTypeFilter="";navigate("/customers");toast("مشتری به فهرست نمایشی اضافه شد؛ ثبت دائمی نیست.");
   }
  }
@@ -302,7 +323,7 @@ document.addEventListener("submit",e=>{
   const data=Object.fromEntries(new FormData(e.target).entries());
   const item=applications.find(a=>a.id===e.target.dataset.appId);
   const note=String(data.note||"").trim();
-  if(item&&note){item.activity=item.activity||[];item.activity.push({type:"یادداشت پیگیری",text:note,date:new Intl.DateTimeFormat("fa-IR",{dateStyle:"short",timeStyle:"short"}).format(new Date())});render();toast("یادداشت به تاریخچه نمایشی پرونده اضافه شد؛ ذخیره دائمی نیست.");}
+  if(item&&note){item.activity=item.activity||[];item.activity.push({type:"یادداشت پیگیری",text:note,date:new Intl.DateTimeFormat("fa-IR",{dateStyle:"short",timeStyle:"short"}).format(new Date())});persistDemoData();render();toast("یادداشت به تاریخچه نمایشی پرونده اضافه شد؛ ذخیره دائمی نیست.");}
  }
  if(e.target.id==="application-form"){
   e.preventDefault();
@@ -312,6 +333,7 @@ document.addEventListener("submit",e=>{
   created.activity.push({type:"ثبت پرونده",text:"پرونده در سامانه ثبت شد.",date:created.date});
   if(data.notes&&String(data.notes).trim())created.activity.push({type:"توضیحات اولیه",text:String(data.notes).trim(),date:created.date});
   applications.unshift(created);
+  persistDemoData();
   applicationFilter="";navigate("/applications");toast("پرونده به فهرست نمایشی اضافه شد؛ ثبت دائمی نیست.");
  }
 });
