@@ -108,6 +108,7 @@ REST_FRAMEWORK = {
         # Login attempts are also keyed by normalized username + source IP.
         "login": env("LOGIN_RATE_LIMIT", default="5/minute"),
         "login_ip": env("LOGIN_IP_RATE_LIMIT", default="20/minute"),
+        "password_change": env("PASSWORD_CHANGE_RATE_LIMIT", default="5/hour"),
     },
 }
 
