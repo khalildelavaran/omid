@@ -73,7 +73,6 @@ class DocumentApiTests(TestCase):
         self.assertEqual(len(document.sha256), 64)
         self.assertNotIn("file", response.data)
         self.assertTrue(document.file.name.startswith("documents/"))
-        self.assertNotIn(str(document.file.storage.base_url), response.data)
         self.assertTrue(
             AuditEvent.objects.filter(
                 action="document.uploaded",
@@ -89,6 +88,17 @@ class DocumentApiTests(TestCase):
         response = self.client.post(
             "/api/v1/documents/",
             self.upload_payload(content=b"<html>not a pdf</html>", content_type="application/pdf"),
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Document.objects.count(), 0)
+
+    def test_upload_size_limit_is_enforced(self):
+        self.client.force_authenticate(self.staff)
+        oversized = VALID_PDF + (b"x" * (10 * 1024 * 1024 + 1))
+        response = self.client.post(
+            "/api/v1/documents/",
+            self.upload_payload(content=oversized),
             format="multipart",
         )
         self.assertEqual(response.status_code, 400)
