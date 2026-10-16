@@ -12,6 +12,7 @@ htmlcov/
 # Django/runtime
 staticfiles/
 media/
+private_documents/
 *.log
 db.sqlite3
 
