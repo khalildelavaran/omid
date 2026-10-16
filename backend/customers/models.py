@@ -2,6 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Customer(models.Model):
@@ -15,7 +16,7 @@ class Customer(models.Model):
         ARCHIVED = "archived", "بایگانی‌شده"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    customer_number = models.CharField(max_length=24, unique=True, db_index=True)
+    customer_number = models.CharField(max_length=24, unique=True, db_index=True, blank=True, default="")
     customer_type = models.CharField(
         max_length=16,
         choices=CustomerType.choices,
@@ -42,6 +43,11 @@ class Customer(models.Model):
             models.Index(fields=["status", "customer_type"]),
             models.Index(fields=["last_name", "first_name"]),
         ]
+
+    def save(self, *args, **kwargs):
+        if not self.customer_number:
+            self.customer_number = f"CUST-{timezone.localdate():%Y%m%d}-{uuid.uuid4().hex[:8].upper()}"
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         if self.customer_type == self.CustomerType.ORGANIZATION:
