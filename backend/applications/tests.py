@@ -3,6 +3,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserProfile
+from core.models import AuditEvent
 from customers.models import Customer
 from .models import ApplicationEvent, LoanApplication
 
@@ -119,6 +120,35 @@ class LoanApplicationApiTests(TestCase):
         event = ApplicationEvent.objects.get(application=self.application, event_type=ApplicationEvent.EventType.NOTE_ADDED)
         self.assertEqual(event.note, "تماس با مشتری انجام شد.")
         self.assertEqual(event.actor, self.staff)
+
+    def test_application_note_audit_does_not_copy_note_content(self):
+        self.client.force_authenticate(self.staff)
+        note = "یادداشت محرمانه نمونه"
+        response = self.client.post(
+            f"/api/v1/applications/{self.application.pk}/notes/",
+            {"note": note},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        audit = AuditEvent.objects.get(action="application.note_added", entity_id=str(self.application.pk))
+        self.assertEqual(audit.metadata["note_length"], len(note))
+        self.assertNotIn(note, str(audit.metadata))
+
+    def test_application_creation_is_globally_audited(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.post(
+            "/api/v1/applications/",
+            {
+                "application_number": "OM-APP-AUDIT-1",
+                "customer": str(self.customer.pk),
+                "product_type": "personal",
+                "requested_amount": 120000,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        audit = AuditEvent.objects.get(action="application.created", entity_id=response.data["id"])
+        self.assertEqual(audit.actor, self.staff)
 
     def test_events_endpoint_returns_history(self):
         self.client.force_authenticate(self.staff)
