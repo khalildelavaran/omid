@@ -75,6 +75,13 @@ class Document(models.Model):
             models.Index(fields=["application", "status"], name="doc_app_status_idx"),
             models.Index(fields=["document_type", "created_at"], name="doc_type_created_idx"),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["replaces_document"],
+                condition=models.Q(replaces_document__isnull=False),
+                name="doc_replacement_once_uniq",
+            ),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.document_number:
