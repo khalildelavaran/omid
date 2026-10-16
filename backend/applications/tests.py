@@ -147,6 +147,8 @@ class LoanApplicationApiTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data["application_number"].startswith("APP-"))
+        self.assertNotEqual(response.data["application_number"], "OM-APP-AUDIT-1")
         audit = AuditEvent.objects.get(action="application.created", entity_id=response.data["id"])
         self.assertEqual(audit.actor, self.staff)
 
