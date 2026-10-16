@@ -77,7 +77,24 @@ tbody tr[hidden]{display:none}
 </main>
 </div>
 <div id="toast" class="toast" role="status"></div>
-<script>window.__OMID_REQUEST_PATH=${JSON.stringify(url.pathname)};</script>
+<script>
+window.__OMID_REQUEST_PATH=${JSON.stringify(url.pathname)};
+window.addEventListener("error",function(event){
+ try{
+  var box=document.getElementById("omid-runtime-diagnostic");
+  if(!box){box=document.createElement("div");box.id="omid-runtime-diagnostic";box.style.cssText="position:fixed;z-index:99999;inset:auto 12px 12px 12px;background:#7f1d1d;color:#fff;padding:14px;border-radius:10px;font:12px/1.8 Tahoma,sans-serif;direction:rtl;white-space:pre-wrap";
+  document.body.appendChild(box);}
+  box.textContent="خطای اجرای سامانه امید\nمسیر مرورگر: "+location.pathname+"\nمسیر پاسخ سرور: "+window.__OMID_REQUEST_PATH+"\nپیام: "+(event.message||"خطای نامشخص")+"\nفایل/خط: "+(event.filename||"")+" : "+(event.lineno||"");
+ }catch(ignore){}
+});
+window.addEventListener("unhandledrejection",function(event){
+ try{
+  var box=document.getElementById("omid-runtime-diagnostic");
+  if(!box){box=document.createElement("div");box.id="omid-runtime-diagnostic";box.style.cssText="position:fixed;z-index:99999;inset:auto 12px 12px 12px;background:#7f1d1d;color:#fff;padding:14px;border-radius:10px;font:12px/1.8 Tahoma,sans-serif;direction:rtl;white-space:pre-wrap";document.body.appendChild(box);}
+  box.textContent="خطای ناهمگام سامانه امید\nمسیر مرورگر: "+location.pathname+"\nمسیر پاسخ سرور: "+window.__OMID_REQUEST_PATH+"\nپیام: "+String(event.reason);
+ }catch(ignore){}
+});
+</script>
 <script>
 const customers = [
  {id:"CU-1405-0312",name:"علی محمدی",type:"حقیقی",phone:"09121234567",email:"ali@example.com",status:"فعال",manager:"مریم رضایی"},
@@ -281,7 +298,7 @@ function renderApplicationDetail(id){
  return '<div class="card"><div class="card-head"><h2>پرونده '+esc(a.id)+'</h2>'+statusPill(a.status)+'</div><div class="form-grid"><div class="form-row"><label>مشتری</label><div>'+esc(a.customer)+'</div></div><div class="form-row"><label>نوع تسهیلات</label><div>'+esc(a.type)+'</div></div><div class="form-row"><label>مبلغ درخواستی</label><div>'+esc(a.amount)+'</div></div><div class="form-row"><label>مسئول پرونده</label><div>'+esc(a.manager)+'</div></div><div class="form-row"><label>تاریخ ثبت</label><div>'+esc(a.date)+'</div></div></div><div class="setting-row"><div>تغییر وضعیت پرونده<small>هر تغییر در تاریخچه همین نشست ثبت می‌شود</small></div><select class="field" id="application-detail-status" data-app-id="'+esc(a.id)+'" style="max-width:220px"><option '+(a.status==="در حال بررسی"?"selected":"")+'>در حال بررسی</option><option '+(a.status==="در انتظار تأیید"?"selected":"")+'>در انتظار تأیید</option><option '+(a.status==="تکمیل مدارک"?"selected":"")+'>تکمیل مدارک</option><option '+(a.status==="تأیید شده"?"selected":"")+'>تأیید شده</option><option '+(a.status==="رد شده"?"selected":"")+'>رد شده</option></select></div><div class="card" style="margin-top:18px"><div class="card-head"><h2>مدارک مرتبط</h2><span class="muted">'+relatedDocs.length+' مدرک</span></div>'+ (docRows?table(["نام مدرک","نوع","وضعیت","تاریخ"],docRows):'<div class="empty">مدرکی برای این پرونده در داده نمونه ثبت نشده است.</div>')+'<div class="actions"><button class="btn" data-link="/documents">رفتن به مدیریت مدارک</button></div></div><div class="section"><div class="card"><h2>ثبت یادداشت پیگیری</h2><form id="application-note-form" data-app-id="'+esc(a.id)+'"><div class="form-row"><label>یادداشت *</label><textarea class="field" name="note" required maxlength="1000" placeholder="نتیجه تماس، اقدام بعدی یا نکته پرونده..."></textarea></div><div class="actions" style="margin-top:12px"><button class="btn primary" type="submit">ثبت یادداشت</button></div></form></div><div class="card"><h2>تاریخچه پرونده</h2><div class="task-list">'+(activity||'<div class="empty">هنوز رویدادی ثبت نشده است.</div>')+'</div></div></div><div class="notice">این تاریخچه و یادداشت‌ها فقط در حافظه موقت رابط کاربری هستند. برای استفاده واقعی، ذخیره‌سازی سمت سرور، کنترل دسترسی و گزارش ممیزی لازم است.</div><div class="actions"><button class="btn" data-link="/workflow">مشاهده گردش کار</button></div></div>';
 }
 function render(){
- let path=window.__OMID_REQUEST_PATH||location.pathname; while(path.length>1&&path.endsWith("/"))path=path.slice(0,-1);
+ let path=location.pathname||window.__OMID_REQUEST_PATH||"/"; while(path.length>1&&path.endsWith("/"))path=path.slice(0,-1);
  let page=path.split("/")[1]||"dashboard";
  if(page==="new")page=path.split("/")[0]==="customers"?"customers":"applications";
  if(!pageInfo[page])page="dashboard";
