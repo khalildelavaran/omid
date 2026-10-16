@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -19,6 +20,18 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        user = self.request.user
+        if not user.is_superuser:
+            try:
+                role = user.profile.role
+            except (AttributeError, user.__class__.profile.RelatedObjectDoesNotExist):
+                return queryset.none()
+            if role != "system_admin":
+                if role in {"intake", "case_worker"}:
+                    queryset = queryset.filter(assigned_to=user)
+                elif role not in {"credit_approver", "finance", "auditor"}:
+                    return queryset.none()
+
         status_filter = self.request.query_params.get("status")
         customer = self.request.query_params.get("customer")
         search = self.request.query_params.get("search")
@@ -29,7 +42,6 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
         if customer:
             queryset = queryset.filter(customer_id=customer)
         if search:
-            from django.db.models import Q
             queryset = queryset.filter(
                 Q(application_number__icontains=search)
                 | Q(customer__customer_number__icontains=search)
