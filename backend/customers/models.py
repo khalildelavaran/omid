@@ -40,8 +40,8 @@ class Customer(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["status", "customer_type"]),
-            models.Index(fields=["last_name", "first_name"]),
+            models.Index(fields=["status", "customer_type"], name="customers_c_status_11e2b7_idx"),
+            models.Index(fields=["last_name", "first_name"], name="customers_c_last_na_23db24_idx"),
         ]
 
     def save(self, *args, **kwargs):
