@@ -99,6 +99,12 @@ const tasks = [
  {title:"بازبینی درخواست‌های در انتظار تأیید",owner:"مدیر سامانه",due:"فردا",priority:"متوسط",done:false},
  {title:"ثبت نتیجه تماس با مشتری",owner:"مریم رضایی",due:"پس‌فردا",priority:"عادی",done:true}
 ];
+const staff = [
+ {name:"حسین بهدارند",role:"مدیر",phone:"",status:"فعال"},
+ {name:"مهرنوش شهبازی",role:"معاون",phone:"",status:"فعال"},
+ {name:"فرنوش شهبازی",role:"قراردادها",phone:"",status:"فعال"},
+ {name:"ظریفه بساک",role:"پذیرش",phone:"",status:"فعال"}
+];
 const docs = [
  {name:"فرم درخواست تسهیلات",case:"OM-1405-0248",type:"فرم",status:"تأیید شده",date:"۱۴۰۵/۰۷/۲۴"},
  {name:"تصویر کارت ملی",case:"OM-1405-0247",type:"هویتی",status:"در انتظار بررسی",date:"۱۴۰۵/۰۷/۲۳"},
@@ -115,11 +121,12 @@ function restoreDemoData(){
   if(Array.isArray(saved.applications)){applications.splice(0,applications.length,...saved.applications);}
   if(Array.isArray(saved.tasks)){tasks.splice(0,tasks.length,...saved.tasks);}
   if(Array.isArray(saved.docs)){docs.splice(0,docs.length,...saved.docs);}
+  if(Array.isArray(saved.staff)){staff.splice(0,staff.length,...saved.staff);}
  }catch(error){console.warn("Omid demo data could not be restored",error);}
 }
 function persistDemoData(){
  try{
-  localStorage.setItem(DEMO_STORAGE_KEY,JSON.stringify({customers,applications,tasks,docs}));
+  localStorage.setItem(DEMO_STORAGE_KEY,JSON.stringify({customers,applications,tasks,docs,staff}));
  }catch(error){console.warn("Omid demo data could not be saved",error);toast("ذخیره محلی در این مرورگر در دسترس نیست.");}
 }
 restoreDemoData();
@@ -235,8 +242,10 @@ function renderReports(){
  return '<div class="grid">'+stat("پرونده‌های ثبت‌شده",total,"▤","","بر اساس فهرست فعلی")+stat("مجموع مبلغ نمایشی",totalAmount.toLocaleString("fa-IR"),"↗","blue","جمع اعداد درج‌شده در مبالغ")+stat("تکمیل مدارک",pct(documentsPending)+"٪","✓","purple","سهم پرونده‌های نیازمند مدارک")+stat("در انتظار تصمیم",waiting,"◷","amber","در حال بررسی یا انتظار تأیید")+'</div><div class="section"><div class="card"><h2>تفکیک وضعیت پرونده‌ها</h2>'+rows.map(r=>'<div class="status-row"><span>'+esc(r[0])+'</span><b>'+r[1]+' · '+pct(r[1])+'٪</b></div><div class="progress"><span style="width:'+pct(r[1])+'%;background:'+(r[0]==="تأیید شده"?"#7589e8":r[0]==="تکمیل مدارک"?"#f2bb5b":"#35b9a5")+'"></span></div>').join('')+'</div><div class="card"><h2>راهنمای گزارش</h2><div class="notice">این گزارش از پرونده‌های نمونه‌ای که در حال حاضر در رابط کاربری وجود دارند محاسبه می‌شود و آمار سازمانی واقعی نیست.</div><div class="setting-row"><div>تعداد مشتریان در نمونه</div><b>'+customers.length+'</b></div><div class="setting-row"><div>تعداد پرونده‌های تأییدشده</div><b>'+approved+'</b></div><div class="setting-row"><div>پرونده‌های نیازمند مدارک</div><b>'+documentsPending+'</b></div></div></div><div class="card table-card"><h2>خلاصه درخواست‌ها</h2>'+table(["وضعیت","تعداد","اقدام پیشنهادی"],summary)+'</div>';
 }
 function renderSettings(){
+ const roleOptions=["مدیر","معاون","قراردادها","پذیرش"];
+ const staffRows=staff.map((person,index)=>'<tr><td>'+esc(person.name)+'</td><td><span class="pill">'+esc(person.role)+'</span></td><td>'+esc(person.phone||"—")+'</td><td>'+esc(person.status||"فعال")+'</td><td><button type="button" class="btn danger" data-action="delete-staff" data-staff-index="'+index+'">حذف</button></td></tr>').join("");
  setMeta("تنظیمات",'<button class="btn primary" data-action="save-settings">ذخیره ترجیحات</button>');
- return '<div class="section" style="margin-top:0"><div class="card"><h2>تنظیمات عمومی</h2><div class="setting-row"><div>عنوان سامانه<small>نامی که در پنل نمایش داده می‌شود</small></div><input class="field" style="max-width:220px" value="سامانه امید"></div><div class="setting-row"><div>زبان رابط کاربری<small>زبان نمایش پنل</small></div><select class="field" style="max-width:180px"><option>فارسی</option></select></div><div class="setting-row"><div>منطقه زمانی<small>زمان نمایش رویدادها</small></div><select class="field" style="max-width:180px"><option>Asia/Tehran</option></select></div></div><div class="card"><h2>وضعیت اتصال</h2><div class="setting-row"><div>رابط برنامه‌نویسی (API)<small>اتصال به بک‌اند Django</small></div>'+statusPill("هنوز متصل نیست")+'</div><div class="setting-row"><div>پایگاه داده<small>PostgreSQL</small></div>'+statusPill("در انتظار اتصال")+'</div><div class="setting-row"><div>درگاه پیامک<small>قابل تنظیم در مرحله بعد</small></div>'+statusPill("پیکربندی نشده")+'</div></div></div><div class="card" style="margin-top:15px"><h2>امنیت و دسترسی</h2><div class="notice">قبل از استفاده عملیاتی، ورود امن، نقش‌ها و مجوزها، ثبت رویدادهای ممیزی و مدیریت اسرار محیط باید تکمیل و آزموده شوند.</div><div class="setting-row"><div>احراز هویت کاربران<small>ورود و نشست امن</small></div><span class="pill wait">در حال توسعه</span></div><div class="setting-row"><div>ثبت رویدادهای ممیزی<small>ردیابی تغییرات پرونده‌ها</small></div><span class="pill wait">در حال توسعه</span></div></div>';
+ return '<div class="section" style="margin-top:0"><div class="card"><div class="card-head"><h2>کارمندان و نقش‌ها</h2><span class="muted">'+staff.length+' کارمند</span></div><div class="notice">در این بخش می‌توانید فهرست کارکنان و نقش سازمانی آن‌ها را مدیریت کنید. این نقش‌ها فعلاً برای دسته‌بندی و نمایش هستند و هنوز مجوزهای واقعی دسترسی را کنترل نمی‌کنند.</div><div class="table-wrap">'+table(["نام کارمند","نقش","شماره تماس","وضعیت","عملیات"],staffRows)+'</div><section class="profile-section"><h2>افزودن کارمند</h2><form id="staff-form"><div class="form-grid"><div class="form-row"><label>نام و نام خانوادگی *</label><input class="field" name="staffName" required placeholder="نام کامل کارمند"></div><div class="form-row"><label>نقش سازمانی *</label><select class="field" name="staffRole" required>'+roleOptions.map(r=>'<option>'+r+'</option>').join("")+'</select></div><div class="form-row"><label>شماره تماس (اختیاری)</label><input class="field" name="staffPhone" inputmode="tel" placeholder="شماره تماس"></div><div class="form-row"><label>وضعیت</label><select class="field" name="staffStatus"><option>فعال</option><option>غیرفعال</option></select></div></div><div class="actions" style="margin-top:14px"><button class="btn primary" type="submit">＋ ثبت کارمند</button></div></form></section></div><div class="card"><h2>تنظیمات عمومی</h2><div class="setting-row"><div>عنوان سامانه<small>نامی که در پنل نمایش داده می‌شود</small></div><input class="field" style="max-width:220px" value="سامانه امید"></div><div class="setting-row"><div>زبان رابط کاربری<small>زبان نمایش پنل</small></div><select class="field" style="max-width:180px"><option>فارسی</option></select></div><div class="setting-row"><div>منطقه زمانی<small>زمان نمایش رویدادها</small></div><select class="field" style="max-width:180px"><option>Asia/Tehran</option></select></div></div><div class="card"><h2>وضعیت اتصال</h2><div class="setting-row"><div>رابط برنامه‌نویسی (API)<small>اتصال به بک‌اند Django</small></div>'+statusPill("هنوز متصل نیست")+'</div><div class="setting-row"><div>پایگاه داده<small>PostgreSQL</small></div>'+statusPill("در انتظار اتصال")+'</div><div class="setting-row"><div>درگاه پیامک<small>قابل تنظیم در مرحله بعد</small></div>'+statusPill("پیکربندی نشده")+'</div></div></div><div class="card" style="margin-top:15px"><h2>امنیت و دسترسی</h2><div class="notice">قبل از استفاده عملیاتی، ورود امن، نقش‌ها و مجوزها، ثبت رویدادهای ممیزی و مدیریت اسرار محیط باید تکمیل و آزموده شوند.</div><div class="setting-row"><div>احراز هویت کاربران<small>ورود و نشست امن</small></div><span class="pill wait">در حال توسعه</span></div><div class="setting-row"><div>ثبت رویدادهای ممیزی<small>ردیابی تغییرات پرونده‌ها</small></div><span class="pill wait">در حال توسعه</span></div></div>';
 }
 function renderCustomerDetail(id){
  const c=customers.find(x=>x.id===id);if(!c)return '<div class="card">مشتری پیدا نشد.</div>';
@@ -326,6 +335,16 @@ document.addEventListener("click",e=>{
     }
    }
   }
+  if(act==="delete-staff"){
+   const idx=Number(action.dataset.staffIndex);
+   if(Number.isInteger(idx)&&idx>=0&&idx<staff.length){
+    const removed=staff[idx];
+    staff.splice(idx,1);
+    persistDemoData();
+    document.getElementById("content").innerHTML=renderSettings();
+    toast("کارمند "+removed.name+" از فهرست حذف شد.");
+   }
+  }
   if(act==="refresh"){render();toast("صفحه با داده‌های نمایشی فعلی به‌روزرسانی شد.");}
   if(act==="delete-task"){const idx=Number(action.dataset.taskId);if(Number.isInteger(idx)&&idx>=0&&idx<tasks.length){tasks.splice(idx,1);persistDemoData();document.getElementById("content").innerHTML=renderWorkflow();toast("وظیفه حذف شد و در همین مرورگر ذخیره شد.");}}
   if(act==="customer-detail")navigate("/customers/"+encodeURIComponent(action.dataset.id));
@@ -372,6 +391,18 @@ document.addEventListener("change",e=>{
  }
 });
 document.addEventListener("submit",async e=>{
+ if(e.target.id==="staff-form"){
+  e.preventDefault();
+  const data=Object.fromEntries(new FormData(e.target).entries());
+  const name=String(data.staffName||"").trim();
+  const role=String(data.staffRole||"").trim();
+  if(!name||!role){toast("نام و نقش کارمند را وارد کنید.");return;}
+  if(staff.some(p=>p.name.trim()===name&&p.role===role)){toast("این کارمند با همین نقش قبلاً ثبت شده است.");return;}
+  staff.push({name,role,phone:String(data.staffPhone||"").trim(),status:data.staffStatus||"فعال"});
+  persistDemoData();
+  document.getElementById("content").innerHTML=renderSettings();
+  toast("کارمند در فهرست تنظیمات ثبت شد.");
+ }
  if(e.target.id==="task-form"){
   e.preventDefault();
   const data=Object.fromEntries(new FormData(e.target).entries());
