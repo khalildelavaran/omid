@@ -167,6 +167,8 @@ class GuaranteeRequestApiTests(TestCase):
         self.assertEqual(updated.status_code, 405)
         request.refresh_from_db()
         self.assertEqual(request.status, GuaranteeRequest.Status.REGISTERED)
+        with self.assertRaises(ValueError):
+            GuaranteeRequest.objects.filter(pk=request.pk).delete()
 
     def test_invalid_status_filter_is_rejected(self):
         self.client.force_authenticate(self.staff)
