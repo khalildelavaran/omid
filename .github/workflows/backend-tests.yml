@@ -33,11 +33,31 @@ jobs:
           DJANGO_SECRET_KEY: ci-only-not-a-real-secret
           DJANGO_DEBUG: "True"
         run: python backend/manage.py check
-      - name: Diagnose generated document migration
+      - name: Diagnose document field migration state
         env:
           DJANGO_SECRET_KEY: ci-only-not-a-real-secret
           DJANGO_DEBUG: "True"
-        run: python backend/manage.py makemigrations documents --dry-run --verbosity 3
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, "backend")
+          import django
+          django.setup()
+          from django.apps import apps
+          from django.db.migrations.loader import MigrationLoader
+          def normalized(field):
+              name, path, args, kwargs = field.deconstruct()
+              storage = kwargs.get("storage")
+              if hasattr(storage, "deconstruct"):
+                  kwargs["storage"] = storage.deconstruct()
+              return {"name": name, "path": path, "args": args, "kwargs": kwargs}
+          old_field = MigrationLoader(None).project_state().models[("documents", "document")].fields["file"]
+          new_field = apps.get_model("documents", "Document")._meta.get_field("file")
+          print("MIGRATED FIELD:", repr(normalized(old_field)))
+          print("CURRENT FIELD:", repr(normalized(new_field)))
+          print("MIGRATED STORAGE:", repr(old_field.storage.deconstruct()), repr(vars(old_field.storage)))
+          print("CURRENT STORAGE:", repr(new_field.storage.deconstruct()), repr(vars(new_field.storage)))
+          PY
       - name: Check migration consistency
         env:
           DJANGO_SECRET_KEY: ci-only-not-a-real-secret
