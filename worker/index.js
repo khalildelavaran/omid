@@ -98,6 +98,10 @@ tbody tr[hidden]{display:none}
 .customer-detail-card .profile-document-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .customer-detail-actions{display:flex;flex-wrap:wrap;gap:9px;align-items:center;padding:10px 12px!important;margin:0!important;border:1px solid #dbe7f5;border-radius:12px;background:#f7faff}
 .customer-detail-actions>strong{margin-inline-end:4px;color:#243b5a}
+.page-meta:has(.customer-detail-actions){justify-content:center}
+.page-meta:has(.customer-detail-actions)>.crumb{display:none}
+.page-meta:has(.customer-detail-actions)>.actions{width:100%;justify-content:center}
+.customer-detail-actions{justify-content:center;max-width:100%}
 @media(max-width:1000px){.customer-detail-card>.profile-section:nth-of-type(1) .form-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.customer-detail-card .profile-document-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.customer-detail-card{grid-template-columns:1fr;padding:12px}.customer-detail-card>.card-head,.customer-detail-card>.profile-section,.customer-detail-card>.profile-section:nth-of-type(1),.customer-detail-card>.profile-section:nth-of-type(5),.customer-detail-card>.profile-section:nth-of-type(6){grid-column:1}.customer-detail-card>.profile-section:nth-of-type(1) .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.customer-detail-card .profile-info-grid,.customer-detail-card .profile-document-grid{grid-template-columns:1fr}}
 @media(max-width:480px){.customer-detail-card>.profile-section:nth-of-type(1) .form-grid{grid-template-columns:1fr}.customer-detail-actions{align-items:stretch}.customer-detail-actions>.btn{flex:1 1 100%}}
