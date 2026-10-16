@@ -1,5 +1,6 @@
 from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.schemas import get_schema_view
+from rest_framework.renderers import JSONOpenAPIRenderer
 
 from accounts.models import UserProfile
 
@@ -34,5 +35,6 @@ openapi_schema_view = get_schema_view(
     ),
     version="1.0.0",
     public=True,
+    renderer_classes=[JSONOpenAPIRenderer],
     permission_classes=[IsAuthenticated, CanReadApiSchema],
 )
