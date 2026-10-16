@@ -9,7 +9,7 @@ from accounts.models import UserProfile
 from applications.models import LoanApplication
 from customers.models import Customer
 from core.models import AuditEvent
-from .models import WorkflowTask
+from .models import WorkflowTask, WorkflowTaskEvent
 
 
 User = get_user_model()
@@ -111,6 +111,12 @@ class WorkflowTaskApiTests(TestCase):
         self.assertNotEqual(response.data["task_number"], "FORGED-TASK-NUMBER")
         self.assertEqual(response.data["assigned_to"], self.staff.pk)
         self.assertTrue(AuditEvent.objects.filter(action="task.created", entity_id=response.data["id"]).exists())
+        created_event = WorkflowTaskEvent.objects.get(
+            task_id=response.data["id"],
+            event_type=WorkflowTaskEvent.EventType.CREATED,
+        )
+        self.assertEqual(created_event.actor, self.staff)
+        self.assertEqual(created_event.new_status, WorkflowTask.Status.OPEN)
 
     def test_task_status_transition_sets_completion_timestamp(self):
         task = WorkflowTask.objects.create(
@@ -129,6 +135,12 @@ class WorkflowTaskApiTests(TestCase):
         self.assertIsNotNone(response.data["completed_at"])
         task.refresh_from_db()
         self.assertEqual(task.status, WorkflowTask.Status.COMPLETED)
+        event = WorkflowTaskEvent.objects.get(
+            task=task, event_type=WorkflowTaskEvent.EventType.STATUS_CHANGED
+        )
+        self.assertEqual(event.previous_status, WorkflowTask.Status.OPEN)
+        self.assertEqual(event.new_status, WorkflowTask.Status.COMPLETED)
+        self.assertEqual(event.actor, self.staff)
 
     def test_completed_task_cannot_be_reopened(self):
         task = WorkflowTask.objects.create(
@@ -185,6 +197,97 @@ class WorkflowTaskApiTests(TestCase):
         self.assertEqual(response.status_code, 405)
         self.assertTrue(WorkflowTask.objects.filter(pk=task.pk).exists())
 
+
+    def test_task_note_is_saved_in_event_history_without_leaking_to_audit_metadata(self):
+        task = WorkflowTask.objects.create(
+            application=self.application,
+            title="نیازمند پیگیری",
+            assigned_to=self.staff,
+            created_by=self.staff,
+        )
+        self.client.force_authenticate(self.staff)
+        note = "با مشتری تماس گرفته شد."
+        response = self.client.post(
+            f"/api/v1/tasks/{task.pk}/notes/",
+            {"note": note},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        event = WorkflowTaskEvent.objects.get(
+            task=task, event_type=WorkflowTaskEvent.EventType.NOTE_ADDED
+        )
+        self.assertEqual(event.note, note)
+        self.assertEqual(event.actor, self.staff)
+        audit = AuditEvent.objects.get(action="task.note_added", entity_id=str(task.pk))
+        self.assertEqual(audit.metadata["note_length"], len(note))
+        self.assertNotIn(note, str(audit.metadata))
+
+        history = self.client.get(f"/api/v1/tasks/{task.pk}/events/")
+        self.assertEqual(history.status_code, 200)
+        self.assertEqual(len(history.data), 1)
+        self.assertEqual(history.data[0]["note"], note)
+
+    def test_task_note_requires_nonempty_text_and_has_length_limit(self):
+        task = WorkflowTask.objects.create(
+            application=self.application,
+            title="یادداشت‌ها",
+            assigned_to=self.staff,
+            created_by=self.staff,
+        )
+        self.client.force_authenticate(self.staff)
+        empty = self.client.post(
+            f"/api/v1/tasks/{task.pk}/notes/", {"note": "  "}, format="json"
+        )
+        self.assertEqual(empty.status_code, 400)
+        too_long = self.client.post(
+            f"/api/v1/tasks/{task.pk}/notes/",
+            {"note": "x" * 5001},
+            format="json",
+        )
+        self.assertEqual(too_long.status_code, 400)
+        self.assertFalse(task.events.filter(event_type=WorkflowTaskEvent.EventType.NOTE_ADDED).exists())
+
+    def test_task_event_history_is_hidden_for_unrelated_worker(self):
+        task = WorkflowTask.objects.create(
+            application=self.application,
+            title="تاریخچه خصوصی",
+            assigned_to=self.staff,
+            created_by=self.staff,
+        )
+        WorkflowTaskEvent.objects.create(
+            task=task,
+            event_type=WorkflowTaskEvent.EventType.NOTE_ADDED,
+            note="یادداشت خصوصی",
+            actor=self.staff,
+        )
+        other = User.objects.create_user(
+            username="unrelated-event-reader", password="test-password-123", is_staff=True
+        )
+        UserProfile.objects.create(user=other, role=UserProfile.Role.CASE_WORKER)
+        self.client.force_authenticate(other)
+        response = self.client.get(f"/api/v1/tasks/{task.pk}/events/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_task_events_are_append_only(self):
+        task = WorkflowTask.objects.create(
+            application=self.application,
+            title="عدم تغییر تاریخچه",
+            assigned_to=self.staff,
+            created_by=self.staff,
+        )
+        event = WorkflowTaskEvent.objects.create(
+            task=task,
+            event_type=WorkflowTaskEvent.EventType.CREATED,
+            actor=self.staff,
+        )
+        event.note = "tampered"
+        with self.assertRaises(ValueError):
+            event.save()
+        with self.assertRaises(ValueError):
+            event.delete()
+        with self.assertRaises(ValueError):
+            WorkflowTaskEvent.objects.filter(pk=event.pk).update(note="tampered")
+
     def test_only_system_admin_can_assign_task(self):
         task = WorkflowTask.objects.create(
             application=self.application,
@@ -214,3 +317,9 @@ class WorkflowTaskApiTests(TestCase):
         task.refresh_from_db()
         self.assertEqual(task.assigned_to_id, target.pk)
         self.assertTrue(AuditEvent.objects.filter(action="task.assigned", entity_id=str(task.pk)).exists())
+        event = WorkflowTaskEvent.objects.get(
+            task=task, event_type=WorkflowTaskEvent.EventType.ASSIGNED
+        )
+        self.assertEqual(event.previous_assignee_id, self.staff.pk)
+        self.assertEqual(event.new_assignee_id, target.pk)
+        self.assertEqual(event.actor, admin_user)
