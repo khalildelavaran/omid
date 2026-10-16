@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: omid
+      POSTGRES_USER: omid
+      POSTGRES_PASSWORD: omid_dev_only
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - omid_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U omid -d omid"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  omid_postgres_data:
