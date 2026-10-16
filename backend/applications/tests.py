@@ -121,6 +121,23 @@ class LoanApplicationApiTests(TestCase):
         self.assertEqual(audit.metadata["decision_note_length"], len(reason))
         self.assertNotIn(reason, str(audit.metadata))
 
+    def test_new_loan_application_cannot_be_created_in_a_final_status(self):
+        admin_user = User.objects.create_user(username="app-system-admin", is_staff=True)
+        UserProfile.objects.create(user=admin_user, role=UserProfile.Role.SYSTEM_ADMIN)
+        self.client.force_authenticate(admin_user)
+        response = self.client.post(
+            "/api/v1/applications/",
+            {
+                "customer": str(self.customer.pk),
+                "product_type": "personal",
+                "requested_amount": 100000,
+                "status": "approved",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(LoanApplication.objects.count(), 1)
+
     def test_credit_approver_can_decide_but_cannot_edit_other_fields(self):
         approver = User.objects.create_user(username="approver", is_staff=True)
         UserProfile.objects.create(user=approver, role=UserProfile.Role.CREDIT_APPROVER)
