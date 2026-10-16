@@ -4,7 +4,7 @@ from rest_framework.throttling import SimpleRateThrottle
 
 
 class LoginRateThrottle(SimpleRateThrottle):
-    """Limit login attempts by source IP and normalized account identifier."""
+    """Limit repeated attempts against the same account from one source IP."""
 
     scope = "login"
 
@@ -16,3 +16,12 @@ class LoginRateThrottle(SimpleRateThrottle):
         ident = self.get_ident(request)
         digest = hashlib.sha256(f"{ident}:{username}".encode("utf-8")).hexdigest()
         return self.cache_format % {"scope": self.scope, "ident": digest}
+
+
+class LoginIPRateThrottle(SimpleRateThrottle):
+    """Also cap total login attempts from a source IP across account names."""
+
+    scope = "login_ip"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
