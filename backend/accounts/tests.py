@@ -135,6 +135,10 @@ class AccountEndpointTests(TestCase):
             event.save()
         with self.assertRaises(ValueError):
             event.delete()
+        with self.assertRaises(ValueError):
+            AuditEvent.objects.filter(pk=event.pk).update(action="tampered")
+        with self.assertRaises(ValueError):
+            AuditEvent.objects.filter(pk=event.pk).delete()
 
 
     @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"password_change": "1/minute"}})
