@@ -7,7 +7,7 @@
 - pagination برای فهرست‌ها، فیلترهای مجاز و مرتب‌سازی allowlistشده.
 - validation در serializer؛ قواعد دامنه در service layer.
 - عملیات حساس با مجوز backend و ثبت audit.
-- schema مستندشده (OpenAPI) پس از ایجاد endpointها تولید و در CI اعتبارسنجی شود.
+- schema ماشین‌خوان OpenAPI از مسیر `/api/v1/schema/` تولید می‌شود؛ این مسیر فقط برای کارکنان دارای نقش داخلی قابل دسترسی است.
 - هر endpoint باید مشخص کند چه نقش‌هایی و چه scope داده‌ای اجازه دسترسی دارند.
 
 نمونه شکل خطا:
@@ -30,6 +30,7 @@
 
 | دامنه | مسیرهای پیشنهادی |
 |---|---|
+| مستندات API | `/api/v1/schema/` (OpenAPI JSON، فقط کارکنان داخلی) |
 | هویت | `/api/v1/auth/csrf/`, `/api/v1/auth/login/`, `/api/v1/auth/me/`, `/api/v1/auth/logout/`, `/api/v1/auth/change-password/` |
 | مشتریان | `/api/v1/customers/`, `/api/v1/customers/{id}/` |
 | پرونده‌ها | `/api/v1/cases/`, `/api/v1/cases/{id}/` |
