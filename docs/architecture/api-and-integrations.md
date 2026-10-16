@@ -34,7 +34,7 @@
 | مشتریان | `/api/v1/customers/`, `/api/v1/customers/{id}/` |
 | پرونده‌ها | `/api/v1/cases/`, `/api/v1/cases/{id}/` |
 | تسهیلات | `/api/v1/applications/`, `/api/v1/applications/{id}/events/`, `/api/v1/applications/{id}/notes/` |
-| وظایف | `/api/v1/tasks/`, `/api/v1/tasks/{id}/` (API اولیه پیاده‌سازی شده؛ واگذاری به کاربر دیگر هنوز اضافه نشده) |
+| وظایف | `/api/v1/tasks/`, `/api/v1/tasks/{id}/`, `/api/v1/tasks/{id}/assign/` (واگذاری فقط برای مدیر سامانه) |
 | اسناد | `/api/v1/documents/`, `/api/v1/documents/{id}/download/` |
 | ممیزی | `/api/v1/audit-events/` (فقط‌خواندنی برای مدیر سامانه و حسابرس) |
 | گزارش | `/api/v1/reports/operations/` (هنوز پیاده‌سازی نشده) |
