@@ -315,7 +315,7 @@ render = function(){
   if(content) content.innerHTML = '<div class="card"><h2>بارگذاری صفحه با مشکل مواجه شد</h2><p class="muted">داده‌های نمایشی این مرورگر با نسخه فعلی سازگار نیستند. صفحه را یک بار بازخوانی کنید؛ اگر مشکل ادامه داشت، داده‌های محلی نسخه نمایشی را پاک‌سازی می‌کنیم.</p><button class="btn primary" type="button" onclick="location.reload()">بارگذاری دوباره</button></div>';
  }
 };
-function navigate(path){history.pushState({}, "", path);customerFilter="";applicationFilter="";if(!path.startsWith("/customers"))customerTypeFilter="";if(!path.startsWith("/applications"))applicationStatusFilter="";if(!path.startsWith("/documents"))documentFilter="";render();window.scrollTo({top:0,behavior:"instant"});}
+function navigate(path){if(!path||typeof path!=="string")return;try{const target=new URL(path,location.origin);if(target.origin!==location.origin){location.href=target.href;return;}location.href=target.pathname+target.search+target.hash;}catch(error){console.error("Omid navigation failed",error);location.href=path;}}
 function toast(message){const el=document.getElementById("toast");el.textContent=message;el.style.display="block";clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>el.style.display="none",3200);}
 document.addEventListener("click",e=>{
  const customerPick=e.target.closest("[data-action=\"select-application-customer\"]");
@@ -325,7 +325,7 @@ document.addEventListener("click",e=>{
   return;
  }
  const link=e.target.closest("[data-link]");
- if(link){e.preventDefault();navigate(link.dataset.link||link.getAttribute("href"));return;}
+ if(link){const destination=link.dataset.link||link.getAttribute("href");if(destination){e.preventDefault();navigate(destination);}return;}
  const anchor=e.target.closest("a[data-page]");
  if(anchor){e.preventDefault();navigate(anchor.getAttribute("href"));return;}
  const action=e.target.closest("[data-action]");
