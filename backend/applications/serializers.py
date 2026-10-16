@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from accounts.models import UserProfile
 from customers.models import Customer
 from .models import ApplicationEvent, LoanApplication
 
@@ -48,6 +49,17 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             if not Customer.objects.filter(pk=value.pk).exists():
                 raise serializers.ValidationError("مشتری انتخاب‌شده معتبر نیست.")
+            user = request.user
+            if not user.is_superuser:
+                profile = getattr(user, "profile", None)
+                role = getattr(profile, "role", None)
+                if role != UserProfile.Role.SYSTEM_ADMIN and role in {
+                    UserProfile.Role.INTAKE,
+                    UserProfile.Role.CASE_WORKER,
+                } and value.assigned_to_id != user.id:
+                    raise serializers.ValidationError(
+                        "برای ثبت پرونده، باید به مشتری انتخاب‌شده دسترسی داشته باشید."
+                    )
         return value
 
     def validate_status(self, value):
