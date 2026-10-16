@@ -1,4 +1,3 @@
-import os
 import re
 
 from django.core.exceptions import ValidationError as DjangoValidationError
