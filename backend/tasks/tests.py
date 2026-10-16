@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -40,6 +43,56 @@ class WorkflowTaskApiTests(TestCase):
         response = self.client.get("/api/v1/tasks/?application=not-a-uuid")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], 0)
+
+    def test_overdue_filter_excludes_completed_tasks_and_summary_counts_scope(self):
+        overdue = WorkflowTask.objects.create(
+            application=self.application,
+            title="وظیفه عقب‌افتاده",
+            due_at=timezone.now() - timedelta(days=2),
+            assigned_to=self.staff,
+            created_by=self.staff,
+        )
+        future = WorkflowTask.objects.create(
+            application=self.application,
+            title="وظیفه آینده",
+            due_at=timezone.now() + timedelta(days=2),
+            assigned_to=self.staff,
+            created_by=self.staff,
+        )
+        completed = WorkflowTask.objects.create(
+            application=self.application,
+            title="وظیفه تکمیل‌شده",
+            status=WorkflowTask.Status.COMPLETED,
+            due_at=timezone.now() - timedelta(days=1),
+            assigned_to=self.staff,
+            created_by=self.staff,
+        )
+        self.client.force_authenticate(self.staff)
+
+        overdue_response = self.client.get("/api/v1/tasks/?overdue=true")
+        self.assertEqual(overdue_response.status_code, 200)
+        self.assertEqual(overdue_response.data["count"], 1)
+        self.assertEqual(overdue_response.data["results"][0]["id"], str(overdue.pk))
+        self.assertTrue(overdue_response.data["results"][0]["is_overdue"])
+
+        not_overdue = self.client.get("/api/v1/tasks/?overdue=false")
+        self.assertEqual(not_overdue.status_code, 200)
+        self.assertEqual(not_overdue.data["count"], 2)
+        by_id = {row["id"]: row for row in not_overdue.data["results"]}
+        self.assertIn(str(future.pk), by_id)
+        self.assertIn(str(completed.pk), by_id)
+        self.assertFalse(by_id[str(completed.pk)]["is_overdue"])
+
+        summary = self.client.get("/api/v1/tasks/summary/")
+        self.assertEqual(summary.status_code, 200)
+        self.assertEqual(summary.data["total"], 3)
+        self.assertEqual(summary.data["overdue"], 1)
+        self.assertEqual(summary.data["completed"], 1)
+
+    def test_invalid_overdue_filter_is_rejected(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.get("/api/v1/tasks/?overdue=sometimes")
+        self.assertEqual(response.status_code, 400)
 
     def test_staff_can_create_task_and_number_is_generated(self):
         self.client.force_authenticate(self.staff)
