@@ -1,7 +1,9 @@
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
+from django.utils.deconstruct import deconstructible
 
 
+@deconstructible
 class PrivateDocumentStorage(FileSystemStorage):
     """Filesystem storage deliberately configured without a public URL."""
 
