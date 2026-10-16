@@ -1,0 +1,47 @@
+from rest_framework import serializers
+
+from .models import Customer
+
+
+class CustomerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = [
+            "id",
+            "customer_number",
+            "customer_type",
+            "first_name",
+            "last_name",
+            "organization_name",
+            "phone_number",
+            "email",
+            "status",
+            "assigned_to",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        customer_type = attrs.get(
+            "customer_type",
+            getattr(self.instance, "customer_type", Customer.CustomerType.INDIVIDUAL),
+        )
+        if customer_type == Customer.CustomerType.INDIVIDUAL:
+            first_name = attrs.get("first_name", getattr(self.instance, "first_name", ""))
+            last_name = attrs.get("last_name", getattr(self.instance, "last_name", ""))
+            if not first_name.strip() or not last_name.strip():
+                raise serializers.ValidationError(
+                    {"first_name": "برای مشتری حقیقی، نام و نام خانوادگی الزامی است."}
+                )
+        elif customer_type == Customer.CustomerType.ORGANIZATION:
+            organization_name = attrs.get(
+                "organization_name",
+                getattr(self.instance, "organization_name", ""),
+            )
+            if not organization_name.strip():
+                raise serializers.ValidationError(
+                    {"organization_name": "برای مشتری حقوقی، نام سازمان الزامی است."}
+                )
+        return attrs
