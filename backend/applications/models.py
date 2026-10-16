@@ -42,7 +42,7 @@ class LoanApplication(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.application_number:
-            self.application_number = f"APP-{timezone.localdate():%Y%m%d}-{uuid.uuid4().hex[:8].upper()}"
+            self.application_number = f"APP-{timezone.localdate():%Y%m%d}-{uuid.uuid4().hex[:10].upper()}"
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
