@@ -21,7 +21,7 @@ class AuditEvent(models.Model):
     objects = AuditEventQuerySet.as_manager()
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="audit_events")
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="audit_events")
     action = models.CharField(max_length=80, db_index=True)
     entity_type = models.CharField(max_length=80, blank=True, db_index=True)
     entity_id = models.CharField(max_length=80, blank=True)
