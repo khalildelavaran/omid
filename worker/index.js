@@ -437,6 +437,12 @@ document.addEventListener("click",e=>{
     toast("کارمند "+removed.name+" از فهرست حذف شد.");
    }
   }
+  if(act==="select-guarantee-application"){
+   const selected=applications.find(a=>a.id===action.dataset.applicationId);
+   const hidden=document.getElementById("guarantee-application-id"),search=document.getElementById("guarantee-application-search"),results=document.getElementById("guarantee-application-results"),label=document.getElementById("guarantee-application-selected");
+   if(selected&&hidden&&search&&results&&label){hidden.value=selected.id;search.value=selected.id;results.innerHTML=guaranteeApplicationResults("",selected.id);label.textContent="پرونده انتخاب‌شده: "+selected.id+" · "+selected.customer+" · "+selected.type;}
+   return;
+  }
   if(act==="refresh"){render();toast("صفحه با داده‌های نمایشی فعلی به‌روزرسانی شد.");}
   if(act==="delete-task"){const idx=Number(action.dataset.taskId);if(Number.isInteger(idx)&&idx>=0&&idx<tasks.length){tasks.splice(idx,1);persistDemoData();document.getElementById("content").innerHTML=renderWorkflow();toast("وظیفه حذف شد و در همین مرورگر ذخیره شد.");}}
   if(act==="customer-detail")navigate("/customers/"+encodeURIComponent(action.dataset.id));
@@ -459,6 +465,12 @@ document.addEventListener("input",e=>{
  if(e.target.id==="document-search"){documentFilter=toEnDigits(e.target.value);const pos=e.target.selectionStart;document.getElementById("content").innerHTML=renderDocuments();const next=document.getElementById("document-search");next.focus();next.setSelectionRange(pos,pos);}
  if(e.target.id==="application-customer-search"){
   const query=e.target.value;const idField=document.getElementById("application-customer-id"),nameField=document.getElementById("application-customer-name"),results=document.getElementById("application-customer-results"),label=document.getElementById("application-customer-selected");if(idField)idField.value="";if(nameField)nameField.value="";if(label)label.textContent="برای ادامه، یکی از نتایج جست‌وجو را انتخاب کنید.";if(results)results.innerHTML=applicationCustomerResults(query,"");
+ }
+ if(e.target.id==="guarantee-application-search"){
+  const hidden=document.getElementById("guarantee-application-id"),results=document.getElementById("guarantee-application-results"),label=document.getElementById("guarantee-application-selected");
+  if(hidden)hidden.value="";
+  if(label)label.textContent="یک پرونده را از نتایج بالا انتخاب کنید.";
+  if(results)results.innerHTML=guaranteeApplicationResults(e.target.value,"");
  }
  if(e.target.id==="global-search"){
   const q=toEnDigits(e.target.value.trim());
@@ -486,6 +498,19 @@ document.addEventListener("change",e=>{
  }
 });
 document.addEventListener("submit",async e=>{
+ if(e.target.id==="guarantee-request-form"){
+  e.preventDefault();
+  const applicationId=String(new FormData(e.target).get("applicationId")||"").trim();
+  const selected=applications.find(a=>a.id===applicationId);
+  if(!selected){toast("ابتدا پرونده تسهیلات را از نتایج جست‌وجو انتخاب کنید.");return;}
+  const requesterId=String(e.target.dataset.requesterId||"");
+  const requester=customers.find(c=>c.id===requesterId);
+  const request={id:"GR-1405-"+String(guaranteeRequests.length+1).padStart(4,"0"),requesterId,requester:requester?requester.name:"مشتری پنل",applicationId:selected.id,customer:selected.customer,status:"ثبت‌شده",note:String(new FormData(e.target).get("note")||"").trim(),date:new Intl.DateTimeFormat("fa-IR",{dateStyle:"short"}).format(new Date())};
+  guaranteeRequests.push(request);
+  persistDemoData();
+  document.getElementById("content").innerHTML=renderGuaranteeRequest();
+  toast("درخواست ضمانت برای پرونده "+selected.id+" ثبت شد. این ثبت فعلاً محلی و نمایشی است.");
+ }
  if(e.target.id==="bank-catalog-form"){
   e.preventDefault();
   const data=Object.fromEntries(new FormData(e.target).entries());
