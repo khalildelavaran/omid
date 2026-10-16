@@ -1,11 +1,15 @@
 import uuid
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from accounts.models import UserProfile
 from core.audit import record_audit
 from .models import WorkflowTask
 from .permissions import IsStaffTaskOperator
@@ -65,6 +69,43 @@ class WorkflowTaskViewSet(viewsets.ModelViewSet):
             entity_id=str(task.pk),
             metadata={"updated_fields": sorted(serializer.validated_data.keys()), "status": task.status},
         )
+
+
+    @action(detail=True, methods=["post"], url_path="assign")
+    @transaction.atomic
+    def assign(self, request, pk=None):
+        role = "system_admin" if request.user.is_superuser else getattr(
+            getattr(request.user, "profile", None), "role", None
+        )
+        if role != UserProfile.Role.SYSTEM_ADMIN:
+            return Response(
+                {"detail": "واگذاری وظیفه فقط در اختیار مدیر سامانه است."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        target_id = request.data.get("assigned_to")
+        if not isinstance(target_id, (str, int)) or not str(target_id).isdigit():
+            raise ValidationError({"assigned_to": "شناسه کاربر معتبر نیست."})
+        target = get_user_model().objects.filter(
+            pk=int(target_id), is_active=True, is_staff=True
+        ).first()
+        target_profile = getattr(target, "profile", None) if target else None
+        if target is None or target_profile is None or target_profile.role == UserProfile.Role.CUSTOMER:
+            raise ValidationError({"assigned_to": "کاربر داخلی فعال و دارای نقش معتبر انتخاب کنید."})
+
+        task = self.get_object()
+        previous_assignee = task.assigned_to_id
+        task.assigned_to = target
+        task.save(update_fields=["assigned_to", "updated_at"])
+        record_audit(
+            request,
+            "task.assigned",
+            actor=request.user,
+            entity_type="workflow_task",
+            entity_id=str(task.pk),
+            metadata={"previous_assignee_id": previous_assignee, "new_assignee_id": target.pk},
+        )
+        return Response(self.get_serializer(task).data, status=status.HTTP_200_OK)
 
     def destroy(self, request, *args, **kwargs):
         return Response({"detail": "حذف فیزیکی وظیفه مجاز نیست."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
