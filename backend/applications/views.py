@@ -95,7 +95,7 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
                 event_type=ApplicationEvent.EventType.STATUS_CHANGED,
                 previous_status=previous_status,
                 new_status=application.status,
-                note=(self.request.data.get("status_note") or "").strip(),
+                note=serializer.context.get("status_note", ""),
                 actor=self.request.user,
             )
             record_audit(
@@ -104,7 +104,11 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
                 actor=self.request.user,
                 entity_type="loan_application",
                 entity_id=str(application.pk),
-                metadata={"previous_status": previous_status, "new_status": application.status},
+                metadata={
+                    "previous_status": previous_status,
+                    "new_status": application.status,
+                    "decision_note_length": len(serializer.context.get("status_note", "")),
+                },
             )
 
     @action(detail=True, methods=["get"], url_path="events")
