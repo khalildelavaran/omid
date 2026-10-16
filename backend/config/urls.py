@@ -27,6 +27,7 @@ urlpatterns = [
     path("api/v1/auth/logout/", LogoutView.as_view(), name="logout"),
     path("api/v1/auth/me/", CurrentUserView.as_view(), name="current-user"),
     path("api/v1/auth/change-password/", ChangePasswordView.as_view(), name="change-password"),
+    path("api/v1/audit-events/", include("core.audit_urls")),
     path("api/v1/customers/", include("customers.urls")),
     path("api/v1/applications/", include("applications.urls")),
     re_path(r"^(?!api/).*$", spa_fallback, name="spa-fallback"),
