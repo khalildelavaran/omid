@@ -426,14 +426,14 @@ document.addEventListener("click",e=>{
  }
 });
 document.addEventListener("input",e=>{
- if(e.target.id==="customer-search"){customerFilter=e.target.value;const pos=e.target.selectionStart;const html=renderCustomers();document.getElementById("content").innerHTML=html;const next=document.getElementById("customer-search");next.focus();next.setSelectionRange(pos,pos);}
- if(e.target.id==="application-search"){applicationFilter=e.target.value;const pos=e.target.selectionStart;const html=renderApplications();document.getElementById("content").innerHTML=html;const next=document.getElementById("application-search");next.focus();next.setSelectionRange(pos,pos);}
- if(e.target.id==="document-search"){documentFilter=e.target.value;const pos=e.target.selectionStart;document.getElementById("content").innerHTML=renderDocuments();const next=document.getElementById("document-search");next.focus();next.setSelectionRange(pos,pos);}
+ if(e.target.id==="customer-search"){customerFilter=toEnDigits(e.target.value);const pos=e.target.selectionStart;const html=renderCustomers();document.getElementById("content").innerHTML=html;const next=document.getElementById("customer-search");next.focus();next.setSelectionRange(pos,pos);}
+ if(e.target.id==="application-search"){applicationFilter=toEnDigits(e.target.value);const pos=e.target.selectionStart;const html=renderApplications();document.getElementById("content").innerHTML=html;const next=document.getElementById("application-search");next.focus();next.setSelectionRange(pos,pos);}
+ if(e.target.id==="document-search"){documentFilter=toEnDigits(e.target.value);const pos=e.target.selectionStart;document.getElementById("content").innerHTML=renderDocuments();const next=document.getElementById("document-search");next.focus();next.setSelectionRange(pos,pos);}
  if(e.target.id==="application-customer-search"){
   const query=e.target.value;const idField=document.getElementById("application-customer-id"),nameField=document.getElementById("application-customer-name"),results=document.getElementById("application-customer-results"),label=document.getElementById("application-customer-selected");if(idField)idField.value="";if(nameField)nameField.value="";if(label)label.textContent="برای ادامه، یکی از نتایج جست‌وجو را انتخاب کنید.";if(results)results.innerHTML=applicationCustomerResults(query,"");
  }
  if(e.target.id==="global-search"){
-  const q=e.target.value.trim();
+  const q=toEnDigits(e.target.value.trim());
   if(currentPage==="customers"){customerFilter=q;document.getElementById("content").innerHTML=renderCustomers();}
   else if(currentPage==="applications"){applicationFilter=q;document.getElementById("content").innerHTML=renderApplications();}
   else if(q){document.querySelectorAll("#content tr, #content .task").forEach(el=>el.hidden=!el.textContent.includes(q));}
