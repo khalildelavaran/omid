@@ -35,6 +35,7 @@ header{display:flex;justify-content:space-between;align-items:center;gap:16px;ma
 footer{text-align:center;padding:24px 0 8px;color:#a0acbb;font-size:10px}
 @media(max-width:1100px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.section{grid-template-columns:1fr}}
 @media(max-width:650px){.profile-repeat-row,.profile-repeat-row.phone-row,.profile-doc-row,.profile-info-grid,.profile-document-grid{grid-template-columns:1fr}.profile-doc-row .profile-doc-preview{grid-column:auto}.app{display:block}aside{width:100%;min-height:0;padding:14px}.brand{padding:0 8px 14px}.menu{display:flex;overflow-x:auto}.menu a{white-space:nowrap;padding:10px 12px}.side-foot{display:none}main{padding:20px 12px}h1{font-size:21px}.grid{gap:9px}.card{padding:14px}.k-value{font-size:24px}.k-icon{width:32px;height:32px}.top{width:100%}.search{width:100%;flex:1}.form-grid{grid-template-columns:1fr}.form-row.full{grid-column:auto}.page-meta{align-items:flex-start}}
+.omid-modal-backdrop{position:fixed;inset:0;z-index:10000;background:rgba(12,28,47,.55);display:flex;align-items:center;justify-content:center;padding:20px}.omid-modal{width:min(520px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border:1px solid #e5ebf2;border-radius:18px;padding:24px;box-shadow:0 24px 80px #07182b45}.omid-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}.omid-modal-head h2{margin:0;font-size:16px}.omid-modal-actions{display:flex;justify-content:flex-start;gap:8px;margin-top:20px}.omid-modal .form-grid{grid-template-columns:1fr}.omid-modal-backdrop[hidden]{display:none!important}@media(max-width:520px){.omid-modal-backdrop{padding:12px}.omid-modal{padding:18px}}
 /* تکمیل تجربه کاربری */
 :root{scroll-behavior:smooth}
 .card{transition:box-shadow .18s ease,border-color .18s ease}
@@ -466,7 +467,20 @@ document.addEventListener("click",e=>{
  if(action){
   const act=action.dataset.action;
   if(act==="print-service"){printServiceReceipt(action.dataset.recordId);return;}
-   if(act==="edit-service"){const index=Number(action.dataset.serviceIndex),item=serviceCatalog[index];if(item){const nameInput=prompt("نام خدمت:",item.name);if(nameInput===null)return;const name=nameInput.trim();if(!name){toast("نام خدمت نمی‌تواند خالی باشد.");return;}if(serviceCatalog.some((x,i)=>i!==index&&x.name.toLocaleLowerCase("fa")===name.toLocaleLowerCase("fa"))){toast("خدمتی با این نام قبلاً ثبت شده است.");return;}const priceInput=prompt("تعرفه خدمت به تومان را وارد کنید (فقط عدد؛ نمونه: 2500000):",String(item.price??0));if(priceInput===null)return;const price=moneyInput(priceInput);if(!Number.isFinite(price)||price<0){toast("تعرفه واردشده معتبر نیست؛ لطفاً فقط عدد وارد کنید.");return;}const descriptionInput=prompt("توضیحات خدمت (اختیاری):",item.description||"");if(descriptionInput===null)return;item.name=name;item.price=price;item.description=descriptionInput.trim();persistDemoData();document.getElementById("content").innerHTML=renderSettings();document.querySelector('[data-action="settings-tab"][data-tab="services"]')?.click();toast("نام، تعرفه و توضیحات خدمت به‌روزرسانی شد.");}return;}
+   if(act==="edit-service"){
+    const index=Number(action.dataset.serviceIndex),item=serviceCatalog[index];
+    if(item){
+     let modal=document.getElementById("service-edit-modal");
+     if(!modal){
+      modal=document.createElement("div");modal.id="service-edit-modal";modal.className="omid-modal-backdrop";modal.hidden=true;
+      modal.innerHTML='<section class="omid-modal" role="dialog" aria-modal="true" aria-labelledby="service-edit-title"><div class="omid-modal-head"><h2 id="service-edit-title">ویرایش خدمت و تعرفه</h2><button type="button" class="btn" data-action="close-service-edit">بستن</button></div><form id="service-edit-form"><input type="hidden" name="serviceIndex"><div class="form-grid"><div class="form-row"><label>نام خدمت *</label><input class="field" name="serviceName" required maxlength="160"></div><div class="form-row"><label>تعرفه خدمت (تومان) *</label><input class="field" type="text" inputmode="numeric" dir="ltr" autocomplete="off" name="servicePrice" required></div><div class="form-row"><label>توضیحات (اختیاری)</label><textarea class="field" name="serviceDescription" rows="3" maxlength="500"></textarea></div></div><div class="omid-modal-actions"><button class="btn primary" type="submit">ذخیره تغییرات</button><button class="btn" type="button" data-action="close-service-edit">انصراف</button></div></form></section>';
+      document.body.appendChild(modal);
+     }
+     const form=modal.querySelector("#service-edit-form");form.elements.serviceIndex.value=String(index);form.elements.serviceName.value=item.name||"";form.elements.servicePrice.value=String(item.price??0);form.elements.serviceDescription.value=item.description||"";modal.hidden=false;form.elements.serviceName.focus();
+    }
+    return;
+   }
+   if(act==="close-service-edit"){const modal=document.getElementById("service-edit-modal");if(modal)modal.hidden=true;return;}
    if(act==="delete-service"){const index=Number(action.dataset.serviceIndex),item=serviceCatalog[index];if(item){if(!confirm("خدمت «"+item.name+"» حذف شود؟ این کار فقط خدمت را از فهرست تعرفه‌ها حذف می‌کند؛ رسیدهای قبلی باقی می‌مانند."))return;serviceCatalog.splice(index,1);persistDemoData();document.getElementById("content").innerHTML=renderSettings();document.querySelector('[data-action="settings-tab"][data-tab="services"]')?.click();toast("خدمت از فهرست تعرفه‌ها حذف شد.");}return;}
   if(act==="toggle-service"){const item=serviceCatalog[Number(action.dataset.serviceIndex)];if(item){item.active=item.active===false;persistDemoData();document.getElementById("content").innerHTML=renderSettings();document.querySelector('[data-action="settings-tab"][data-tab="services"]')?.click();toast(item.active?"خدمت فعال شد.":"خدمت غیرفعال شد.");}return;}
   if(act==="settings-tab"){
@@ -579,7 +593,17 @@ document.addEventListener("change",e=>{
  }
 });
 document.addEventListener("submit",async e=>{
- if(e.target.id==="service-catalog-form"){
+ if(e.target.id==="service-edit-form"){
+   e.preventDefault();const data=Object.fromEntries(new FormData(e.target).entries());const index=Number(data.serviceIndex),item=serviceCatalog[index],name=String(data.serviceName||"").trim(),price=moneyInput(data.servicePrice);
+   if(!item){toast("خدمت برای ویرایش پیدا نشد.");return;}
+   if(!name){toast("نام خدمت الزامی است.");return;}
+   if(serviceCatalog.some((x,i)=>i!==index&&x.name.toLocaleLowerCase("fa")===name.toLocaleLowerCase("fa"))){toast("خدمتی با این نام قبلاً ثبت شده است.");return;}
+   if(!Number.isFinite(price)||price<0){toast("تعرفه معتبر نیست؛ لطفاً مبلغ را به عدد وارد کنید.");return;}
+   item.name=name;item.price=price;item.description=String(data.serviceDescription||"").trim();persistDemoData();
+   const modal=document.getElementById("service-edit-modal");if(modal)modal.hidden=true;
+   document.getElementById("content").innerHTML=renderSettings();document.querySelector('[data-action="settings-tab"][data-tab="services"]')?.click();toast("نام، تعرفه و توضیحات خدمت به‌روزرسانی شد.");
+  }
+  if(e.target.id==="service-catalog-form"){
   e.preventDefault();const data=Object.fromEntries(new FormData(e.target).entries());const name=String(data.serviceName||"").trim();const price=moneyInput(data.servicePrice);
   if(!name||!Number.isFinite(price)||price<0){toast("نام خدمت و تعرفه معتبر الزامی است.");return;}
   if(serviceCatalog.some(x=>x.name.toLocaleLowerCase("fa")===name.toLocaleLowerCase("fa"))){toast("خدمتی با این نام قبلاً ثبت شده است.");return;}
