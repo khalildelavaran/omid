@@ -18,12 +18,14 @@ def safe_original_filename(value):
 class DocumentSerializer(serializers.ModelSerializer):
     application_number = serializers.CharField(source="application.application_number", read_only=True)
     uploaded_by_username = serializers.CharField(source="uploaded_by.username", read_only=True)
+    replaces_document_number = serializers.CharField(source="replaces_document.document_number", read_only=True, default=None)
     reviewed_by_username = serializers.CharField(source="reviewed_by.username", read_only=True, default=None)
 
     class Meta:
         model = Document
         fields = [
             "id", "document_number", "application", "application_number", "document_type",
+            "replaces_document", "replaces_document_number",
             "original_filename", "content_type", "size_bytes", "sha256", "status",
             "review_note", "uploaded_by", "uploaded_by_username", "reviewed_by",
             "reviewed_by_username", "reviewed_at", "created_at", "updated_at",
@@ -34,6 +36,11 @@ class DocumentSerializer(serializers.ModelSerializer):
 class DocumentUploadSerializer(serializers.Serializer):
     application = serializers.PrimaryKeyRelatedField(queryset=LoanApplication.objects.all())
     document_type = serializers.ChoiceField(choices=Document.DocumentType.choices)
+    replaces_document = serializers.PrimaryKeyRelatedField(
+        queryset=Document.objects.select_related("application").all(),
+        required=False,
+        write_only=True,
+    )
     file = serializers.FileField(write_only=True)
 
     def validate_application(self, application):
@@ -50,6 +57,27 @@ class DocumentUploadSerializer(serializers.Serializer):
             if application.assigned_to_id == user.id:
                 return application
         raise serializers.ValidationError("به پرونده انتخاب‌شده دسترسی بارگذاری سند ندارید.")
+
+    def validate(self, attrs):
+        previous = attrs.get("replaces_document")
+        if previous is not None:
+            if previous.status != Document.Status.REJECTED:
+                raise serializers.ValidationError({
+                    "replaces_document": "فقط سندی که نیازمند اصلاح اعلام شده قابل جایگزینی است."
+                })
+            if previous.replacement_documents.exists():
+                raise serializers.ValidationError({
+                    "replaces_document": "این نسخه قبلاً جایگزین شده است؛ آخرین نسخه را انتخاب کنید."
+                })
+            if attrs["application"].pk != previous.application_id:
+                raise serializers.ValidationError({
+                    "replaces_document": "سند جایگزین باید متعلق به همان پرونده باشد."
+                })
+            if attrs["document_type"] != previous.document_type:
+                raise serializers.ValidationError({
+                    "document_type": "نوع سند جایگزین باید با نسخه قبلی یکسان باشد."
+                })
+        return attrs
 
     def validate_file(self, upload):
         try:
