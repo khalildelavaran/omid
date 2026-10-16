@@ -28,6 +28,7 @@ urlpatterns = [
     path("api/v1/auth/me/", CurrentUserView.as_view(), name="current-user"),
     path("api/v1/auth/change-password/", ChangePasswordView.as_view(), name="change-password"),
     path("api/v1/audit-events/", include("core.audit_urls")),
+    path("api/v1/reports/", include("core.report_urls")),
     path("api/v1/customers/", include("customers.urls")),
     path("api/v1/applications/", include("applications.urls")),
     path("api/v1/tasks/", include("tasks.urls")),
