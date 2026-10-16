@@ -116,6 +116,18 @@ class DocumentViewSet(viewsets.GenericViewSet):
             filename=document.original_filename,
             content_type=document.content_type,
         )
+        record_audit(
+            request,
+            "document.downloaded",
+            actor=request.user,
+            entity_type="document",
+            entity_id=str(document.pk),
+            metadata={
+                "application_id": str(document.application_id),
+                "document_type": document.document_type,
+                "size_bytes": document.size_bytes,
+            },
+        )
         response["Cache-Control"] = "private, no-store, max-age=0"
         response["Pragma"] = "no-cache"
         response["X-Content-Type-Options"] = "nosniff"
