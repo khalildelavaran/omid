@@ -4,8 +4,21 @@ from django.conf import settings
 from django.db import models
 
 
+class AuditEventQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValueError("Audit events are append-only.")
+
+    def delete(self):
+        raise ValueError("Audit events are append-only.")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValueError("Audit events are append-only.")
+
+
 class AuditEvent(models.Model):
     """Append-only, privacy-conscious security and business audit event."""
+
+    objects = AuditEventQuerySet.as_manager()
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="audit_events")
