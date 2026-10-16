@@ -37,6 +37,7 @@ jobs:
         env:
           DJANGO_SECRET_KEY: ci-only-not-a-real-secret
           DJANGO_DEBUG: "True"
+          DJANGO_SETTINGS_MODULE: config.settings
         run: |
           python - <<'PY'
           import sys
