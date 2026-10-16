@@ -34,12 +34,13 @@
 | مشتریان | `/api/v1/customers/`, `/api/v1/customers/{id}/` |
 | پرونده‌ها | `/api/v1/cases/`, `/api/v1/cases/{id}/` |
 | تسهیلات | `/api/v1/applications/`, `/api/v1/applications/{id}/events/`, `/api/v1/applications/{id}/notes/` |
+| ضمانت | `/api/v1/guarantees/`, `/api/v1/guarantees/{id}/` (ثبت و مشاهده درخواست؛ درخواست‌دهنده می‌تواند با مشتری پرونده متفاوت باشد، اما هر دو باید در محدوده دسترسی کاربر باشند) |
 | وظایف | `/api/v1/tasks/`, `/api/v1/tasks/{id}/`, `/api/v1/tasks/{id}/assign/`, `/api/v1/tasks/{id}/events/`, `/api/v1/tasks/{id}/notes/`, `/api/v1/tasks/summary/`; فیلتر `overdue=true/false` و تاریخچه تغییرات (واگذاری فقط برای مدیر سامانه) |
 | اسناد | `/api/v1/documents/`, `/api/v1/documents/{id}/download/`, `/api/v1/documents/{id}/review/`, `/api/v1/documents/{id}/replace/` (فایل خصوصی، PDF/JPEG/PNG، حداکثر ۱۰ مگابایت؛ جایگزینی نسخه بدون حذف سابقه) |
 | ممیزی | `/api/v1/audit-events/` (فقط‌خواندنی برای مدیر سامانه و حسابرس) |
 | گزارش | `/api/v1/reports/operations/` (هنوز پیاده‌سازی نشده) |
 
-مسیرهای هویت، مشتریان، تسهیلات، وظایف، ممیزی و API اولیه اسناد در backend فعلی پیاده‌سازی شده‌اند؛ مسیرهای گزارش هنوز پیشنهادی‌اند.
+مسیرهای هویت، مشتریان، تسهیلات، وظایف، ضمانت، ممیزی و API اولیه اسناد در backend فعلی پیاده‌سازی شده‌اند؛ مسیرهای گزارش و API خدمات/رسید هنوز پیاده‌سازی نشده‌اند.
 
 ## 3. یکپارچه‌سازی پیامک
 
