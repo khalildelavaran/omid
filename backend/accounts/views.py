@@ -1,3 +1,5 @@
+import hashlib
+
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -9,7 +11,9 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.audit import record_audit
 from .models import UserProfile
+from .throttles import LoginRateThrottle
 
 
 INTERNAL_ROLES = {
@@ -48,6 +52,7 @@ def csrf_token(request):
 class LoginView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         username = request.data.get("username")
@@ -67,12 +72,29 @@ class LoginView(APIView):
             or profile is None
             or profile.role not in INTERNAL_ROLES
         ):
+            identifier = hashlib.sha256(username.strip().casefold().encode("utf-8")).hexdigest()
+            record_audit(
+                request,
+                "auth.login",
+                entity_type="account",
+                entity_id=identifier,
+                outcome="failure",
+                metadata={"reason": "invalid_credentials_or_role"},
+            )
             return Response(
                 {"detail": "نام کاربری یا گذرواژه معتبر نیست، یا دسترسی داخلی فعال نیست."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         login(request._request, user)
+        record_audit(
+            request,
+            "auth.login",
+            actor=user,
+            entity_type="account",
+            entity_id=str(user.pk),
+            metadata={"role": profile.role},
+        )
         return Response({"user": user_payload(user)}, status=status.HTTP_200_OK)
 
 
@@ -80,7 +102,15 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        actor = request.user
         logout(request._request)
+        record_audit(
+            request,
+            "auth.logout",
+            actor=actor,
+            entity_type="account",
+            entity_id=str(actor.pk),
+        )
         return Response({"detail": "با موفقیت خارج شدید."}, status=status.HTTP_200_OK)
 
 
@@ -115,6 +145,13 @@ class ChangePasswordView(APIView):
         request.user.set_password(new_password)
         request.user.save(update_fields=["password"])
         update_session_auth_hash(request._request, request.user)
+        record_audit(
+            request,
+            "auth.password_changed",
+            actor=request.user,
+            entity_type="account",
+            entity_id=str(request.user.pk),
+        )
         profile = getattr(request.user, "profile", None)
         if profile and profile.must_change_password:
             profile.must_change_password = False
