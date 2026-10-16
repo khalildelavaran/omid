@@ -21,20 +21,12 @@ class LoanApplication(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     application_number = models.CharField(max_length=32, unique=True, db_index=True)
-    customer = models.ForeignKey(
-        "customers.Customer",
-        on_delete=models.PROTECT,
-        related_name="loan_applications",
-    )
+    customer = models.ForeignKey("customers.Customer", on_delete=models.PROTECT, related_name="loan_applications")
     product_type = models.CharField(max_length=24, choices=ProductType.choices)
     requested_amount = models.DecimalField(max_digits=18, decimal_places=0)
     term_months = models.PositiveSmallIntegerField(null=True, blank=True)
     status = models.CharField(max_length=24, choices=Status.choices, default=Status.UNDER_REVIEW)
-    assigned_to = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name="assigned_loan_applications",
-    )
+    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="assigned_loan_applications")
     purpose = models.CharField(max_length=250, blank=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -43,8 +35,8 @@ class LoanApplication(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["status", "created_at"]),
-            models.Index(fields=["assigned_to", "status"]),
+            models.Index(fields=["status", "created_at"], name="apps_status_created_idx"),
+            models.Index(fields=["assigned_to", "status"], name="apps_owner_status_idx"),
         ]
 
     def __str__(self) -> str:
