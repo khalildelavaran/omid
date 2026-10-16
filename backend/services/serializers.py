@@ -38,12 +38,18 @@ class ServiceCatalogItemSerializer(serializers.ModelSerializer):
 
 
 class ServiceRecordSerializer(serializers.ModelSerializer):
-    customer_name = serializers.CharField(source="customer.__str__", read_only=True)
+    customer_name = serializers.SerializerMethodField()
     service_name = serializers.CharField(source="service_name_snapshot", read_only=True)
     service_code = serializers.CharField(source="service_code_snapshot", read_only=True)
-    performed_by_name = serializers.CharField(source="performed_by.get_full_name", read_only=True)
+    performed_by_name = serializers.SerializerMethodField()
     created_by_username = serializers.CharField(source="created_by.username", read_only=True)
     amount_due = serializers.DecimalField(max_digits=18, decimal_places=0, read_only=True)
+
+    def get_customer_name(self, obj):
+        return str(obj.customer)
+
+    def get_performed_by_name(self, obj):
+        return obj.performed_by.get_full_name() or obj.performed_by.get_username()
 
     class Meta:
         model = ServiceRecord
