@@ -38,6 +38,13 @@ class Document(models.Model):
         on_delete=models.PROTECT,
         related_name="documents",
     )
+    replaces_document = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="replacement_documents",
+    )
     document_type = models.CharField(max_length=24, choices=DocumentType.choices)
     file = models.FileField(storage=PrivateDocumentStorage(), upload_to=private_document_path)
     original_filename = models.CharField(max_length=255)
