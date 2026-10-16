@@ -49,6 +49,17 @@ class LoanApplication(models.Model):
         return self.application_number
 
 
+class ApplicationEventQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValueError("Application events are append-only.")
+
+    def delete(self):
+        raise ValueError("Application events are append-only.")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValueError("Application events are append-only.")
+
+
 class ApplicationEvent(models.Model):
     """Append-only business history for a loan application."""
 
@@ -56,6 +67,8 @@ class ApplicationEvent(models.Model):
         CREATED = "created", "ثبت پرونده"
         STATUS_CHANGED = "status_changed", "تغییر وضعیت"
         NOTE_ADDED = "note_added", "یادداشت پیگیری"
+
+    objects = ApplicationEventQuerySet.as_manager()
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     application = models.ForeignKey(LoanApplication, on_delete=models.PROTECT, related_name="events")
@@ -75,6 +88,14 @@ class ApplicationEvent(models.Model):
     class Meta:
         ordering = ["created_at", "id"]
         indexes = [models.Index(fields=["application", "created_at"], name="app_event_created_idx")]
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValueError("Application events are append-only.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Application events cannot be deleted through the model API.")
 
     def __str__(self) -> str:
         return f"{self.application.application_number}: {self.event_type}"
