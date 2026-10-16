@@ -461,7 +461,7 @@ document.addEventListener("click",e=>{
  if(action){
   const act=action.dataset.action;
   if(act==="print-service"){printServiceReceipt(action.dataset.recordId);return;}
-  if(act==="toggle-service"){const item=serviceCatalog[Number(action.dataset.serviceIndex)];if(item){item.active=item.active===false;persistDemoData();document.getElementById("content").innerHTML=renderSettings();document.querySelector("[data-action=\"settings-tab\"][data-tab=\"services\"]")?.click();toast(item.active?"خدمت فعال شد.":"خدمت غیرفعال شد.");}return;}
+  if(act==="toggle-service"){const item=serviceCatalog[Number(action.dataset.serviceIndex)];if(item){item.active=item.active===false;persistDemoData();document.getElementById("content").innerHTML=renderSettings();document.querySelector('[data-action="settings-tab"][data-tab="services"]')?.click();toast(item.active?"خدمت فعال شد.":"خدمت غیرفعال شد.");}return;}
   if(act==="settings-tab"){
    const tab=action.dataset.tab;
    document.querySelectorAll("[data-settings-panel]").forEach(panel=>{panel.hidden=panel.dataset.settingsPanel!==tab;});
@@ -578,7 +578,7 @@ document.addEventListener("submit",async e=>{
   if(serviceCatalog.some(x=>x.name.toLocaleLowerCase("fa")===name.toLocaleLowerCase("fa"))){toast("خدمتی با این نام قبلاً ثبت شده است.");return;}
   const id="SV-"+String(serviceCatalog.length+1).padStart(4,"0");
   serviceCatalog.push({id,code:String(data.serviceCode||"").trim()||id,name,price,description:String(data.serviceDescription||"").trim(),active:data.serviceActive!=="no",createdAt:new Date().toISOString()});
-  persistDemoData();document.getElementById("content").innerHTML=renderSettings();document.querySelector("[data-action=\"settings-tab\"][data-tab=\"services\"]")?.click();toast("خدمت و تعرفه آن ثبت شد.");
+  persistDemoData();document.getElementById("content").innerHTML=renderSettings();document.querySelector('[data-action="settings-tab"][data-tab="services"]')?.click();toast("خدمت و تعرفه آن ثبت شد.");
  }
  if(e.target.id==="service-record-form"){
   e.preventDefault();const data=Object.fromEntries(new FormData(e.target).entries());const customer=customers.find(c=>c.id===data.customerId),service=serviceCatalog.find(x=>x.id===data.serviceId&&x.active!==false);
