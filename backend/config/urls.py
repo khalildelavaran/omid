@@ -4,6 +4,7 @@ from django.template import TemplateDoesNotExist, loader
 from django.urls import include, path, re_path
 
 from accounts.views import ChangePasswordView, CurrentUserView, LoginView, LogoutView, csrf_token
+from core.schema import openapi_schema_view
 
 
 def spa_fallback(request, path=""):
@@ -22,6 +23,7 @@ def spa_fallback(request, path=""):
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/health/", include("core.urls")),
+    path("api/v1/schema/", openapi_schema_view, name="openapi-schema"),
     path("api/v1/auth/csrf/", csrf_token, name="csrf-token"),
     path("api/v1/auth/login/", LoginView.as_view(), name="login"),
     path("api/v1/auth/logout/", LogoutView.as_view(), name="logout"),
