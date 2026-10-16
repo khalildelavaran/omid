@@ -41,3 +41,34 @@ class LoanApplication(models.Model):
 
     def __str__(self) -> str:
         return self.application_number
+
+
+class ApplicationEvent(models.Model):
+    """Append-only business history for a loan application."""
+
+    class EventType(models.TextChoices):
+        CREATED = "created", "ثبت پرونده"
+        STATUS_CHANGED = "status_changed", "تغییر وضعیت"
+        NOTE_ADDED = "note_added", "یادداشت پیگیری"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    application = models.ForeignKey(LoanApplication, on_delete=models.PROTECT, related_name="events")
+    event_type = models.CharField(max_length=24, choices=EventType.choices)
+    previous_status = models.CharField(max_length=24, choices=LoanApplication.Status.choices, blank=True)
+    new_status = models.CharField(max_length=24, choices=LoanApplication.Status.choices, blank=True)
+    note = models.TextField(blank=True)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="loan_application_events",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["application", "created_at"], name="app_event_created_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.application.application_number}: {self.event_type}"

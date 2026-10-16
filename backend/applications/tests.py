@@ -3,7 +3,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from customers.models import Customer
-from .models import LoanApplication
+from .models import ApplicationEvent, LoanApplication
 
 User = get_user_model()
 
@@ -53,3 +53,50 @@ class LoanApplicationApiTests(TestCase):
             "requested_amount": 0,
         }, format="json")
         self.assertEqual(response.status_code, 400)
+
+    def test_application_status_change_is_audited(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.patch(
+            f"/api/v1/applications/{self.application.pk}/",
+            {"status": "awaiting_documents"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        event = ApplicationEvent.objects.get(application=self.application, event_type=ApplicationEvent.EventType.STATUS_CHANGED)
+        self.assertEqual(event.previous_status, LoanApplication.Status.UNDER_REVIEW)
+        self.assertEqual(event.new_status, LoanApplication.Status.AWAITING_DOCUMENTS)
+        self.assertEqual(event.actor, self.staff)
+
+    def test_invalid_status_transition_is_rejected(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.patch(
+            f"/api/v1/applications/{self.application.pk}/",
+            {"status": "approved"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(ApplicationEvent.objects.filter(application=self.application, event_type=ApplicationEvent.EventType.STATUS_CHANGED).exists())
+
+    def test_follow_up_note_is_persisted_in_event_history(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.post(
+            f"/api/v1/applications/{self.application.pk}/notes/",
+            {"note": "تماس با مشتری انجام شد."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        event = ApplicationEvent.objects.get(application=self.application, event_type=ApplicationEvent.EventType.NOTE_ADDED)
+        self.assertEqual(event.note, "تماس با مشتری انجام شد.")
+        self.assertEqual(event.actor, self.staff)
+
+    def test_events_endpoint_returns_history(self):
+        self.client.force_authenticate(self.staff)
+        ApplicationEvent.objects.create(
+            application=self.application,
+            event_type=ApplicationEvent.EventType.CREATED,
+            new_status=self.application.status,
+            actor=self.staff,
+        )
+        response = self.client.get(f"/api/v1/applications/{self.application.pk}/events/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)

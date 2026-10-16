@@ -1,7 +1,19 @@
 from rest_framework import serializers
 
 from customers.models import Customer
-from .models import LoanApplication
+from .models import ApplicationEvent, LoanApplication
+
+
+class ApplicationEventSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source="actor.username", read_only=True, default=None)
+
+    class Meta:
+        model = ApplicationEvent
+        fields = [
+            "id", "event_type", "previous_status", "new_status", "note",
+            "actor", "actor_username", "created_at",
+        ]
+        read_only_fields = fields
 
 
 class LoanApplicationSerializer(serializers.ModelSerializer):
@@ -36,4 +48,32 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             if not Customer.objects.filter(pk=value.pk).exists():
                 raise serializers.ValidationError("مشتری انتخاب‌شده معتبر نیست.")
+        return value
+
+    def validate_status(self, value):
+        if not self.instance or value == self.instance.status:
+            return value
+        allowed = {
+            LoanApplication.Status.UNDER_REVIEW: {
+                LoanApplication.Status.AWAITING_DOCUMENTS,
+                LoanApplication.Status.AWAITING_APPROVAL,
+                LoanApplication.Status.CANCELLED,
+            },
+            LoanApplication.Status.AWAITING_DOCUMENTS: {
+                LoanApplication.Status.UNDER_REVIEW,
+                LoanApplication.Status.AWAITING_APPROVAL,
+                LoanApplication.Status.CANCELLED,
+            },
+            LoanApplication.Status.AWAITING_APPROVAL: {
+                LoanApplication.Status.UNDER_REVIEW,
+                LoanApplication.Status.APPROVED,
+                LoanApplication.Status.REJECTED,
+                LoanApplication.Status.CANCELLED,
+            },
+            LoanApplication.Status.APPROVED: set(),
+            LoanApplication.Status.REJECTED: set(),
+            LoanApplication.Status.CANCELLED: set(),
+        }
+        if value not in allowed.get(self.instance.status, set()):
+            raise serializers.ValidationError("این تغییر وضعیت در گردش کار مجاز نیست.")
         return value
