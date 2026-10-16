@@ -6,6 +6,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.audit import record_audit
 from .models import ApplicationEvent, LoanApplication
 from .permissions import IsStaffApplicationOperator
 from .serializers import ApplicationEventSerializer, LoanApplicationSerializer
@@ -61,11 +62,27 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
             note="پرونده ایجاد شد.",
             actor=self.request.user,
         )
+        record_audit(
+            self.request,
+            "application.created",
+            actor=self.request.user,
+            entity_type="loan_application",
+            entity_id=str(application.pk),
+            metadata={"status": application.status, "product_type": application.product_type},
+        )
 
     @transaction.atomic
     def perform_update(self, serializer):
         previous_status = serializer.instance.status
         application = serializer.save()
+        record_audit(
+            self.request,
+            "application.updated",
+            actor=self.request.user,
+            entity_type="loan_application",
+            entity_id=str(application.pk),
+            metadata={"updated_fields": sorted(serializer.validated_data.keys())},
+        )
         if application.status != previous_status:
             ApplicationEvent.objects.create(
                 application=application,
@@ -74,6 +91,14 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
                 new_status=application.status,
                 note=(self.request.data.get("status_note") or "").strip(),
                 actor=self.request.user,
+            )
+            record_audit(
+                self.request,
+                "application.status_changed",
+                actor=self.request.user,
+                entity_type="loan_application",
+                entity_id=str(application.pk),
+                metadata={"previous_status": previous_status, "new_status": application.status},
             )
 
     @action(detail=True, methods=["get"], url_path="events")
@@ -97,5 +122,13 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
             new_status=application.status,
             note=note.strip(),
             actor=request.user,
+        )
+        record_audit(
+            request,
+            "application.note_added",
+            actor=request.user,
+            entity_type="loan_application",
+            entity_id=str(application.pk),
+            metadata={"note_length": len(note.strip())},
         )
         return Response(ApplicationEventSerializer(event).data, status=status.HTTP_201_CREATED)
