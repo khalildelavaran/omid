@@ -72,7 +72,19 @@ tbody tr[hidden]{display:none}
   <div class="top"><input id="global-search" class="search" placeholder="جست‌وجو در صفحه..." aria-label="جست‌وجو در صفحه"><button class="icon-btn" type="button" aria-label="اعلان‌ها" title="اعلان‌ها" id="notifications">♧</button><div class="avatar" title="مدیر سامانه">ا</div></div>
 </header>
 <div id="page-meta" class="page-meta"></div>
-<div id="content"></div>
+<div id="content">
+  <div class="grid">
+    <div class="card"><div class="k-head"><span class="k-label">مشتریان ثبت‌شده</span><span class="k-icon">♙</span></div><div class="k-value">۲٬۴۸۶</div><div class="muted">آمار نمونه داشبورد</div></div>
+    <div class="card"><div class="k-head"><span class="k-label">پرونده‌های در جریان</span><span class="k-icon blue">▤</span></div><div class="k-value">۳۲۸</div><div class="muted">در حال پیگیری</div></div>
+    <div class="card"><div class="k-head"><span class="k-label">در انتظار تأیید</span><span class="k-icon amber">◷</span></div><div class="k-value">۴۷</div><div class="muted">نیازمند بررسی</div></div>
+    <div class="card"><div class="k-head"><span class="k-label">تکمیل مدارک</span><span class="k-icon purple">✓</span></div><div class="k-value">۸۶٪</div><div class="muted">شاخص نمونه</div></div>
+  </div>
+  <div class="section">
+    <div class="card"><h2>روند درخواست‌های تسهیلات</h2><div class="bars"><div class="bar" style="height:38%"></div><div class="bar" style="height:55%"></div><div class="bar" style="height:45%"></div><div class="bar" style="height:72%"></div><div class="bar" style="height:63%"></div><div class="bar" style="height:91%"></div></div><div class="months"><span>اردیبهشت</span><span>خرداد</span><span>تیر</span><span>مرداد</span><span>شهریور</span><span>مهر</span></div></div>
+    <div class="card"><h2>وضعیت پرونده‌ها</h2><div class="status-row"><span>در حال بررسی</span><b>۴۸٪</b></div><div class="progress"><span style="width:48%;background:#35b9a5"></span></div><div class="status-row"><span>نیازمند مدرک</span><b>۲۵٪</b></div><div class="progress"><span style="width:25%;background:#f2bb5b"></span></div><div class="status-row"><span>تأیید شده</span><b>۲۷٪</b></div><div class="progress"><span style="width:27%;background:#7589e8"></span></div></div>
+  </div>
+  <div class="card table-card"><h2>داشبورد در حال بارگذاری</h2><p class="muted">این نمای اولیه حتی در صورت اجرا نشدن جاوااسکریپت قابل مشاهده است.</p><a class="btn primary" href="/" onclick="location.reload();return false">تلاش دوباره برای بارگذاری</a></div>
+</div>
 <footer>سامانه امید · نسخه نمایشی · داده‌های این نسخه نمونه هستند</footer>
 </main>
 </div>
