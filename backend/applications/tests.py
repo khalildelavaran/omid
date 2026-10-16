@@ -46,6 +46,12 @@ class LoanApplicationApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], 1)
 
+    def test_invalid_customer_uuid_filter_returns_empty_result(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.get("/api/v1/applications/?customer=not-a-uuid")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 0)
+
     def test_non_positive_amount_is_rejected(self):
         self.client.force_authenticate(self.staff)
         response = self.client.post("/api/v1/applications/", {
