@@ -103,6 +103,10 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 25,
+    "DEFAULT_THROTTLE_RATES": {
+        # Login attempts are also keyed by normalized username + source IP.
+        "login": env("LOGIN_RATE_LIMIT", default="5/minute"),
+    },
 }
 
 SESSION_COOKIE_HTTPONLY = True
