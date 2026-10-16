@@ -130,6 +130,7 @@ const docs = [
  {name:"صورت‌های مالی شرکت",case:"OM-1405-0246",type:"مالی",status:"نیازمند تکمیل",date:"۱۴۰۵/۰۷/۲۲"},
  {name:"گواهی محل سکونت",case:"OM-1405-0245",type:"پشتیبان",status:"تأیید شده",date:"۱۴۰۵/۰۷/۲۱"}
 ];
+const guaranteeRequests = [];
 // نگهداری داده‌های نمایشی در همین مرورگر؛ این ذخیره‌سازی جایگزین بک‌اند نیست.
 const DEMO_STORAGE_KEY = "omid-demo-v2";
 function restoreDemoData(){
@@ -140,13 +141,14 @@ function restoreDemoData(){
   if(Array.isArray(saved.applications)){applications.splice(0,applications.length,...saved.applications);}
   if(Array.isArray(saved.tasks)){tasks.splice(0,tasks.length,...saved.tasks);}
   if(Array.isArray(saved.docs)){docs.splice(0,docs.length,...saved.docs);}
+  if(Array.isArray(saved.guaranteeRequests)){guaranteeRequests.splice(0,guaranteeRequests.length,...saved.guaranteeRequests);}
   if(Array.isArray(saved.staff)){staff.splice(0,staff.length,...saved.staff);}
   if(Array.isArray(saved.bankCatalog)){bankCatalog.splice(0,bankCatalog.length,...saved.bankCatalog);}
  }catch(error){console.warn("Omid demo data could not be restored",error);}
 }
 function persistDemoData(){
  try{
-  localStorage.setItem(DEMO_STORAGE_KEY,JSON.stringify({customers,applications,tasks,docs,staff,bankCatalog}));
+  localStorage.setItem(DEMO_STORAGE_KEY,JSON.stringify({customers,applications,tasks,docs,guaranteeRequests,staff,bankCatalog}));
  }catch(error){console.warn("Omid demo data could not be saved",error);toast("ذخیره محلی در این مرورگر در دسترس نیست.");}
 }
 restoreDemoData();
@@ -154,6 +156,7 @@ const pageInfo = {
  dashboard:["داشبورد مدیریتی","نمای کلی وضعیت مشتریان و پرونده‌های تسهیلات"],
  customers:["مدیریت مشتریان","ثبت، جست‌وجو و پیگیری اطلاعات مشتریان"],
  applications:["درخواست‌های تسهیلات","مدیریت پرونده‌های اعتباری از ثبت تا تصمیم نهایی"],
+ guarantees:["درخواست ضمانت","انتخاب پرونده تسهیلات و ثبت درخواست ضمانت"],
  workflow:["گردش کار","وظایف، ارجاع‌ها و اقدام‌های در انتظار"],
  documents:["اسناد و مدارک","پیگیری وضعیت مدارک مرتبط با پرونده‌ها"],
  reports:["گزارش‌های مدیریتی","نمای کلی عملکرد و وضعیت پرونده‌ها"],
@@ -301,7 +304,31 @@ function renderCustomerDetail(id){
  const phoneHtml=phones.length?phones.map(p=>'<div class="profile-info-card"><b>'+esc(p.title||"شماره تماس")+'</b><p dir="ltr">'+esc(p.number||"—")+'</p></div>').join(""):'<div class="empty">شماره‌ای ثبت نشده است.</div>';
  const bankHtml=banks.length?banks.map(b=>'<div class="profile-info-card"><b>'+esc(b.bank||"بانک")+'</b><p>'+esc(b.title||"حساب بانکی")+'</p><small>شماره حساب: '+esc(b.accountNumber||"—")+'</small></div>').join(""):'<div class="empty">حساب بانکی ثبت نشده است.</div>';
  const docHtml=documents.length?documents.map(d=>'<div class="profile-document-card"><div class="profile-document-preview">'+(d.dataUrl&&String(d.dataUrl).startsWith("data:image/")?'<a href="'+esc(d.dataUrl)+'" target="_blank" rel="noopener"><img src="'+esc(d.dataUrl)+'" alt="'+esc(d.title||d.type||"مدرک مشتری")+'"></a>':d.dataUrl?'<a class="btn" href="'+esc(d.dataUrl)+'" target="_blank" rel="noopener">مشاهده / بازکردن فایل</a>':'<span class="muted">فایلی پیوست نشده</span>')+'</div><div><b>'+esc(d.title||d.type||"مدرک")+'</b><p class="muted">'+esc(d.type||"سایر")+'</p><small>'+esc(d.fileName||"")+'</small></div></div>').join(""):'<div class="empty">هنوز مدرکی به پروفایل مشتری افزوده نشده است.</div>';
- return '<div class="card"><div class="card-head"><div><h2>'+esc(c.name)+'</h2><span class="muted">کد مشتری: '+esc(c.id)+'</span></div>'+statusPill(c.status)+'</div><section class="profile-section"><h2>اطلاعات هویتی</h2><div class="form-grid">'+info("نوع مشتری",c.type)+info("نام",c.firstName||c.name)+info("نام خانوادگی",c.lastName)+info("کد ملی",c.nationalId)+info("تاریخ تولد",isoToFa(c.birthDate)||c.birthDate)+info("نام پدر",c.fatherName)+info("شغل",c.occupation)+info("کدپستی اصلی",c.postalCode)+info("ایمیل",c.email)+info("مسئول پرونده",c.manager)+info("سامانه ثنا",c.sana?"ثبت‌نام دارد":"ثبت‌نام نشده / نامشخص")+info("یادداشت",c.notes)+'</div></section><section class="profile-section"><div class="profile-section-head"><h2>آدرس‌ها</h2><span class="muted">'+addresses.length+' مورد</span></div><div class="profile-info-grid">'+addressHtml+'</div></section><section class="profile-section"><div class="profile-section-head"><h2>شماره‌های تماس</h2><span class="muted">'+phones.length+' مورد</span></div><div class="profile-info-grid">'+phoneHtml+'</div></section><section class="profile-section"><div class="profile-section-head"><h2>حساب‌های بانکی</h2><span class="muted">'+banks.length+' مورد</span></div><div class="profile-info-grid">'+bankHtml+'</div></section><section class="profile-section"><div class="profile-section-head"><h2>مدارک مشتری</h2><span class="muted">'+documents.length+' مدرک</span><button class="btn primary" data-link="/customers/'+encodeURIComponent(c.id)+'/edit">افزودن / مدیریت مدارک</button></div><div class="profile-document-grid">'+docHtml+'</div></section><section class="profile-section"><div class="card-head"><h2>پرونده‌های مرتبط</h2><span class="muted">'+related.length+' مورد</span></div>'+(related.length?table(["شماره پرونده","نوع تسهیلات","مبلغ","وضعیت","عملیات"],related.map(a=>'<tr><td class="id">'+esc(a.id)+'</td><td>'+esc(a.type)+'</td><td>'+esc(a.amount)+'</td><td>'+statusPill(a.status)+'</td><td><button class="btn" data-action="application-detail" data-id="'+esc(a.id)+'">مشاهده</button></td></tr>').join("")):'<div class="empty">هنوز پرونده‌ای برای این مشتری ثبت نشده است.</div>')+'<div class="actions" style="margin-top:18px"><button class="btn primary" data-link="/applications/new?customerId='+encodeURIComponent(c.id)+'">ایجاد پرونده تسهیلات</button></div></section></div>';
+ return '<div class="card"><div class="card-head"><div><h2>'+esc(c.name)+'</h2><span class="muted">کد مشتری: '+esc(c.id)+'</span></div>'+statusPill(c.status)+'</div><section class="profile-section"><h2>اطلاعات هویتی</h2><div class="form-grid">'+info("نوع مشتری",c.type)+info("نام",c.firstName||c.name)+info("نام خانوادگی",c.lastName)+info("کد ملی",c.nationalId)+info("تاریخ تولد",isoToFa(c.birthDate)||c.birthDate)+info("نام پدر",c.fatherName)+info("شغل",c.occupation)+info("کدپستی اصلی",c.postalCode)+info("ایمیل",c.email)+info("مسئول پرونده",c.manager)+info("سامانه ثنا",c.sana?"ثبت‌نام دارد":"ثبت‌نام نشده / نامشخص")+info("یادداشت",c.notes)+'</div></section><section class="profile-section"><div class="profile-section-head"><h2>آدرس‌ها</h2><span class="muted">'+addresses.length+' مورد</span></div><div class="profile-info-grid">'+addressHtml+'</div></section><section class="profile-section"><div class="profile-section-head"><h2>شماره‌های تماس</h2><span class="muted">'+phones.length+' مورد</span></div><div class="profile-info-grid">'+phoneHtml+'</div></section><section class="profile-section"><div class="profile-section-head"><h2>حساب‌های بانکی</h2><span class="muted">'+banks.length+' مورد</span></div><div class="profile-info-grid">'+bankHtml+'</div></section><section class="profile-section"><div class="profile-section-head"><h2>مدارک مشتری</h2><span class="muted">'+documents.length+' مدرک</span><button class="btn primary" data-link="/customers/'+encodeURIComponent(c.id)+'/edit">افزودن / مدیریت مدارک</button></div><div class="profile-document-grid">'+docHtml+'</div></section><section class="profile-section"><div class="card-head"><h2>پرونده‌های مرتبط</h2><span class="muted">'+related.length+' مورد</span></div>'+(related.length?table(["شماره پرونده","نوع تسهیلات","مبلغ","وضعیت","عملیات"],related.map(a=>'<tr><td class="id">'+esc(a.id)+'</td><td>'+esc(a.type)+'</td><td>'+esc(a.amount)+'</td><td>'+statusPill(a.status)+'</td><td><button class="btn" data-action="application-detail" data-id="'+esc(a.id)+'">مشاهده</button></td></tr>').join("")):'<div class="empty">هنوز پرونده‌ای برای این مشتری ثبت نشده است.</div>')+'<div class="actions" style="margin-top:18px"><button class="btn primary" data-link="/applications/new?customerId='+encodeURIComponent(c.id)+'">ایجاد پرونده تسهیلات</button><button class="btn" data-link="/guarantees/new?requesterId='+encodeURIComponent(c.id)+'">درخواست ضمانت</button></div></section></div>';
+}
+function guaranteeApplicationResults(query,selectedId){
+ const raw=toEnDigits(String(query||"").trim()).toLocaleLowerCase("fa");
+ const normalize=v=>toEnDigits(String(v||"")).toLocaleLowerCase("fa");
+ const sorted=applications.slice().sort((a,b)=>normalize(b.date).localeCompare(normalize(a.date))||String(b.id).localeCompare(String(a.id)));
+ const matches=sorted.filter(a=>{
+  const c=customers.find(x=>x.name===a.customer||x.id===a.customerId);
+  const haystack=[a.id,a.applicationNumber,a.customer,a.customerId,a.type,a.status,c&&c.nationalId,c&&c.phone,...(c&&Array.isArray(c.phones)?c.phones.map(p=>p.number):[])].map(normalize).join(" ");
+  return !raw||haystack.includes(raw);
+ }).slice(0,15);
+ if(!matches.length)return '<div class="empty" style="padding:14px">پرونده‌ای با این شماره یا مشخصات مشتری پیدا نشد.</div>';
+ return matches.map(a=>{
+  const c=customers.find(x=>x.name===a.customer||x.id===a.customerId);
+  const selected=a.id===selectedId;
+  return '<button type="button" class="customer-pick-option" data-action="select-guarantee-application" data-application-id="'+esc(a.id)+'" style="display:flex;width:100%;justify-content:space-between;align-items:center;gap:12px;text-align:right;padding:12px 13px;border:0;border-bottom:1px solid #edf1f6;background:'+(selected?'#eefaf7':'#fff')+';cursor:pointer;color:#243850"><span><b>'+esc(a.id)+'</b><small style="display:block;color:#52657c;margin-top:4px">'+esc(a.customer)+' · '+esc(a.type)+' · '+esc(a.amount)+'</small><small style="display:block;color:#8492a6;margin-top:4px">'+(c&&c.nationalId?'کد ملی '+esc(c.nationalId)+' · ':'')+(c&&c.phone?'موبایل '+esc(c.phone):'شماره تماس ثبت نشده')+' · تاریخ '+esc(a.date||"نامشخص")+'</small></span><span class="pill">'+(selected?'انتخاب‌شده':esc(a.status||"پرونده تسهیلات"))+'</span></button>';
+ }).join("");
+}
+function renderGuaranteeRequest(){
+ const params=new URLSearchParams(location.search);
+ const requester=customers.find(c=>c.id===params.get("requesterId"));
+ const selectedId=params.get("applicationId")||"";
+ setMeta("درخواست ضمانت",'<button class="btn" data-link="'+(requester?"/customers/"+encodeURIComponent(requester.id):"/customers")+'">← بازگشت</button>');
+ const selected=applications.find(a=>a.id===selectedId);
+ return '<div class="card"><div class="card-head"><div><h2>ثبت درخواست ضمانت</h2><span class="muted">ابتدا پرونده تسهیلات موردنظر را انتخاب کنید.</span></div><span class="pill wait">نسخه نمایشی</span></div><div class="notice">فهرست به‌صورت پیش‌فرض از جدیدترین پرونده‌های تسهیلات شروع می‌شود. می‌توانید با شماره پرونده، نام مشتری، کد ملی یا موبایل جست‌وجو کنید؛ سپس پرونده مرتبط را انتخاب کنید.</div><form id="guarantee-request-form" data-requester-id="'+esc(requester?requester.id:"")+'"><div class="form-grid"><div class="form-row full"><label>درخواست‌دهنده ضمانت</label><input class="field" readonly value="'+esc(requester?requester.name+" · "+requester.id:"از فهرست مشتریان انتخاب نشده")+'"><small class="muted">درخواست‌دهنده می‌تواند با مشتریِ پرونده تسهیلات متفاوت باشد.</small></div><div class="form-row full"><label for="guarantee-application-search">جست‌وجوی پرونده تسهیلات *</label><input id="guarantee-application-search" class="field" autocomplete="off" placeholder="شماره پرونده، نام مشتری، کد ملی یا موبایل..." value="'+esc(selected?selected.id:"")+'"><input type="hidden" name="applicationId" id="guarantee-application-id" value="'+esc(selected?selected.id:"")+'"><div id="guarantee-application-results" style="border:1px solid #e8edf4;border-radius:10px;overflow:hidden;max-height:360px;overflow-y:auto;margin-top:6px">'+guaranteeApplicationResults(selected?selected.id:"",selected?selected.id:"")+'</div><div id="guarantee-application-selected" class="notice" style="margin-top:10px;margin-bottom:0">'+(selected?"پرونده انتخاب‌شده: "+esc(selected.id)+" · "+esc(selected.customer):"یک پرونده را از نتایج بالا انتخاب کنید.")+'</div></div><div class="form-row full"><label for="guarantee-note">توضیحات (اختیاری)</label><textarea class="field" id="guarantee-note" name="note" rows="3" maxlength="1000" placeholder="توضیحات تکمیلی درخواست ضمانت"></textarea></div></div><div class="actions" style="margin-top:18px"><button class="btn primary" type="submit">ثبت درخواست ضمانت</button><button class="btn" type="button" data-link="'+(requester?"/customers/"+encodeURIComponent(requester.id):"/customers")+'">انصراف</button></div></form></div><div class="card table-card"><div class="card-head"><h2>درخواست‌های ضمانت ثبت‌شده در این مرورگر</h2><span class="muted">'+guaranteeRequests.length+' مورد</span></div>'+(guaranteeRequests.length?table(["شماره درخواست","پرونده تسهیلات","مشتری پرونده","وضعیت","تاریخ ثبت"],guaranteeRequests.slice().reverse().map(g=>'<tr><td class="id">'+esc(g.id)+'</td><td>'+esc(g.applicationId)+'</td><td>'+esc(g.customer)+'</td><td>'+statusPill(g.status)+'</td><td>'+esc(g.date)+'</td></tr>').join("")):'<div class="empty">هنوز درخواست ضمانتی در این مرورگر ثبت نشده است.</div>')+'</div><div class="notice">توجه: در حال حاضر این رابط از داده‌های نمایشی و ذخیره‌سازی همین مرورگر استفاده می‌کند؛ ثبت درخواست در پایگاه داده مرکزی یا ارسال برای واحد ضمانت هنوز متصل نشده است.</div>';
 }
 function renderApplicationDetail(id){
  const a=applications.find(x=>x.id===id);if(!a)return '<div class="card">پرونده پیدا نشد.</div>';
@@ -328,7 +355,8 @@ function render(){
  document.querySelectorAll(".menu a").forEach(a=>a.classList.toggle("active",a.dataset.page===page));
  document.getElementById("global-search").placeholder=page==="customers"?"جست‌وجوی مشتری...":page==="applications"?"جست‌وجوی پرونده...":"جست‌وجو در صفحه...";
  let html="";
- if(path.startsWith("/customers/")&&path.endsWith("/edit")) html=renderCustomers();
+ if(path==="/guarantees/new") html=renderGuaranteeRequest();
+ else if(path.startsWith("/customers/")&&path.endsWith("/edit")) html=renderCustomers();
  else if(path==="/documents/new") html=renderDocumentForm();
  else if(path.startsWith("/documents/")) html=renderDocumentDetail(decodeURIComponent(path.split("/")[2]||""));
  else if(path.startsWith("/customers/")&&!path.endsWith("/new")) html=renderCustomerDetail(decodeURIComponent(path.split("/")[2]||""));
