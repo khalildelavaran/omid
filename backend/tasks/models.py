@@ -61,3 +61,79 @@ class WorkflowTask(models.Model):
 
     def __str__(self):
         return f"{self.task_number}: {self.title}"
+
+class WorkflowTaskEventQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValueError("Workflow task events are append-only.")
+
+    def delete(self):
+        raise ValueError("Workflow task events are append-only.")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValueError("Workflow task events are append-only.")
+
+
+class WorkflowTaskEvent(models.Model):
+    class EventType(models.TextChoices):
+        CREATED = "created", "ایجاد وظیفه"
+        UPDATED = "updated", "ویرایش وظیفه"
+        STATUS_CHANGED = "status_changed", "تغییر وضعیت"
+        ASSIGNED = "assigned", "واگذاری وظیفه"
+        DUE_DATE_CHANGED = "due_date_changed", "تغییر موعد"
+        NOTE_ADDED = "note_added", "یادداشت پیگیری"
+
+    objects = WorkflowTaskEventQuerySet.as_manager()
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    task = models.ForeignKey(
+        WorkflowTask,
+        on_delete=models.PROTECT,
+        related_name="events",
+    )
+    event_type = models.CharField(max_length=24, choices=EventType.choices)
+    previous_status = models.CharField(max_length=20, choices=WorkflowTask.Status.choices, blank=True)
+    new_status = models.CharField(max_length=20, choices=WorkflowTask.Status.choices, blank=True)
+    previous_assignee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="task_events_previous_assignee",
+    )
+    new_assignee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="task_events_new_assignee",
+    )
+    previous_due_at = models.DateTimeField(null=True, blank=True)
+    new_due_at = models.DateTimeField(null=True, blank=True)
+    note = models.TextField(blank=True)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="workflow_task_events",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [
+            models.Index(fields=["task", "created_at"], name="task_event_time_idx"),
+            models.Index(fields=["event_type", "created_at"], name="task_event_type_idx"),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValueError("Workflow task events are append-only.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Workflow task events cannot be deleted through the model API.")
+
+    def __str__(self):
+        return f"{self.task.task_number}:{self.event_type}"
+
