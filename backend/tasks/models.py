@@ -54,7 +54,7 @@ class WorkflowTask(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.task_number:
-            self.task_number = f"TASK-{timezone.localdate():%Y%m%d}-{uuid.uuid4().hex[:8].upper()}"
+            self.task_number = f"TASK-{timezone.localdate():%Y%m%d}-{uuid.uuid4().hex[:10].upper()}"
         if self.status == self.Status.COMPLETED and self.completed_at is None:
             self.completed_at = timezone.now()
         super().save(*args, **kwargs)
