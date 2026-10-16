@@ -134,6 +134,49 @@ class DocumentViewSet(viewsets.GenericViewSet):
         response["Content-Security-Policy"] = "default-src 'none'; sandbox"
         return response
 
+    @action(detail=True, methods=["post"], url_path="replace")
+    @transaction.atomic
+    def replace(self, request, pk=None):
+        previous = self.get_object()
+        if previous.status != Document.Status.REJECTED:
+            return Response(
+                {"detail": "فقط سندی که نیازمند اصلاح اعلام شده قابل جایگزینی است."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if previous.replacement_documents.exists():
+            return Response(
+                {"detail": "این نسخه قبلاً جایگزین شده است؛ آخرین نسخه را انتخاب کنید."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        serializer = DocumentUploadSerializer(
+            data={
+                "application": str(previous.application_id),
+                "document_type": previous.document_type,
+                "replaces_document": str(previous.pk),
+                "file": request.data.get("file"),
+            },
+            context=self.get_serializer_context(),
+        )
+        serializer.is_valid(raise_exception=True)
+        replacement = serializer.save()
+        record_audit(
+            request,
+            "document.replaced",
+            actor=request.user,
+            entity_type="document",
+            entity_id=str(replacement.pk),
+            metadata={
+                "previous_document_id": str(previous.pk),
+                "application_id": str(replacement.application_id),
+                "document_type": replacement.document_type,
+                "size_bytes": replacement.size_bytes,
+                "sha256": replacement.sha256,
+            },
+        )
+        output = DocumentSerializer(replacement, context=self.get_serializer_context())
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=["post"], url_path="review")
     @transaction.atomic
     def review(self, request, pk=None):
