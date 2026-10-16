@@ -131,3 +131,33 @@ class WorkflowTaskApiTests(TestCase):
         response = self.client.delete(f"/api/v1/tasks/{task.pk}/")
         self.assertEqual(response.status_code, 405)
         self.assertTrue(WorkflowTask.objects.filter(pk=task.pk).exists())
+
+    def test_only_system_admin_can_assign_task(self):
+        task = WorkflowTask.objects.create(
+            application=self.application,
+            title="واگذاری",
+            assigned_to=self.staff,
+            created_by=self.staff,
+        )
+        self.client.force_authenticate(self.staff)
+        denied = self.client.post(
+            f"/api/v1/tasks/{task.pk}/assign/",
+            {"assigned_to": self.staff.pk},
+            format="json",
+        )
+        self.assertEqual(denied.status_code, 403)
+
+        admin_user = User.objects.create_user(username="task-admin", password="test-password-123", is_staff=True)
+        UserProfile.objects.create(user=admin_user, role=UserProfile.Role.SYSTEM_ADMIN)
+        target = User.objects.create_user(username="task-target", password="test-password-123", is_staff=True)
+        UserProfile.objects.create(user=target, role=UserProfile.Role.INTAKE)
+        self.client.force_authenticate(admin_user)
+        assigned = self.client.post(
+            f"/api/v1/tasks/{task.pk}/assign/",
+            {"assigned_to": target.pk},
+            format="json",
+        )
+        self.assertEqual(assigned.status_code, 200)
+        task.refresh_from_db()
+        self.assertEqual(task.assigned_to_id, target.pk)
+        self.assertTrue(AuditEvent.objects.filter(action="task.assigned", entity_id=str(task.pk)).exists())
