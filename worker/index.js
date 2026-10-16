@@ -106,7 +106,7 @@ const docs = [
  {name:"گواهی محل سکونت",case:"OM-1405-0245",type:"پشتیبان",status:"تأیید شده",date:"۱۴۰۵/۰۷/۲۱"}
 ];
 // نگهداری داده‌های نمایشی در همین مرورگر؛ این ذخیره‌سازی جایگزین بک‌اند نیست.
-const DEMO_STORAGE_KEY = "omid-demo-v1";
+const DEMO_STORAGE_KEY = "omid-demo-v2";
 function restoreDemoData(){
  try{
   const saved=JSON.parse(localStorage.getItem(DEMO_STORAGE_KEY)||"null");
@@ -245,6 +245,16 @@ function render(){
  document.getElementById("content").innerHTML=html;
  document.getElementById("global-search").value="";
 }
+// اگر داده‌های محلی قدیمی یا ناسازگار باشند، خطا نباید بخش اصلی صفحه را خالی بگذارد.
+const renderPage = render;
+render = function(){
+ try { renderPage(); }
+ catch(error) {
+  console.error("Omid render failed", error);
+  const content = document.getElementById("content");
+  if(content) content.innerHTML = '<div class="card"><h2>بارگذاری صفحه با مشکل مواجه شد</h2><p class="muted">داده‌های نمایشی این مرورگر با نسخه فعلی سازگار نیستند. صفحه را یک بار بازخوانی کنید؛ اگر مشکل ادامه داشت، داده‌های محلی نسخه نمایشی را پاک‌سازی می‌کنیم.</p><button class="btn primary" type="button" onclick="location.reload()">بارگذاری دوباره</button></div>';
+ }
+};
 function navigate(path){history.pushState({}, "", path);customerFilter="";applicationFilter="";if(!path.startsWith("/customers"))customerTypeFilter="";if(!path.startsWith("/applications"))applicationStatusFilter="";if(!path.startsWith("/documents"))documentFilter="";render();window.scrollTo({top:0,behavior:"instant"});}
 function toast(message){const el=document.getElementById("toast");el.textContent=message;el.style.display="block";clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>el.style.display="none",3200);}
 document.addEventListener("click",e=>{
