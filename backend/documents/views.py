@@ -3,7 +3,7 @@ from django.http import FileResponse, Http404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -16,7 +16,7 @@ from .serializers import DocumentReviewSerializer, DocumentSerializer, DocumentU
 
 class DocumentViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated, IsStaffDocumentOperator]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     queryset = Document.objects.select_related(
         "application", "application__customer", "uploaded_by", "reviewed_by"
     ).all()
