@@ -106,6 +106,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         # Login attempts are also keyed by normalized username + source IP.
         "login": env("LOGIN_RATE_LIMIT", default="5/minute"),
+        "login_ip": env("LOGIN_IP_RATE_LIMIT", default="20/minute"),
     },
 }
 
