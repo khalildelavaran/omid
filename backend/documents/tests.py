@@ -135,6 +135,14 @@ class DocumentApiTests(TestCase):
         self.assertIn("no-store", response["Cache-Control"])
         self.assertEqual(b"".join(response.streaming_content), VALID_PDF)
 
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action="document.downloaded",
+                entity_id=uploaded.data["id"],
+                actor=self.staff,
+            ).exists()
+        )
+
     def test_rejected_document_cannot_be_downloaded(self):
         uploaded = self.upload_document()
         reviewed = self.client.post(
