@@ -31,5 +31,6 @@ urlpatterns = [
     path("api/v1/customers/", include("customers.urls")),
     path("api/v1/applications/", include("applications.urls")),
     path("api/v1/tasks/", include("tasks.urls")),
+    path("api/v1/documents/", include("documents.urls")),
     re_path(r"^(?!api/).*$", spa_fallback, name="spa-fallback"),
 ]
