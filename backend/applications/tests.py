@@ -30,8 +30,7 @@ class LoanApplicationApiTests(TestCase):
         )
 
     def test_anonymous_user_cannot_list_applications(self):
-        response = self.client.get("/api/v1/applications/")
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.client.get("/api/v1/applications/").status_code, 403)
 
     def test_staff_can_list_assigned_applications(self):
         self.client.force_authenticate(self.staff)
@@ -68,6 +67,36 @@ class LoanApplicationApiTests(TestCase):
         self.assertEqual(event.previous_status, LoanApplication.Status.UNDER_REVIEW)
         self.assertEqual(event.new_status, LoanApplication.Status.AWAITING_DOCUMENTS)
         self.assertEqual(event.actor, self.staff)
+
+    def test_case_worker_cannot_make_final_credit_decision(self):
+        self.client.force_authenticate(self.staff)
+        self.application.status = LoanApplication.Status.AWAITING_APPROVAL
+        self.application.save(update_fields=["status"])
+        response = self.client.patch(
+            f"/api/v1/applications/{self.application.pk}/",
+            {"status": "approved"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_credit_approver_can_decide_but_cannot_edit_other_fields(self):
+        approver = User.objects.create_user(username="approver", is_staff=True)
+        UserProfile.objects.create(user=approver, role=UserProfile.Role.CREDIT_APPROVER)
+        self.application.status = LoanApplication.Status.AWAITING_APPROVAL
+        self.application.save(update_fields=["status"])
+        self.client.force_authenticate(approver)
+        decision = self.client.patch(
+            f"/api/v1/applications/{self.application.pk}/",
+            {"status": "approved", "status_note": "تأیید پس از بررسی"},
+            format="json",
+        )
+        self.assertEqual(decision.status_code, 200)
+        edit = self.client.patch(
+            f"/api/v1/applications/{self.application.pk}/",
+            {"notes": "unauthorized edit"},
+            format="json",
+        )
+        self.assertEqual(edit.status_code, 403)
 
     def test_invalid_status_transition_is_rejected(self):
         self.client.force_authenticate(self.staff)
