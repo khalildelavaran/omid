@@ -88,14 +88,14 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
         role = getattr(getattr(request.user, "profile", None), "role", None) if request else None
         if request and request.user.is_superuser:
             role = UserProfile.Role.SYSTEM_ADMIN
+        final_statuses = {LoanApplication.Status.APPROVED, LoanApplication.Status.REJECTED}
+        if value in final_statuses and role != UserProfile.Role.CREDIT_APPROVER:
+            raise serializers.ValidationError("ثبت تصمیم نهایی اعتباری فقط در اختیار تأییدکننده اعتباری است.")
         if role == UserProfile.Role.CREDIT_APPROVER:
-            if value not in {LoanApplication.Status.APPROVED, LoanApplication.Status.REJECTED}:
+            if value not in final_statuses:
                 raise serializers.ValidationError("تأییدکننده اعتباری فقط می‌تواند تصمیم نهایی ثبت کند.")
             if not self.instance or self.instance.status != LoanApplication.Status.AWAITING_APPROVAL:
                 raise serializers.ValidationError("تصمیم نهایی فقط برای پرونده در انتظار تأیید مجاز است.")
-        elif role in {UserProfile.Role.INTAKE, UserProfile.Role.CASE_WORKER}:
-            if value in {LoanApplication.Status.APPROVED, LoanApplication.Status.REJECTED}:
-                raise serializers.ValidationError("ثبت تصمیم نهایی اعتباری در اختیار تأییدکننده اعتباری است.")
 
         if not self.instance or value == self.instance.status:
             return value
