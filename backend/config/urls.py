@@ -3,6 +3,8 @@ from django.http import Http404, HttpResponse
 from django.template import TemplateDoesNotExist, loader
 from django.urls import include, path, re_path
 
+from accounts.views import ChangePasswordView, CurrentUserView, LoginView, LogoutView, csrf_token
+
 
 def spa_fallback(request, path=""):
     """Serve the frontend entry point for non-API routes."""
@@ -20,7 +22,11 @@ def spa_fallback(request, path=""):
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/health/", include("core.urls")),
-    path("api/v1/auth/", include("accounts.urls")),
+    path("api/v1/auth/csrf/", csrf_token, name="csrf-token"),
+    path("api/v1/auth/login/", LoginView.as_view(), name="login"),
+    path("api/v1/auth/logout/", LogoutView.as_view(), name="logout"),
+    path("api/v1/auth/me/", CurrentUserView.as_view(), name="current-user"),
+    path("api/v1/auth/change-password/", ChangePasswordView.as_view(), name="change-password"),
     path("api/v1/customers/", include("customers.urls")),
     path("api/v1/applications/", include("applications.urls")),
     re_path(r"^(?!api/).*$", spa_fallback, name="spa-fallback"),
