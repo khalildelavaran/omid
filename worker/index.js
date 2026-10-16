@@ -342,7 +342,7 @@ render = function(){
 function navigate(path){if(!path||typeof path!=="string")return;try{const target=new URL(path,location.origin);if(target.origin!==location.origin){location.assign(target.href);return;}const destination=target.pathname+target.search+target.hash;if(destination===location.pathname+location.search+location.hash){render();return;}location.assign(destination);}catch(error){console.error("Omid navigation failed",error);location.assign(path);}}
 function toast(message){const el=document.getElementById("toast");el.textContent=message;el.style.display="block";clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>el.style.display="none",3200);}
 document.addEventListener("click",e=>{
- const customerPick=e.target.closest("[data-action=\"select-application-customer\"]");
+ const customerPick=e.target.closest("[data-action=\\\"select-application-customer\\\"]");
  if(customerPick){
   const customer=customers.find(c=>c.id===customerPick.dataset.customerId);
   if(customer){const search=document.getElementById("application-customer-search"),idField=document.getElementById("application-customer-id"),nameField=document.getElementById("application-customer-name"),results=document.getElementById("application-customer-results"),label=document.getElementById("application-customer-selected");if(search)search.value=customer.name+" · "+customer.id;if(idField)idField.value=customer.id;if(nameField)nameField.value=customer.name;if(results)results.innerHTML=applicationCustomerResults(customer.name,customer.id);if(label)label.textContent="مشتری انتخاب‌شده: "+customer.name+" · "+customer.id;}
