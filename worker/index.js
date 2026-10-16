@@ -182,6 +182,7 @@ const persianDigits="۰۱۲۳۴۵۶۷۸۹",latinDigits="0123456789",faMonths=["�
 const faCalendar=new Intl.DateTimeFormat("en-US-u-ca-persian-nu-latn",{year:"numeric",month:"numeric",day:"numeric",timeZone:"UTC"});
 function toFaDigits(v){return String(v??"").replace(/[0-9]/g,d=>persianDigits[Number(d)]).replace(/[٠-٩]/g,d=>persianDigits[d.charCodeAt(0)-1632]);}
 function toEnDigits(v){return String(v??"").replace(/[۰-۹]/g,d=>latinDigits[persianDigits.indexOf(d)]).replace(/[٠-٩]/g,d=>latinDigits[d.charCodeAt(0)-1632]);}
+function moneyInput(v){const normalized=toEnDigits(String(v??"").replace(/[٬,،\s]/g,""));if(normalized==="")return 0;const n=Number(normalized);return Number.isFinite(n)?n:NaN;}
 function faParts(d){const o={};faCalendar.formatToParts(d).forEach(p=>{if(["year","month","day"].includes(p.type))o[p.type]=Number(p.value);});return o;}
 function isoDay(d){return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0");}
 function fromIso(v){const m=/^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(String(v||""));return m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3])):null;}
