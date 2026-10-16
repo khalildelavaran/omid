@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
 
+from accounts.models import UserProfile
 from customers.models import Customer
 from .models import ApplicationEvent, LoanApplication
 
@@ -12,6 +13,7 @@ class LoanApplicationApiTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.staff = User.objects.create_user(username="caseworker", password="test-pass-123", is_staff=True)
+        UserProfile.objects.create(user=self.staff, role=UserProfile.Role.CASE_WORKER)
         self.customer = Customer.objects.create(
             customer_number="OM-CUST-0001",
             customer_type=Customer.CustomerType.INDIVIDUAL,
@@ -31,7 +33,7 @@ class LoanApplicationApiTests(TestCase):
         response = self.client.get("/api/v1/applications/")
         self.assertEqual(response.status_code, 403)
 
-    def test_staff_can_list_applications(self):
+    def test_staff_can_list_assigned_applications(self):
         self.client.force_authenticate(self.staff)
         response = self.client.get("/api/v1/applications/")
         self.assertEqual(response.status_code, 200)
@@ -106,3 +108,23 @@ class LoanApplicationApiTests(TestCase):
         response = self.client.delete(f"/api/v1/applications/{self.application.pk}/")
         self.assertEqual(response.status_code, 405)
         self.assertTrue(LoanApplication.objects.filter(pk=self.application.pk).exists())
+
+    def test_case_worker_cannot_read_another_workers_application(self):
+        other = User.objects.create_user(username="other-caseworker", is_staff=True)
+        UserProfile.objects.create(user=other, role=UserProfile.Role.CASE_WORKER)
+        self.client.force_authenticate(other)
+        response = self.client.get(f"/api/v1/applications/{self.application.pk}/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_finance_role_is_read_only(self):
+        finance = User.objects.create_user(username="finance", is_staff=True)
+        UserProfile.objects.create(user=finance, role=UserProfile.Role.FINANCE)
+        self.client.force_authenticate(finance)
+        self.assertEqual(self.client.get("/api/v1/applications/").status_code, 200)
+        response = self.client.post("/api/v1/applications/", {
+            "application_number": "OM-APP-NEW",
+            "customer": str(self.customer.pk),
+            "product_type": "personal",
+            "requested_amount": 100000,
+        }, format="json")
+        self.assertEqual(response.status_code, 403)
