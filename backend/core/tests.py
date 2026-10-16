@@ -191,4 +191,4 @@ class OperationsReportApiTests(TestCase):
         self.client.force_authenticate(self.finance)
         response = self.client.post("/api/v1/reports/operations/", {}, format="json")
         self.assertEqual(response.status_code, 405)
-\n
+
