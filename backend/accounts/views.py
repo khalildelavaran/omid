@@ -8,6 +8,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -123,11 +124,22 @@ class CurrentUserView(APIView):
 
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password_change"
 
     def post(self, request):
         current_password = request.data.get("current_password")
         new_password = request.data.get("new_password")
         if not isinstance(current_password, str) or not request.user.check_password(current_password):
+            record_audit(
+                request,
+                "auth.password_change",
+                actor=request.user,
+                entity_type="account",
+                entity_id=str(request.user.pk),
+                outcome="failure",
+                metadata={"reason": "incorrect_current_password"},
+            )
             return Response(
                 {"current_password": "گذرواژه فعلی صحیح نیست."},
                 status=status.HTTP_400_BAD_REQUEST,
