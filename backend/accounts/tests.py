@@ -1,10 +1,13 @@
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase, override_settings
+from django.test import TestCase
+from unittest.mock import patch
 from rest_framework.test import APIClient
 
 from accounts.models import UserProfile
 from core.models import AuditEvent
+from accounts.throttles import LoginIPRateThrottle, LoginRateThrottle
+from rest_framework.throttling import ScopedRateThrottle
 
 User = get_user_model()
 
@@ -141,7 +144,7 @@ class AccountEndpointTests(TestCase):
             AuditEvent.objects.filter(pk=event.pk).delete()
 
 
-    @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"password_change": "1/minute"}})
+    @patch.object(ScopedRateThrottle, "THROTTLE_RATES", {"password_change": "1/minute"})
     def test_password_change_is_rate_limited_and_failed_attempt_is_audited(self):
         cache.clear()
         self.client.force_login(self.user)
@@ -170,7 +173,8 @@ class AccountEndpointTests(TestCase):
         self.assertEqual(second.status_code, 429)
         cache.clear()
 
-    @override_settings(REST_FRAMEWORK={"DEFAULT_THROTTLE_RATES": {"login": "2/minute", "login_ip": "20/minute"}})
+    @patch.object(LoginRateThrottle, "THROTTLE_RATES", {"login": "2/minute"})
+    @patch.object(LoginIPRateThrottle, "THROTTLE_RATES", {"login_ip": "20/minute"})
     def test_login_is_rate_limited(self):
         cache.clear()
         token = self.csrf()
