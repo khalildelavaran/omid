@@ -86,6 +86,41 @@ class LoanApplicationApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_rejection_requires_reason_and_persists_it_in_history(self):
+        approver = User.objects.create_user(username="reject-approver", is_staff=True)
+        UserProfile.objects.create(user=approver, role=UserProfile.Role.CREDIT_APPROVER)
+        self.application.status = LoanApplication.Status.AWAITING_APPROVAL
+        self.application.save(update_fields=["status"])
+        self.client.force_authenticate(approver)
+
+        missing_reason = self.client.patch(
+            f"/api/v1/applications/{self.application.pk}/",
+            {"status": "rejected"},
+            format="json",
+        )
+        self.assertEqual(missing_reason.status_code, 400)
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status, LoanApplication.Status.AWAITING_APPROVAL)
+
+        reason = "شرایط اعتباری درخواست احراز نشد."
+        rejected = self.client.patch(
+            f"/api/v1/applications/{self.application.pk}/",
+            {"status": "rejected", "status_note": reason},
+            format="json",
+        )
+        self.assertEqual(rejected.status_code, 200, rejected.data)
+        event = ApplicationEvent.objects.get(
+            application=self.application,
+            event_type=ApplicationEvent.EventType.STATUS_CHANGED,
+            new_status=LoanApplication.Status.REJECTED,
+        )
+        self.assertEqual(event.note, reason)
+        audit = AuditEvent.objects.get(
+            action="application.status_changed", entity_id=str(self.application.pk)
+        )
+        self.assertEqual(audit.metadata["decision_note_length"], len(reason))
+        self.assertNotIn(reason, str(audit.metadata))
+
     def test_credit_approver_can_decide_but_cannot_edit_other_fields(self):
         approver = User.objects.create_user(username="approver", is_staff=True)
         UserProfile.objects.create(user=approver, role=UserProfile.Role.CREDIT_APPROVER)
