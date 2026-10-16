@@ -192,3 +192,36 @@ class OperationsReportApiTests(TestCase):
         response = self.client.post("/api/v1/reports/operations/", {}, format="json")
         self.assertEqual(response.status_code, 405)
 
+class OpenApiSchemaTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.staff = get_user_model().objects.create_user(
+            username="schema-reader", password="test-password-123", is_staff=True
+        )
+        UserProfile.objects.create(user=self.staff, role=UserProfile.Role.AUDITOR)
+
+    def test_anonymous_user_cannot_read_api_schema(self):
+        response = self.client.get("/api/v1/schema/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_internal_staff_can_read_schema_for_implemented_api_groups(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.get("/api/v1/schema/")
+        self.assertEqual(response.status_code, 200, getattr(response, "data", None))
+        self.assertIn("openapi", response.data)
+        paths = response.data["paths"]
+        self.assertIn("/api/v1/customers/", paths)
+        self.assertIn("/api/v1/applications/", paths)
+        self.assertIn("/api/v1/guarantees/", paths)
+        self.assertIn("/api/v1/services/receipts/", paths)
+        self.assertIn("/api/v1/reports/operations/", paths)
+
+    def test_customer_account_cannot_read_api_schema(self):
+        customer = get_user_model().objects.create_user(
+            username="schema-customer", password="test-password-123", is_staff=False
+        )
+        UserProfile.objects.create(user=customer, role=UserProfile.Role.CUSTOMER)
+        self.client.force_authenticate(customer)
+        response = self.client.get("/api/v1/schema/")
+        self.assertEqual(response.status_code, 403)
+
