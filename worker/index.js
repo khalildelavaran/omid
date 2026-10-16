@@ -84,14 +84,14 @@ window.addEventListener("error",function(event){
   var box=document.getElementById("omid-runtime-diagnostic");
   if(!box){box=document.createElement("div");box.id="omid-runtime-diagnostic";box.style.cssText="position:fixed;z-index:99999;inset:auto 12px 12px 12px;background:#7f1d1d;color:#fff;padding:14px;border-radius:10px;font:12px/1.8 Tahoma,sans-serif;direction:rtl;white-space:pre-wrap";
   document.body.appendChild(box);}
-  box.textContent="خطای اجرای سامانه امید\nمسیر مرورگر: "+location.pathname+"\nمسیر پاسخ سرور: "+window.__OMID_REQUEST_PATH+"\nپیام: "+(event.message||"خطای نامشخص")+"\nفایل/خط: "+(event.filename||"")+" : "+(event.lineno||"");
+  box.textContent="خطای اجرای سامانه امید\\nمسیر مرورگر: "+location.pathname+"\\nمسیر پاسخ سرور: "+window.__OMID_REQUEST_PATH+"\\nپیام: "+(event.message||"خطای نامشخص")+"\\nفایل/خط: "+(event.filename||"")+" : "+(event.lineno||"");
  }catch(ignore){}
 });
 window.addEventListener("unhandledrejection",function(event){
  try{
   var box=document.getElementById("omid-runtime-diagnostic");
   if(!box){box=document.createElement("div");box.id="omid-runtime-diagnostic";box.style.cssText="position:fixed;z-index:99999;inset:auto 12px 12px 12px;background:#7f1d1d;color:#fff;padding:14px;border-radius:10px;font:12px/1.8 Tahoma,sans-serif;direction:rtl;white-space:pre-wrap";document.body.appendChild(box);}
-  box.textContent="خطای ناهمگام سامانه امید\nمسیر مرورگر: "+location.pathname+"\nمسیر پاسخ سرور: "+window.__OMID_REQUEST_PATH+"\nپیام: "+String(event.reason);
+  box.textContent="خطای ناهمگام سامانه امید\\nمسیر مرورگر: "+location.pathname+"\\nمسیر پاسخ سرور: "+window.__OMID_REQUEST_PATH+"\\nپیام: "+String(event.reason);
  }catch(ignore){}
 });
 </script>
