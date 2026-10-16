@@ -35,6 +35,12 @@ class WorkflowTaskApiTests(TestCase):
     def test_anonymous_user_cannot_list_tasks(self):
         self.assertEqual(self.client.get("/api/v1/tasks/").status_code, 403)
 
+    def test_invalid_application_filter_returns_empty_result(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.get("/api/v1/tasks/?application=not-a-uuid")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 0)
+
     def test_staff_can_create_task_and_number_is_generated(self):
         self.client.force_authenticate(self.staff)
         response = self.client.post(
