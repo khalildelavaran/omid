@@ -34,7 +34,7 @@ class CustomerApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], 1)
 
-    def test_customer_number_must_be_unique(self):
+    def test_customer_number_is_generated_by_server(self):
         self.client.force_authenticate(self.staff_user)
         response = self.client.post(
             "/api/v1/customers/",
@@ -42,11 +42,13 @@ class CustomerApiTests(TestCase):
                 "customer_number": "OM-000001",
                 "customer_type": "individual",
                 "first_name": "نمونه",
-                "last_name": "تکراری",
+                "last_name": "جدید",
             },
             format="json",
         )
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data["customer_number"].startswith("CUST-"))
+        self.assertNotEqual(response.data["customer_number"], "OM-000001")
 
     def test_search_supports_persian_digits_and_customer_name(self):
         self.client.force_authenticate(self.staff_user)
