@@ -34,10 +34,10 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="loanapplication",
-            index=models.Index(fields=["status", "created_at"], name="applications_status_created_idx"),
+            index=models.Index(fields=["status", "created_at"], name="apps_status_created_idx"),
         ),
         migrations.AddIndex(
             model_name="loanapplication",
-            index=models.Index(fields=["assigned_to", "status"], name="applications_assigned_status_idx"),
+            index=models.Index(fields=["assigned_to", "status"], name="apps_owner_status_idx"),
         ),
     ]
