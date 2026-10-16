@@ -92,6 +92,7 @@ const applications = [
  {id:"OM-1405-0245",customer:"مریم حسینی",type:"سرمایه در گردش",amount:"۵۰۰ میلیون تومان",status:"در حال بررسی",manager:"مریم رضایی",date:"۱۴۰۵/۰۷/۲۱"},
  {id:"OM-1405-0244",customer:"رضا کریمی",type:"تسهیلات شخصی",amount:"۱۵۰ میلیون تومان",status:"تأیید شده",manager:"آرمان صالحی",date:"۱۴۰۵/۰۷/۲۰"}
 ];
+applications.forEach(a=>{a.activity=[{type:"ثبت پرونده",text:"پرونده در سامانه ثبت شد.",date:a.date},{type:"وضعیت",text:"وضعیت اولیه: "+a.status,date:a.date}];});
 const tasks = [
  {title:"بررسی مدارک پرونده OM-1405-0247",owner:"آرمان صالحی",due:"امروز",priority:"بالا",done:false},
  {title:"پیگیری تکمیل مدارک شرکت پارس تجارت",owner:"امیر کاظمی",due:"امروز",priority:"متوسط",done:false},
@@ -197,7 +198,10 @@ function renderCustomerDetail(id){
 function renderApplicationDetail(id){
  const a=applications.find(x=>x.id===id);if(!a)return '<div class="card">پرونده پیدا نشد.</div>';
  setMeta("درخواست‌ها / جزئیات پرونده",'<button class="btn" data-link="/applications">← بازگشت</button>');
- return '<div class="card"><div class="card-head"><h2>پرونده '+esc(a.id)+'</h2>'+statusPill(a.status)+'</div><div class="form-grid"><div class="form-row"><label>مشتری</label><div>'+esc(a.customer)+'</div></div><div class="form-row"><label>نوع تسهیلات</label><div>'+esc(a.type)+'</div></div><div class="form-row"><label>مبلغ درخواستی</label><div>'+esc(a.amount)+'</div></div><div class="form-row"><label>مسئول پرونده</label><div>'+esc(a.manager)+'</div></div><div class="form-row"><label>تاریخ ثبت</label><div>'+esc(a.date)+'</div></div></div><div class="setting-row"><div>تغییر وضعیت پرونده<small>تغییر فقط در داده نمونه این نشست اعمال می‌شود</small></div><select class="field" id="application-detail-status" data-app-id="'+esc(a.id)+'" style="max-width:220px"><option '+(a.status==="در حال بررسی"?"selected":"")+'>در حال بررسی</option><option '+(a.status==="در انتظار تأیید"?"selected":"")+'>در انتظار تأیید</option><option '+(a.status==="تکمیل مدارک"?"selected":"")+'>تکمیل مدارک</option><option '+(a.status==="تأیید شده"?"selected":"")+'>تأیید شده</option><option '+(a.status==="رد شده"?"selected":"")+'>رد شده</option></select></div><div class="notice" style="margin-top:20px">جزئیات نمایش‌داده‌شده داده نمونه هستند. گردش واقعی تأیید و ثبت تصمیم در مرحله اتصال بک‌اند پیاده‌سازی می‌شود.</div><div class="actions"><button class="btn" data-link="/documents">مشاهده مدارک</button><button class="btn" data-link="/workflow">مشاهده گردش کار</button></div></div>';
+ const relatedDocs=docs.filter(d=>d.case===a.id);
+ const docRows=relatedDocs.map(d=>'<tr><td>'+esc(d.name)+'</td><td>'+esc(d.type)+'</td><td>'+statusPill(d.status)+'</td><td>'+esc(d.date)+'</td></tr>').join('');
+ const activity=(a.activity||[]).slice().reverse().map(ev=>'<div class="task"><span class="k-icon blue">◷</span><div style="flex:1"><b>'+esc(ev.type)+'</b><small>'+esc(ev.text)+'</small><small>'+esc(ev.date)+'</small></div></div>').join('');
+ return '<div class="card"><div class="card-head"><h2>پرونده '+esc(a.id)+'</h2>'+statusPill(a.status)+'</div><div class="form-grid"><div class="form-row"><label>مشتری</label><div>'+esc(a.customer)+'</div></div><div class="form-row"><label>نوع تسهیلات</label><div>'+esc(a.type)+'</div></div><div class="form-row"><label>مبلغ درخواستی</label><div>'+esc(a.amount)+'</div></div><div class="form-row"><label>مسئول پرونده</label><div>'+esc(a.manager)+'</div></div><div class="form-row"><label>تاریخ ثبت</label><div>'+esc(a.date)+'</div></div></div><div class="setting-row"><div>تغییر وضعیت پرونده<small>هر تغییر در تاریخچه همین نشست ثبت می‌شود</small></div><select class="field" id="application-detail-status" data-app-id="'+esc(a.id)+'" style="max-width:220px"><option '+(a.status==="در حال بررسی"?"selected":"")+'>در حال بررسی</option><option '+(a.status==="در انتظار تأیید"?"selected":"")+'>در انتظار تأیید</option><option '+(a.status==="تکمیل مدارک"?"selected":"")+'>تکمیل مدارک</option><option '+(a.status==="تأیید شده"?"selected":"")+'>تأیید شده</option><option '+(a.status==="رد شده"?"selected":"")+'>رد شده</option></select></div><div class="card" style="margin-top:18px"><div class="card-head"><h2>مدارک مرتبط</h2><span class="muted">'+relatedDocs.length+' مدرک</span></div>'+ (docRows?table(["نام مدرک","نوع","وضعیت","تاریخ"],docRows):'<div class="empty">مدرکی برای این پرونده در داده نمونه ثبت نشده است.</div>')+'<div class="actions"><button class="btn" data-link="/documents">رفتن به مدیریت مدارک</button></div></div><div class="section"><div class="card"><h2>ثبت یادداشت پیگیری</h2><form id="application-note-form" data-app-id="'+esc(a.id)+'"><div class="form-row"><label>یادداشت *</label><textarea class="field" name="note" required maxlength="1000" placeholder="نتیجه تماس، اقدام بعدی یا نکته پرونده..."></textarea></div><div class="actions" style="margin-top:12px"><button class="btn primary" type="submit">ثبت یادداشت</button></div></form></div><div class="card"><h2>تاریخچه پرونده</h2><div class="task-list">'+(activity||'<div class="empty">هنوز رویدادی ثبت نشده است.</div>')+'</div></div></div><div class="notice">این تاریخچه و یادداشت‌ها فقط در حافظه موقت رابط کاربری هستند. برای استفاده واقعی، ذخیره‌سازی سمت سرور، کنترل دسترسی و گزارش ممیزی لازم است.</div><div class="actions"><button class="btn" data-link="/workflow">مشاهده گردش کار</button></div></div>';
 }
 function render(){
  const path=location.pathname.replace(/\/+$/,"")||"/";
@@ -263,7 +267,7 @@ document.addEventListener("input",e=>{
 document.addEventListener("change",e=>{
  if(e.target.id==="customer-type"){customerTypeFilter=e.target.value;document.getElementById("content").innerHTML=renderCustomers();}
  if(e.target.id==="application-status"){applicationStatusFilter=e.target.value;document.getElementById("content").innerHTML=renderApplications();}
- if(e.target.id==="application-detail-status"){const item=applications.find(a=>a.id===e.target.dataset.appId);if(item){item.status=e.target.value;toast("وضعیت پرونده در داده نمونه به‌روزرسانی شد.");render();}}
+ if(e.target.id==="application-detail-status"){const item=applications.find(a=>a.id===e.target.dataset.appId);if(item&&item.status!==e.target.value){const previous=item.status;item.status=e.target.value;item.activity=item.activity||[];item.activity.push({type:"تغییر وضعیت",text:"وضعیت از «"+previous+"» به «"+item.status+"» تغییر کرد.",date:new Intl.DateTimeFormat("fa-IR",{dateStyle:"short",timeStyle:"short"}).format(new Date())});toast("وضعیت و تاریخچه پرونده به‌روزرسانی شد.");render();}}
  if(e.target.matches("[data-document-status]")){const doc=docs.find(d=>d.case===e.target.dataset.docCase);if(doc){doc.status=e.target.value;document.getElementById("content").innerHTML=renderDocuments();toast("وضعیت مدرک در فهرست نمایشی تغییر کرد؛ ثبت دائمی نیست.");}}
  if(e.target.matches("[data-task]")){
   const t=tasks[Number(e.target.dataset.task)];if(t){t.done=e.target.checked;toast(t.done?"وظیفه در نمونه به‌عنوان انجام‌شده علامت خورد.":"وظیفه به فهرست بازگشت.");}
@@ -293,11 +297,21 @@ document.addEventListener("submit",e=>{
    customerFilter="";customerTypeFilter="";navigate("/customers");toast("مشتری به فهرست نمایشی اضافه شد؛ ثبت دائمی نیست.");
   }
  }
+ if(e.target.id==="application-note-form"){
+  e.preventDefault();
+  const data=Object.fromEntries(new FormData(e.target).entries());
+  const item=applications.find(a=>a.id===e.target.dataset.appId);
+  const note=String(data.note||"").trim();
+  if(item&&note){item.activity=item.activity||[];item.activity.push({type:"یادداشت پیگیری",text:note,date:new Intl.DateTimeFormat("fa-IR",{dateStyle:"short",timeStyle:"short"}).format(new Date())});render();toast("یادداشت به تاریخچه نمایشی پرونده اضافه شد؛ ذخیره دائمی نیست.");}
+ }
  if(e.target.id==="application-form"){
   e.preventDefault();
   const data=Object.fromEntries(new FormData(e.target).entries());
   const id="OM-1405-"+String(249+applications.length-5).padStart(4,"0");
-  applications.unshift({id,customer:data.customer,type:data.type,amount:Number(data.amount).toLocaleString("fa-IR")+" تومان",status:data.status||"در حال بررسی",manager:data.manager||"تعیین نشده",date:new Intl.DateTimeFormat("fa-IR").format(new Date())});
+  const created={id,customer:data.customer,type:data.type,amount:Number(data.amount).toLocaleString("fa-IR")+" تومان",status:data.status||"در حال بررسی",manager:data.manager||"تعیین نشده",date:new Intl.DateTimeFormat("fa-IR").format(new Date()),activity:[]};
+  created.activity.push({type:"ثبت پرونده",text:"پرونده در سامانه ثبت شد.",date:created.date});
+  if(data.notes&&String(data.notes).trim())created.activity.push({type:"توضیحات اولیه",text:String(data.notes).trim(),date:created.date});
+  applications.unshift(created);
   applicationFilter="";navigate("/applications");toast("پرونده به فهرست نمایشی اضافه شد؛ ثبت دائمی نیست.");
  }
 });
