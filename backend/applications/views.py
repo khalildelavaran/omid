@@ -14,12 +14,16 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
     serializer_class = LoanApplicationSerializer
     permission_classes = [IsAuthenticated, IsStaffApplicationOperator]
     queryset = LoanApplication.objects.select_related("customer", "assigned_to").all()
+    # Loan/credit files are retained for audit and must not be hard-deleted via the API.
+    http_method_names = ["get", "post", "put", "patch", "head", "options"]
 
     def get_queryset(self):
         queryset = super().get_queryset()
         status_filter = self.request.query_params.get("status")
         customer = self.request.query_params.get("customer")
         search = self.request.query_params.get("search")
+        if search:
+            search = str(search).translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")).strip()
         if status_filter:
             queryset = queryset.filter(status=status_filter)
         if customer:
