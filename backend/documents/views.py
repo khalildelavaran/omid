@@ -157,6 +157,9 @@ class DocumentViewSet(viewsets.GenericViewSet):
     @transaction.atomic
     def replace(self, request, pk=None):
         previous = self.get_object()
+        # Serialize competing replacements; the unique constraint below the
+        # model remains the final guard on databases with row-level locking.
+        previous = Document.objects.select_for_update().get(pk=previous.pk)
         if previous.status != Document.Status.REJECTED:
             return Response(
                 {"detail": "فقط سندی که نیازمند اصلاح اعلام شده قابل جایگزینی است."},
