@@ -21,6 +21,8 @@ python backend/manage.py runserver
 
 The API liveness endpoint is available at `http://127.0.0.1:8000/api/v1/health/`.
 
+Core API routes include `/api/v1/customers/`, `/api/v1/applications/`, `/api/v1/tasks/`, and the restricted read-only `/api/v1/audit-events/` feed. Run `python backend/manage.py migrate` after pulling changes; new migrations include the audit log, generated record numbers, and workflow tasks.
+
 The example database password is for local development only. Do not reuse it in production.
 
 ## Internal authentication API
