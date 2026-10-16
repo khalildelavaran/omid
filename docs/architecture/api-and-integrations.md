@@ -30,15 +30,16 @@
 
 | دامنه | مسیرهای پیشنهادی |
 |---|---|
-| هویت | `/api/v1/auth/session/`, `/api/v1/auth/logout/` |
+| هویت | `/api/v1/auth/csrf/`, `/api/v1/auth/login/`, `/api/v1/auth/me/`, `/api/v1/auth/logout/`, `/api/v1/auth/change-password/` |
 | مشتریان | `/api/v1/customers/`, `/api/v1/customers/{id}/` |
 | پرونده‌ها | `/api/v1/cases/`, `/api/v1/cases/{id}/` |
-| تسهیلات | `/api/v1/loan-applications/`, `/api/v1/loan-applications/{id}/transitions/` |
-| وظایف | `/api/v1/tasks/`, `/api/v1/tasks/{id}/assignments/` |
+| تسهیلات | `/api/v1/applications/`, `/api/v1/applications/{id}/events/`, `/api/v1/applications/{id}/notes/` |
+| وظایف | `/api/v1/tasks/`, `/api/v1/tasks/{id}/` (API اولیه پیاده‌سازی شده؛ واگذاری به کاربر دیگر هنوز اضافه نشده) |
 | اسناد | `/api/v1/documents/`, `/api/v1/documents/{id}/download/` |
-| گزارش | `/api/v1/reports/operations/` |
+| ممیزی | `/api/v1/audit-events/` (فقط‌خواندنی برای مدیر سامانه و حسابرس) |
+| گزارش | `/api/v1/reports/operations/` (هنوز پیاده‌سازی نشده) |
 
-این‌ها نام‌های پیشنهادی‌اند؛ تا زمان پیاده‌سازی، مسیرهای واقعی محسوب نمی‌شوند.
+مسیرهای هویت، مشتریان، تسهیلات، وظایف و ممیزی در backend فعلی پیاده‌سازی شده‌اند؛ مسیرهای اسناد و گزارش هنوز پیشنهادی‌اند.
 
 ## 3. یکپارچه‌سازی پیامک
 
