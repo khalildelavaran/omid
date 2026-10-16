@@ -1,4 +1,5 @@
 from django.db import migrations, models
+import documents.models
 import documents.storage
 
 
@@ -13,7 +14,7 @@ class Migration(migrations.Migration):
             name="file",
             field=models.FileField(
                 storage=documents.storage.PrivateDocumentStorage(),
-                upload_to="documents.models.private_document_path",
+                upload_to=documents.models.private_document_path,
             ),
         ),
     ]
