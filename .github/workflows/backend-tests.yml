@@ -33,6 +33,11 @@ jobs:
           DJANGO_SECRET_KEY: ci-only-not-a-real-secret
           DJANGO_DEBUG: "True"
         run: python backend/manage.py check
+      - name: Check migration consistency
+        env:
+          DJANGO_SECRET_KEY: ci-only-not-a-real-secret
+          DJANGO_DEBUG: "True"
+        run: python backend/manage.py makemigrations --check --dry-run
       - name: Run tests
         env:
           DJANGO_SECRET_KEY: ci-only-not-a-real-secret
