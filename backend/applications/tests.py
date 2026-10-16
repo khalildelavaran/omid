@@ -243,6 +243,23 @@ class LoanApplicationApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
 
+    def test_application_events_are_append_only(self):
+        event = ApplicationEvent.objects.create(
+            application=self.application,
+            event_type=ApplicationEvent.EventType.NOTE_ADDED,
+            note="تماس ثبت شد.",
+            actor=self.staff,
+        )
+        event.note = "تغییر غیرمجاز"
+        with self.assertRaises(ValueError):
+            event.save()
+        with self.assertRaises(ValueError):
+            event.delete()
+        with self.assertRaises(ValueError):
+            ApplicationEvent.objects.filter(pk=event.pk).update(note="تغییر غیرمجاز")
+        with self.assertRaises(ValueError):
+            ApplicationEvent.objects.filter(pk=event.pk).delete()
+
     def test_loan_application_hard_delete_is_disabled(self):
         self.client.force_authenticate(self.staff)
         response = self.client.delete(f"/api/v1/applications/{self.application.pk}/")
