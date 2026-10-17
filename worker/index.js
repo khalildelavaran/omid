@@ -742,10 +742,14 @@ document.addEventListener("click",async e=>{
     if(!window.__OMID_API_PROXY_CONFIGURED){toast("ابتدا OMID_API_ORIGIN را در Worker تنظیم کنید.");return;}
     try{
       const result=await omidApiRequest("/api/v1/auth/me/",{method:"GET"});
-      if(result.response.ok&&result.body&&result.body.user){
+      if(result.response.ok&&result.body&&result.body.user&&result.body.user.is_staff&&result.body.user.role&&result.body.user.role!=="customer"){
         backendSessionUser=result.body.user;
         updateOmidSessionStatus(omidBackendUserSummary(backendSessionUser)+" رابط اصلی هنوز از داده‌های نمایشی استفاده می‌کند.");
         toast("نشست کارکنان معتبر است؛ داده‌های برنامه هنوز به API متصل نیستند.");
+      }else if(result.response.ok){
+        backendSessionUser=null;
+        updateOmidSessionStatus("نشست وجود دارد، اما نقش کاربر برای استفاده داخلی مجاز نیست.");
+        toast("حساب نشست فعلی نقش مجاز کارکنان را ندارد.");
       }else if(result.response.status===401||result.response.status===403){
         backendSessionUser=null;
         updateOmidSessionStatus("نشست کارکنان فعال نیست؛ با حساب داخلی وارد شوید.");
