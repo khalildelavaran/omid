@@ -192,6 +192,28 @@ class ServiceApiTests(TestCase):
             1,
         )
 
+    def test_same_key_with_omitted_required_paid_field_is_not_treated_as_replay(self):
+        key = "receipt-key-0004"
+        self.client.force_authenticate(self.worker)
+        payload = self.receipt_payload(paid="0")
+        first = self.client.post(
+            "/api/v1/services/receipts/",
+            payload,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=key,
+        )
+        self.assertEqual(first.status_code, 201, first.data)
+        changed = dict(payload)
+        changed.pop("paid")
+        second = self.client.post(
+            "/api/v1/services/receipts/",
+            changed,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=key,
+        )
+        self.assertEqual(second.status_code, 409)
+        self.assertEqual(ServiceRecord.objects.count(), 1)
+
     def test_idempotent_replay_survives_service_deactivation(self):
         key = "receipt-key-0003"
         first = self.create_receipt(idempotency_key=key)
