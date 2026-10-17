@@ -162,8 +162,8 @@ class CustomerSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        addresses = instance.addresses.filter(is_active=True).order_by("created_at", "id")
-        phones = instance.phones.filter(is_active=True).order_by("created_at", "id")
+        addresses = [item for item in instance.addresses.all() if item.is_active]
+        phones = [item for item in instance.phones.all() if item.is_active]
         data["addresses"] = CustomerAddressSerializer(
             addresses, many=True, context=self.context
         ).data
