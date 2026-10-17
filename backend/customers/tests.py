@@ -114,7 +114,11 @@ class CustomerApiTests(TestCase):
         self.assertEqual(response.data["addresses"][0]["value"], "تهران، خیابان نمونه")
         self.assertEqual(response.data["addresses"][0]["postal_code"], "۱۲۳۴۵۶۷۸۹۰")
         self.assertEqual(len(response.data["phones"]), 2)
-        self.assertEqual(response.data["phone_number"], "۰۹۱۲۱۲۳۴۵۶۷")
+        self.assertEqual(response.data["phones"][1]["number"], "02112345678")
+        self.assertEqual(response.data["phone_number"], "09121234567")
+        search_by_secondary_phone = self.client.get("/api/v1/customers/?search=۰۲۱۱۲۳۴۵۶۷۸")
+        self.assertEqual(search_by_secondary_phone.status_code, 200)
+        self.assertEqual(search_by_secondary_phone.data["count"], 1)
         address_id = response.data["addresses"][0]["id"]
         old_phone_ids = [item["id"] for item in response.data["phones"]]
 
@@ -132,7 +136,7 @@ class CustomerApiTests(TestCase):
         self.assertEqual(update.data["addresses"][0]["id"], address_id)
         self.assertEqual(update.data["addresses"][0]["value"], "تهران، خیابان جدید")
         self.assertEqual(len(update.data["phones"]), 1)
-        self.assertEqual(update.data["phone_number"], "۰۹۱۲۱۲۳۴۵۶۷")
+        self.assertEqual(update.data["phone_number"], "09121234567")
         self.assertTrue(CustomerAddress.objects.filter(pk=address_id, is_active=True).exists())
         self.assertTrue(CustomerPhone.objects.filter(pk=old_phone_ids[1], is_active=False).exists())
         self.assertTrue(CustomerPhone.objects.filter(pk=old_phone_ids[1]).exists())
