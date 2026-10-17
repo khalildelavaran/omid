@@ -229,6 +229,7 @@ class GuaranteeRequestApiTests(TestCase):
         audit = AuditEvent.objects.get(
             action="guarantee_request.status_changed",
             entity_id=guarantee_id,
+            metadata__new_status=GuaranteeRequest.Status.REJECTED,
         )
         self.assertEqual(audit.metadata["reason_length"], len(reason))
         self.assertNotIn(reason, str(audit.metadata))
