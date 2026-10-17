@@ -71,6 +71,8 @@ class ServiceRecord(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     receipt_number = models.CharField(max_length=40, unique=True, blank=True, default="")
+    idempotency_key = models.CharField(max_length=128, blank=True, default="")
+    request_fingerprint = models.CharField(max_length=64, blank=True, default="")
     customer = models.ForeignKey(
         "customers.Customer",
         on_delete=models.PROTECT,
@@ -110,6 +112,11 @@ class ServiceRecord(models.Model):
             models.Index(fields=["payment_method", "created_at"], name="service_receipt_method_idx"),
         ]
         constraints = [
+            models.UniqueConstraint(
+                fields=["created_by", "idempotency_key"],
+                condition=models.Q(idempotency_key__gt=""),
+                name="service_receipt_idempotency_uniq",
+            ),
             models.CheckConstraint(condition=models.Q(price__gte=0), name="service_receipt_price_nonnegative"),
             models.CheckConstraint(condition=models.Q(discount__gte=0), name="service_receipt_discount_nonnegative"),
             models.CheckConstraint(condition=models.Q(total__gte=0), name="service_receipt_total_nonnegative"),
