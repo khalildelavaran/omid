@@ -854,6 +854,38 @@ document.addEventListener("change",e=>{
  }
 });
 document.addEventListener("submit",async e=>{
+ if(e.target.id==="backend-login-form"){
+  e.preventDefault();
+  const form=e.target;
+  const formData=new FormData(form);
+  const username=String(formData.get("username")||"").trim();
+  const password=String(formData.get("password")||"");
+  if(!window.__OMID_API_PROXY_CONFIGURED){toast("ابتدا OMID_API_ORIGIN را در Worker تنظیم کنید.");return;}
+  if(!username||!password){toast("نام کاربری و گذرواژه را وارد کنید.");return;}
+  try{
+   const csrfToken=await omidApiCsrfToken();
+   const result=await omidApiRequest("/api/v1/auth/login/",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","X-CSRFToken":csrfToken},
+    body:JSON.stringify({username,password})
+   });
+   if(!result.response.ok)throw new Error(omidApiErrorMessage(result.body,result.response.status));
+   const user=result.body&&result.body.user;
+   if(!user||!user.is_staff||!user.role)throw new Error("پاسخ ورود بک‌اند کامل نیست؛ نقش کاربر داخلی تأیید نشد.");
+   backendSessionUser=user;
+   updateOmidSessionStatus(omidBackendUserSummary(user)+" این ورود فقط آزمون نشست است؛ داده‌های صفحهٔ اصلی هنوز نمایشی هستند.");
+   form.reset();
+   toast("ورود بک‌اند موفق بود؛ صفحهٔ اصلی هنوز از API داده دریافت نمی‌کند.");
+  }catch(error){
+   const message=String(error&&error.message||"ورود به بک‌اند ناموفق بود.");
+   updateOmidSessionStatus("ورود ناموفق بود: "+message);
+   toast(message);
+  }finally{
+   const passwordInput=form.querySelector("#backend-login-password");
+   if(passwordInput)passwordInput.value="";
+  }
+  return;
+ }
  if(e.target.id==="service-edit-form"){
    e.preventDefault();const data=Object.fromEntries(new FormData(e.target).entries());const index=Number(data.serviceIndex),item=serviceCatalog[index],name=String(data.serviceName||"").trim(),price=moneyInput(data.servicePrice);
    if(!item){toast("خدمت برای ویرایش پیدا نشد.");return;}
