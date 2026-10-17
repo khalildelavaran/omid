@@ -3,6 +3,7 @@
 Production secrets must be supplied through environment variables.
 """
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import environ
 
@@ -21,12 +22,25 @@ CSRF_TRUSTED_ORIGINS = env("DJANGO_CSRF_TRUSTED_ORIGINS")
 DATABASE_URL = env("DATABASE_URL", default="")
 
 if not DEBUG:
-    if not SECRET_KEY:
-        raise RuntimeError("DJANGO_SECRET_KEY must be set when DEBUG is disabled.")
-    if not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS:
-        raise RuntimeError("Set DJANGO_ALLOWED_HOSTS to explicit production hostnames; wildcards are not allowed.")
+    if len(SECRET_KEY) < 50:
+        raise RuntimeError("DJANGO_SECRET_KEY must be a long, unique secret of at least 50 characters.")
+    if (
+        not ALLOWED_HOSTS
+        or any(not host or "*" in host or "://" in host or "/" in host for host in ALLOWED_HOSTS)
+    ):
+        raise RuntimeError("Set DJANGO_ALLOWED_HOSTS to explicit hostnames only; URLs and wildcards are not allowed.")
     if not CSRF_TRUSTED_ORIGINS:
         raise RuntimeError("Set DJANGO_CSRF_TRUSTED_ORIGINS to the exact trusted HTTPS frontend origin(s).")
+    for origin in CSRF_TRUSTED_ORIGINS:
+        parsed_origin = urlsplit(origin)
+        if (
+            parsed_origin.scheme != "https"
+            or not parsed_origin.netloc
+            or parsed_origin.path not in ("", "/")
+            or parsed_origin.query
+            or parsed_origin.fragment
+        ):
+            raise RuntimeError("Every DJANGO_CSRF_TRUSTED_ORIGINS entry must be an HTTPS origin without path, query, or fragment.")
     if not DATABASE_URL.startswith(("postgres://", "postgresql://")):
         raise RuntimeError("DATABASE_URL must be a PostgreSQL URL when DEBUG is disabled.")
 
