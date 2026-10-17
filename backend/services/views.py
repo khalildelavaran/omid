@@ -47,7 +47,7 @@ def _service_receipt_fingerprint(data):
         "service": _canonical_identifier(data.get("service")),
         "performed_by": _canonical_identifier(data.get("performed_by")),
         "discount": _canonical_decimal(data.get("discount"), default="0"),
-        "paid": _canonical_decimal(data.get("paid")),
+        "paid": _canonical_decimal(data.get("paid"), default="<missing>"),
         "payment_method": str(data.get("payment_method") or "").strip(),
         "note": str(data.get("note") or "").strip(),
     }
