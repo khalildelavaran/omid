@@ -32,6 +32,7 @@ class AccountEndpointTests(TestCase):
         token = self.csrf()
         self.assertTrue(token)
         self.assertIn("csrftoken", self.client.cookies)
+        self.assertTrue(self.client.cookies["csrftoken"]["httponly"])
 
     def test_login_rejects_missing_csrf(self):
         response = self.client.post(
