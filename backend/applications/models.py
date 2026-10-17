@@ -30,6 +30,14 @@ class LoanApplication(models.Model):
     assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="assigned_loan_applications")
     purpose = models.CharField(max_length=250, blank=True)
     notes = models.TextField(blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    archived_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="archived_loan_applications",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -67,6 +75,7 @@ class ApplicationEvent(models.Model):
         CREATED = "created", "ثبت پرونده"
         STATUS_CHANGED = "status_changed", "تغییر وضعیت"
         NOTE_ADDED = "note_added", "یادداشت پیگیری"
+        ARCHIVED = "archived", "بایگانی پرونده"
 
     objects = ApplicationEventQuerySet.as_manager()
 
