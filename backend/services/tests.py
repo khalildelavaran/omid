@@ -62,12 +62,16 @@ class ServiceApiTests(TestCase):
             "note": "شرح داخلی رسید",
         }
 
-    def create_receipt(self, *, user=None, customer=None):
+    def create_receipt(self, *, user=None, customer=None, idempotency_key=None):
         self.client.force_authenticate(user or self.worker)
+        headers = {}
+        if idempotency_key:
+            headers["HTTP_IDEMPOTENCY_KEY"] = idempotency_key
         response = self.client.post(
             "/api/v1/services/receipts/",
             self.receipt_payload(customer=customer),
             format="json",
+            **headers,
         )
         self.assertEqual(response.status_code, 201, response.data)
         return response
@@ -134,6 +138,86 @@ class ServiceApiTests(TestCase):
             action="service_receipt.created", entity_id=str(record.pk)
         )
         self.assertNotIn("شرح داخلی رسید", str(audit.metadata))
+
+    def test_same_idempotency_key_replays_existing_receipt_without_duplicate_audit(self):
+        key = "receipt-key-0001"
+        self.client.force_authenticate(self.worker)
+        payload = self.receipt_payload()
+        first = self.client.post(
+            "/api/v1/services/receipts/",
+            payload,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=key,
+        )
+        self.assertEqual(first.status_code, 201, first.data)
+        second = self.client.post(
+            "/api/v1/services/receipts/",
+            payload,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=key,
+        )
+        self.assertEqual(second.status_code, 200, second.data)
+        self.assertEqual(second.data["id"], first.data["id"])
+        self.assertEqual(second["Idempotency-Replayed"], "true")
+        self.assertEqual(ServiceRecord.objects.count(), 1)
+        self.assertEqual(
+            AuditEvent.objects.filter(
+                action="service_receipt.created",
+                actor=self.worker,
+            ).count(),
+            1,
+        )
+
+    def test_same_idempotency_key_with_changed_payload_is_rejected(self):
+        key = "receipt-key-0002"
+        self.client.force_authenticate(self.worker)
+        first = self.client.post(
+            "/api/v1/services/receipts/",
+            self.receipt_payload(),
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=key,
+        )
+        self.assertEqual(first.status_code, 201, first.data)
+        changed = self.receipt_payload(paid="40000")
+        second = self.client.post(
+            "/api/v1/services/receipts/",
+            changed,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=key,
+        )
+        self.assertEqual(second.status_code, 409)
+        self.assertEqual(ServiceRecord.objects.count(), 1)
+        self.assertEqual(
+            AuditEvent.objects.filter(action="service_receipt.created", actor=self.worker).count(),
+            1,
+        )
+
+    def test_idempotent_replay_survives_service_deactivation(self):
+        key = "receipt-key-0003"
+        first = self.create_receipt(idempotency_key=key)
+        self.service.active = False
+        self.service.save(update_fields=["active", "updated_at"])
+        self.client.force_authenticate(self.worker)
+        replay = self.client.post(
+            "/api/v1/services/receipts/",
+            self.receipt_payload(),
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=key,
+        )
+        self.assertEqual(replay.status_code, 200, replay.data)
+        self.assertEqual(replay.data["id"], first.data["id"])
+        self.assertEqual(ServiceRecord.objects.count(), 1)
+
+    def test_invalid_idempotency_key_is_rejected(self):
+        self.client.force_authenticate(self.worker)
+        response = self.client.post(
+            "/api/v1/services/receipts/",
+            self.receipt_payload(),
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="short",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(ServiceRecord.objects.count(), 0)
 
     def test_discount_and_paid_amount_cannot_exceed_allowed_values(self):
         self.client.force_authenticate(self.worker)
