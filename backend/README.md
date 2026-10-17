@@ -21,7 +21,7 @@ python backend/manage.py runserver
 
 The API liveness endpoint is available at `http://127.0.0.1:8000/api/v1/health/`. The machine-readable OpenAPI schema is available at `http://127.0.0.1:8000/api/v1/schema/` after signing in with an authorized internal staff account.
 
-Core API routes include `/api/v1/customers/`, `/api/v1/applications/`, `/api/v1/tasks/`, and the restricted read-only `/api/v1/audit-events/` feed. Run `python backend/manage.py migrate` after pulling changes; new migrations include the audit log, generated record numbers, and workflow tasks.
+Core API routes include `/api/v1/customers/`, `/api/v1/applications/`, `/api/v1/tasks/`, and the restricted read-only `/api/v1/audit-events/` feed. Service receipt creation accepts the optional `Idempotency-Key` request header (8–128 allowed ASCII characters); repeat requests with the same user/key and same payload return the original receipt, while a changed payload returns `409 Conflict`. Run `python backend/manage.py migrate` after pulling changes; new migrations include the audit log, generated record numbers, and workflow tasks.
 
 The example database password is for local development only. Do not reuse it in production.
 
