@@ -1,7 +1,10 @@
+import hashlib
+import json
+import re
 import uuid
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from rest_framework import status, viewsets
 from rest_framework.exceptions import ValidationError
@@ -17,6 +20,39 @@ from .serializers import (
     ServiceRecordCreateSerializer,
     ServiceRecordSerializer,
 )
+
+
+IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
+
+
+def _canonical_identifier(value):
+    raw = str(value or "").strip()
+    try:
+        return str(uuid.UUID(raw))
+    except (ValueError, TypeError, AttributeError):
+        return raw
+
+
+def _canonical_decimal(value, default="0"):
+    raw = str(default if value in (None, "") else value).strip()
+    try:
+        return format(Decimal(raw).normalize(), "f")
+    except (InvalidOperation, ValueError):
+        return raw
+
+
+def _service_receipt_fingerprint(data):
+    canonical = {
+        "customer": _canonical_identifier(data.get("customer")),
+        "service": _canonical_identifier(data.get("service")),
+        "performed_by": _canonical_identifier(data.get("performed_by")),
+        "discount": _canonical_decimal(data.get("discount"), default="0"),
+        "paid": _canonical_decimal(data.get("paid")),
+        "payment_method": str(data.get("payment_method") or "").strip(),
+        "note": str(data.get("note") or "").strip(),
+    }
+    encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 class ServiceCatalogItemViewSet(viewsets.ModelViewSet):
@@ -138,6 +174,22 @@ class ServiceRecordViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
+        idempotency_key = request.headers.get("Idempotency-Key", "").strip()
+        if idempotency_key and not IDEMPOTENCY_KEY_PATTERN.fullmatch(idempotency_key):
+            return Response(
+                {"detail": "Idempotency-Key باید ۸ تا ۱۲۸ نویسه از حروف لاتین، عدد، نقطه، خط تیره، زیرخط یا دونقطه باشد."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        fingerprint = _service_receipt_fingerprint(request.data) if idempotency_key else ""
+
+        if idempotency_key:
+            existing = ServiceRecord.objects.filter(
+                created_by=request.user,
+                idempotency_key=idempotency_key,
+            ).first()
+            if existing is not None:
+                return self._idempotent_receipt_response(existing, fingerprint)
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -160,7 +212,26 @@ class ServiceRecordViewSet(viewsets.ModelViewSet):
             raise ValidationError({"paid": "مبلغ دریافتی نمی‌تواند از مبلغ نهایی خدمت بیشتر باشد."})
         serializer.validated_data["service"] = service
 
-        record = serializer.save(created_by=request.user)
+        try:
+            # A nested savepoint lets us recover safely from a concurrent
+            # request that won the unique idempotency constraint.
+            with transaction.atomic():
+                record = serializer.save(
+                    created_by=request.user,
+                    idempotency_key=idempotency_key,
+                    request_fingerprint=fingerprint,
+                )
+        except IntegrityError:
+            if not idempotency_key:
+                raise
+            existing = ServiceRecord.objects.filter(
+                created_by=request.user,
+                idempotency_key=idempotency_key,
+            ).first()
+            if existing is None:
+                raise
+            return self._idempotent_receipt_response(existing, fingerprint)
+
         record_audit(
             request,
             "service_receipt.created",
@@ -180,6 +251,17 @@ class ServiceRecordViewSet(viewsets.ModelViewSet):
         )
         output = ServiceRecordSerializer(record, context=self.get_serializer_context())
         return Response(output.data, status=status.HTTP_201_CREATED)
+
+    def _idempotent_receipt_response(self, record, fingerprint):
+        if record.request_fingerprint != fingerprint:
+            return Response(
+                {"detail": "این Idempotency-Key قبلاً با اطلاعات متفاوت استفاده شده است."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        output = ServiceRecordSerializer(record, context=self.get_serializer_context())
+        response = Response(output.data, status=status.HTTP_200_OK)
+        response["Idempotency-Replayed"] = "true"
+        return response
 
     def destroy(self, request, *args, **kwargs):
         return Response(
