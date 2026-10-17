@@ -25,6 +25,14 @@ Core API routes include `/api/v1/customers/`, `/api/v1/applications/`, `/api/v1/
 
 The example database password is for local development only. Do not reuse it in production.
 
+## Cloudflare Worker same-origin API bridge
+
+The Worker includes an optional same-origin proxy for paths under `/api/`. Configure the Worker variable `OMID_API_ORIGIN` with the HTTPS origin of the deployed Django backend (for example, `https://api.example.org`); provide only the origin, not a path, query string, credentials, or an HTTP URL. The proxy forwards browser cookies and the `X-CSRFToken` header, disables response caching, and rejects non-HTTPS or malformed backend origins.
+
+The connection diagnostic is available in the Omid UI under **Settings → Connection → Test backend connection**. Without `OMID_API_ORIGIN`, API requests intentionally return `503 Service Unavailable`.
+
+**Important current state:** the proxy has been deployed and its five Node-based tests pass, but the Cloudflare Worker currently has no `OMID_API_ORIGIN` variable configured and the Django backend has not been deployed to a known public HTTPS origin. The UI still uses demo/localStorage data; adding the proxy does not by itself enable staff login, map UI fields to API serializers, or synchronize existing browser data. Do not enter real customer or financial information until the backend origin, session/CSRF configuration, data adapters, and end-to-end tests are complete.
+
 ## Internal authentication API
 
 The internal staff API uses Django sessions, not bearer tokens. Browser clients must send cookies and use the CSRF token for state-changing requests.
