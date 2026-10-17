@@ -285,3 +285,83 @@ class LoanApplicationApiTests(TestCase):
             "requested_amount": 100000,
         }, format="json")
         self.assertEqual(response.status_code, 403)
+
+
+    def test_only_system_admin_can_archive_application_and_history_is_audited(self):
+        self.client.force_authenticate(self.staff)
+        denied = self.client.post(
+            f"/api/v1/applications/{self.application.pk}/archive/",
+            {"reason": "پرونده تکراری است."},
+            format="json",
+        )
+        self.assertEqual(denied.status_code, 403)
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.archived_at)
+
+        admin_user = User.objects.create_user(
+            username="archive-admin", password="test-pass-123", is_staff=True
+        )
+        UserProfile.objects.create(user=admin_user, role=UserProfile.Role.SYSTEM_ADMIN)
+        self.client.force_authenticate(admin_user)
+        reason = "پرونده تکراری است."
+        archived = self.client.post(
+            f"/api/v1/applications/{self.application.pk}/archive/",
+            {"reason": reason},
+            format="json",
+        )
+        self.assertEqual(archived.status_code, 200, archived.data)
+        self.assertIsNotNone(archived.data["archived_at"])
+        self.assertEqual(archived.data["archived_by"], admin_user.pk)
+        self.assertEqual(
+            self.client.get(f"/api/v1/applications/{self.application.pk}/").status_code,
+            404,
+        )
+        self.assertEqual(self.client.get("/api/v1/applications/").data["count"], 0)
+        archived_list = self.client.get("/api/v1/applications/?include_archived=true")
+        self.assertEqual(archived_list.status_code, 200)
+        self.assertEqual(archived_list.data["count"], 1)
+        self.assertEqual(archived_list.data["results"][0]["id"], str(self.application.pk))
+
+        event = ApplicationEvent.objects.get(
+            application=self.application,
+            event_type=ApplicationEvent.EventType.ARCHIVED,
+        )
+        self.assertEqual(event.note, reason)
+        audit = AuditEvent.objects.get(
+            action="application.archived",
+            entity_id=str(self.application.pk),
+        )
+        self.assertEqual(audit.metadata["reason_length"], len(reason))
+        self.assertNotIn(reason, str(audit.metadata))
+
+    def test_only_admin_or_auditor_can_include_archived_applications(self):
+        admin_user = User.objects.create_user(
+            username="archive-admin-view", password="test-pass-123", is_staff=True
+        )
+        UserProfile.objects.create(user=admin_user, role=UserProfile.Role.SYSTEM_ADMIN)
+        self.client.force_authenticate(admin_user)
+        response = self.client.post(
+            f"/api/v1/applications/{self.application.pk}/archive/",
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.client.force_authenticate(self.staff)
+        hidden = self.client.get("/api/v1/applications/?include_archived=true")
+        self.assertEqual(hidden.status_code, 200)
+        self.assertEqual(hidden.data["count"], 0)
+
+        auditor = User.objects.create_user(
+            username="archive-auditor", password="test-pass-123", is_staff=True
+        )
+        UserProfile.objects.create(user=auditor, role=UserProfile.Role.AUDITOR)
+        self.client.force_authenticate(auditor)
+        visible = self.client.get("/api/v1/applications/?include_archived=true")
+        self.assertEqual(visible.status_code, 200)
+        self.assertEqual(visible.data["count"], 1)
+
+    def test_invalid_include_archived_filter_is_rejected(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.get("/api/v1/applications/?include_archived=maybe")
+        self.assertEqual(response.status_code, 400)
