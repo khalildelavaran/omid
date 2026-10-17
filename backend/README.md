@@ -57,7 +57,7 @@ The Worker includes an optional same-origin proxy for paths under `/api/`. Confi
 
 The connection diagnostic is available in the Omid UI under **Settings → Connection → Test backend connection**. Without `OMID_API_ORIGIN`, API requests intentionally return `503 Service Unavailable`.
 
-**Important current state:** the proxy has been deployed and its five Node-based tests pass, but the Cloudflare Worker currently has no `OMID_API_ORIGIN` variable configured and the Django backend has not been deployed to a known public HTTPS origin. The UI still uses demo/localStorage data; adding the proxy does not by itself enable staff login, map UI fields to API serializers, or synchronize existing browser data. Do not enter real customer or financial information until the backend origin, session/CSRF configuration, data adapters, and end-to-end tests are complete.
+**Important current state:** the proxy and optional staff-session diagnostic have been deployed. The Settings panel exposes staff login/session-check/logout controls only when `OMID_API_ORIGIN` is configured; the Worker currently has no such variable, and Django has not been deployed to a known public HTTPS origin, so those controls are not displayed. Even when enabled, these controls only test a Django session: they do not gate the main app, enforce UI role access, map UI fields to API serializers, or synchronize localStorage data. The app still uses demo/localStorage data. Do not enter real customer or financial information until the backend origin, app-wide access controls, data adapters, and end-to-end tests are complete.
 
 ## Internal authentication API
 
