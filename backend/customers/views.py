@@ -59,7 +59,8 @@ class CustomerViewSet(viewsets.ModelViewSet):
                 | Q(organization_name__icontains=search)
                 | Q(phone_number__icontains=search)
                 | Q(email__icontains=search)
-            )
+                | Q(phones__is_active=True, phones__number__icontains=search)
+            ).distinct()
         return queryset
 
     @transaction.atomic
