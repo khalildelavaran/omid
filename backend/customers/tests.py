@@ -114,13 +114,14 @@ class CustomerApiTests(TestCase):
         self.assertEqual(response.data["addresses"][0]["value"], "تهران، خیابان نمونه")
         self.assertEqual(response.data["addresses"][0]["postal_code"], "۱۲۳۴۵۶۷۸۹۰")
         self.assertEqual(len(response.data["phones"]), 2)
-        self.assertEqual(response.data["phones"][1]["number"], "02112345678")
+        phone_ids_by_number = {item["number"]: item["id"] for item in response.data["phones"]}
+        self.assertEqual(set(phone_ids_by_number), {"09121234567", "02112345678"})
         self.assertEqual(response.data["phone_number"], "09121234567")
         search_by_secondary_phone = self.client.get("/api/v1/customers/?search=۰۲۱۱۲۳۴۵۶۷۸")
         self.assertEqual(search_by_secondary_phone.status_code, 200)
         self.assertEqual(search_by_secondary_phone.data["count"], 1)
         address_id = response.data["addresses"][0]["id"]
-        old_phone_ids = [item["id"] for item in response.data["phones"]]
+        old_secondary_phone_id = phone_ids_by_number["02112345678"]
 
         update = self.client.patch(
             f"/api/v1/customers/{self.customer.pk}/",
@@ -138,8 +139,8 @@ class CustomerApiTests(TestCase):
         self.assertEqual(len(update.data["phones"]), 1)
         self.assertEqual(update.data["phone_number"], "09121234567")
         self.assertTrue(CustomerAddress.objects.filter(pk=address_id, is_active=True).exists())
-        self.assertTrue(CustomerPhone.objects.filter(pk=old_phone_ids[1], is_active=False).exists())
-        self.assertTrue(CustomerPhone.objects.filter(pk=old_phone_ids[1]).exists())
+        self.assertTrue(CustomerPhone.objects.filter(pk=old_secondary_phone_id, is_active=False).exists())
+        self.assertTrue(CustomerPhone.objects.filter(pk=old_secondary_phone_id).exists())
 
     def test_nested_records_cannot_be_attached_across_customers(self):
         self.client.force_authenticate(self.staff_user)
