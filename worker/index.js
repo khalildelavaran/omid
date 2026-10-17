@@ -1,6 +1,102 @@
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
+
+    // Same-origin API bridge. The backend origin is an optional Worker
+    // environment variable; never accept an upstream URL from the browser.
+    if (url.pathname.startsWith("/api/")) {
+      const configuredOrigin = String(env?.OMID_API_ORIGIN || "").trim();
+      if (!configuredOrigin) {
+        return new Response(JSON.stringify({
+          detail: "اتصال بک‌اند پیکربندی نشده است. متغیر OMID_API_ORIGIN را در تنظیمات Worker تعریف کنید."
+        }), {
+          status: 503,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff"
+          }
+        });
+      }
+
+      let backend;
+      try {
+        backend = new URL(configuredOrigin);
+      } catch (_error) {
+        return new Response(JSON.stringify({ detail: "مقدار OMID_API_ORIGIN معتبر نیست." }), {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff"
+          }
+        });
+      }
+
+      if (backend.protocol !== "https:" || backend.username || backend.password ||
+          backend.pathname !== "/" || backend.search || backend.hash) {
+        return new Response(JSON.stringify({
+          detail: "OMID_API_ORIGIN باید یک origin مستقل HTTPS باشد؛ مسیر، query یا اطلاعات ورود مجاز نیست."
+        }), {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff"
+          }
+        });
+      }
+
+      try {
+        const target = new URL(url.pathname + url.search, backend.origin);
+        const initialRequest = new Request(target.toString(), request);
+        const forwardedHeaders = new Headers(initialRequest.headers);
+        forwardedHeaders.delete("host");
+        forwardedHeaders.set("X-Forwarded-Host", url.host);
+        forwardedHeaders.set("X-Forwarded-Proto", url.protocol.replace(":", ""));
+        const upstreamRequest = new Request(initialRequest, {
+          headers: forwardedHeaders,
+          redirect: "manual"
+        });
+        const upstreamResponse = await fetch(upstreamRequest);
+        const responseHeaders = new Headers(upstreamResponse.headers);
+        responseHeaders.set("Cache-Control", "no-store");
+        responseHeaders.set("X-Content-Type-Options", "nosniff");
+
+        // Keep same-origin redirects inside the Worker proxy.
+        const locationHeader = responseHeaders.get("Location");
+        if (locationHeader) {
+          try {
+            const redirectUrl = new URL(locationHeader, backend.origin);
+            if (redirectUrl.origin === backend.origin) {
+              responseHeaders.set(
+                "Location",
+                url.origin + redirectUrl.pathname + redirectUrl.search + redirectUrl.hash
+              );
+            }
+          } catch (_error) {
+            // Preserve a non-URL Location value; the upstream response is still returned.
+          }
+        }
+        return new Response(upstreamResponse.body, {
+          status: upstreamResponse.status,
+          statusText: upstreamResponse.statusText,
+          headers: responseHeaders
+        });
+      } catch (_error) {
+        return new Response(JSON.stringify({
+          detail: "ارتباط با بک‌اند برقرار نشد؛ تنظیمات origin و دسترس‌پذیری سرویس را بررسی کنید."
+        }), {
+          status: 502,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff"
+          }
+        });
+      }
+    }
+
     if (url.pathname === "/favicon.ico") return new Response(null, { status: 204 });
 
     const html = `<!doctype html>
@@ -138,6 +234,7 @@ tbody tr[hidden]{display:none}
 <div id="toast" class="toast" role="status"></div>
 <script>
 window.__OMID_REQUEST_PATH=${JSON.stringify(url.pathname)};
+window.__OMID_API_PROXY_CONFIGURED=${JSON.stringify(Boolean(env?.OMID_API_ORIGIN))};
 window.addEventListener("error",function(event){
  try{
   var box=document.getElementById("omid-runtime-diagnostic");
