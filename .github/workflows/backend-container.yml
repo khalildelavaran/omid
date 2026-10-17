@@ -79,7 +79,7 @@ jobs:
             --volume omid-documents-ci:/var/lib/omid/private-documents \
             omid-api:ci
 
-      - name: Smoke test health, CSRF cookie, and login CSRF protection
+      - name: Smoke test health, secure CSRF cookie, and trusted HTTPS proxy origin
         shell: bash
         run: |
           ready=0
@@ -125,6 +125,8 @@ jobs:
             --output /tmp/omid-login.json \
             --write-out '%{http_code}' \
             --header "Cookie: $csrf_cookie" \
+            --header 'Origin: https://omid.khalil-delavaran.workers.dev' \
+            --header 'X-Forwarded-Proto: https' \
             --header 'Content-Type: application/json' \
             --request POST \
             --data '{}' \
@@ -141,6 +143,8 @@ jobs:
             --write-out '%{http_code}' \
             --header "Cookie: $csrf_cookie" \
             --header "X-CSRFToken: $csrf_token" \
+            --header 'Origin: https://omid.khalil-delavaran.workers.dev' \
+            --header 'X-Forwarded-Proto: https' \
             --header 'Content-Type: application/json' \
             --request POST \
             --data '{}' \
