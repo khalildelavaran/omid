@@ -26,4 +26,17 @@ class Migration(migrations.Migration):
                 to=settings.AUTH_USER_MODEL,
             ),
         ),
+        migrations.AlterField(
+            model_name="applicationevent",
+            name="event_type",
+            field=models.CharField(
+                choices=[
+                    ("created", "ثبت پرونده"),
+                    ("status_changed", "تغییر وضعیت"),
+                    ("note_added", "یادداشت پیگیری"),
+                    ("archived", "بایگانی پرونده"),
+                ],
+                max_length=24,
+            ),
+        ),
     ]
