@@ -25,6 +25,30 @@ Core API routes include `/api/v1/customers/`, `/api/v1/applications/`, `/api/v1/
 
 The example database password is for local development only. Do not reuse it in production.
 
+## Production container
+
+A production-oriented Docker image is available at the repository root. It runs Gunicorn as a non-root user, serves Django static assets through WhiteNoise, and exposes a health check at `/api/v1/health/`. CI builds the image but does not publish it or deploy it automatically.
+
+Before deploying, configure these environment variables in the hosting platform (do not put production values in Git):
+
+- `DJANGO_SECRET_KEY`: a long, unique random secret.
+- `DJANGO_DEBUG=False`.
+- `DJANGO_ALLOWED_HOSTS`: the backend hostname only, without a scheme.
+- `DJANGO_CSRF_TRUSTED_ORIGINS=https://omid.khalil-delavaran.workers.dev`: the browser-facing Worker origin; replace it if the public UI origin changes.
+- `DATABASE_URL`: a production PostgreSQL URL with a strong password and TLS settings required by the database provider.
+- `PRIVATE_DOCUMENT_ROOT=/var/lib/omid/private-documents`: mount a persistent, private disk at this path and ensure the container user can write to it.
+- `PORT`: set by most container platforms; the image defaults to `8000`.
+
+Run database migrations as a release/deploy command before sending traffic:
+
+```bash
+python manage.py migrate --noinput
+```
+
+Build the image from the repository root with `docker build -t omid-api .`. The container does not automatically run migrations on each startup. Keep private documents on persistent storage that is not served as public media/static content, and back up the database and document volume. The sample development credentials in `docker-compose.yml` are not suitable for production.
+
+After deploying to an HTTPS origin, configure Cloudflare Worker variable `OMID_API_ORIGIN` to that origin. Then verify the health endpoint through the Worker at `/api/v1/health/` and test session/CSRF authentication before enabling any UI data adapters.
+
 ## Cloudflare Worker same-origin API bridge
 
 The Worker includes an optional same-origin proxy for paths under `/api/`. Configure the Worker variable `OMID_API_ORIGIN` with the HTTPS origin of the deployed Django backend (for example, `https://api.example.org`); provide only the origin, not a path, query string, credentials, or an HTTP URL. The proxy forwards browser cookies and the `X-CSRFToken` header, disables response caching, and rejects non-HTTPS or malformed backend origins.
