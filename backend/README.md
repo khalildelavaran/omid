@@ -39,6 +39,8 @@ Before deploying, configure these environment variables in the hosting platform 
 - `PRIVATE_DOCUMENT_ROOT=/var/lib/omid/private-documents`: mount a persistent, private disk at this path and ensure the container user can write to it.
 - `PORT`: set by most container platforms; the image defaults to `8000`.
 
+When `DJANGO_DEBUG=False`, startup deliberately fails unless a strong `DJANGO_SECRET_KEY` (at least 50 characters), explicit non-wildcard `DJANGO_ALLOWED_HOSTS`, HTTPS-only `DJANGO_CSRF_TRUSTED_ORIGINS` origins, and a PostgreSQL `DATABASE_URL` are present. This prevents the image from silently starting against local SQLite or permissive host settings. The Docker build uses only dummy build-time values for `collectstatic`; those values must never be used at runtime.
+
 Run database migrations as a release/deploy command before sending traffic:
 
 ```bash
