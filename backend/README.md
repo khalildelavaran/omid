@@ -61,7 +61,7 @@ The connection diagnostic is available in the Omid UI under **Settings → Conne
 
 ## Internal authentication API
 
-The internal staff API uses Django sessions, not bearer tokens. Browser clients must send cookies and use the CSRF token for state-changing requests.
+The internal staff API uses Django sessions, not bearer tokens. Browser clients must send cookies and use the CSRF token for state-changing requests. The CSRF endpoint returns a masked token in its JSON body; the CSRF cookie is `HttpOnly` and should not be read with `document.cookie`. Keep the returned token in memory and send it in the `X-CSRFToken` header for writes.
 
 1. `GET /api/v1/auth/csrf/` to obtain a CSRF token and cookie.
 2. `POST /api/v1/auth/login/` with JSON `{"username":"…","password":"…"}` and header `X-CSRFToken`.
