@@ -53,7 +53,7 @@ After deploying to an HTTPS origin, configure Cloudflare Worker variable `OMID_A
 
 ## Cloudflare Worker same-origin API bridge
 
-The Worker includes an optional same-origin proxy for paths under `/api/`. Configure the Worker variable `OMID_API_ORIGIN` with the HTTPS origin of the deployed Django backend (for example, `https://api.example.org`); provide only the origin, not a path, query string, credentials, or an HTTP URL. The proxy forwards browser cookies and the `X-CSRFToken` header, disables response caching, and rejects non-HTTPS or malformed backend origins.
+The Worker includes an optional same-origin proxy for paths under `/api/`. Configure the Worker variable `OMID_API_ORIGIN` with the HTTPS origin of the deployed Django backend (for example, `https://api.example.org`); provide only the origin, not a path, query string, credentials, or an HTTP URL. The proxy forwards browser cookies and the `X-CSRFToken` header, disables response caching, and rejects non-HTTPS or malformed backend origins. It also overwrites `X-Forwarded-Proto` with the browser-facing scheme; Django is configured to trust that header for the controlled Worker proxy, so secure-request and CSRF origin checks can account for TLS termination.
 
 The connection diagnostic is available in the Omid UI under **Settings → Connection → Test backend connection**. Without `OMID_API_ORIGIN`, API requests intentionally return `503 Service Unavailable`.
 
