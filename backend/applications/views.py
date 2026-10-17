@@ -2,6 +2,7 @@ import uuid
 
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -32,16 +33,28 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
         ):
             queryset = queryset.select_for_update()
         user = self.request.user
+        role = "system_admin" if user.is_superuser else getattr(
+            getattr(user, "profile", None), "role", None
+        )
         if not user.is_superuser:
-            try:
-                role = user.profile.role
-            except (AttributeError, user.__class__.profile.RelatedObjectDoesNotExist):
+            if role is None:
                 return queryset.none()
             if role != "system_admin":
                 if role in {"intake", "case_worker"}:
                     queryset = queryset.filter(assigned_to=user)
                 elif role not in {"credit_approver", "finance", "auditor"}:
                     return queryset.none()
+
+        include_archived = self.request.query_params.get("include_archived", "").strip().lower()
+        if include_archived not in {"", "true", "false"}:
+            raise ValidationError({"include_archived": "مقدار مجاز برابر true یا false است."})
+        can_view_archived = (
+            include_archived == "true"
+            and self.request.method in {"GET", "HEAD", "OPTIONS"}
+            and role in {"system_admin", "auditor"}
+        )
+        if not can_view_archived:
+            queryset = queryset.filter(archived_at__isnull=True)
 
         status_filter = self.request.query_params.get("status")
         customer = self.request.query_params.get("customer")
@@ -126,6 +139,49 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
                     "decision_note_length": len(serializer.context.get("status_note", "")),
                 },
             )
+
+    @action(detail=True, methods=["post"], url_path="archive")
+    @transaction.atomic
+    def archive(self, request, pk=None):
+        role = "system_admin" if request.user.is_superuser else getattr(
+            getattr(request.user, "profile", None), "role", None
+        )
+        if role != "system_admin":
+            return Response(
+                {"detail": "بایگانی پرونده فقط در اختیار مدیر سامانه است."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        application = self.get_object()
+        reason = request.data.get("reason", "")
+        if not isinstance(reason, str):
+            raise ValidationError({"reason": "دلیل بایگانی باید متن باشد."})
+        reason = reason.strip()
+        if len(reason) > 500:
+            raise ValidationError({"reason": "دلیل بایگانی نباید بیشتر از ۵۰۰ نویسه باشد."})
+
+        application.archived_at = timezone.now()
+        application.archived_by = request.user
+        application.save(update_fields=["archived_at", "archived_by", "updated_at"])
+        ApplicationEvent.objects.create(
+            application=application,
+            event_type=ApplicationEvent.EventType.ARCHIVED,
+            previous_status=application.status,
+            new_status=application.status,
+            note=reason,
+            actor=request.user,
+        )
+        record_audit(
+            request,
+            "application.archived",
+            actor=request.user,
+            entity_type="loan_application",
+            entity_id=str(application.pk),
+            metadata={"reason_length": len(reason)},
+        )
+        return Response(LoanApplicationSerializer(
+            application, context=self.get_serializer_context()
+        ).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["get"], url_path="events")
     def events(self, request, pk=None):
