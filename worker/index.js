@@ -235,6 +235,60 @@ tbody tr[hidden]{display:none}
 <script>
 window.__OMID_REQUEST_PATH=${JSON.stringify(url.pathname)};
 window.__OMID_API_PROXY_CONFIGURED=${JSON.stringify(Boolean(env?.OMID_API_ORIGIN))};
+let backendSessionUser = null;
+let backendSessionMessage = "نشست کارکنان هنوز بررسی نشده است.";
+
+async function omidApiRequest(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  headers.set("Accept", "application/json");
+  const response = await fetch(path, {
+    ...options,
+    headers,
+    credentials: "same-origin",
+    cache: "no-store"
+  });
+  let body = {};
+  try { body = await response.json(); } catch (_error) { body = {}; }
+  return { response, body };
+}
+
+function omidApiErrorMessage(body, status) {
+  if (body && typeof body.detail === "string" && body.detail.trim()) return body.detail;
+  if (body && typeof body === "object") {
+    for (const value of Object.values(body)) {
+      if (typeof value === "string" && value.trim()) return value;
+      if (Array.isArray(value)) {
+        const first = value.find(item => typeof item === "string" && item.trim());
+        if (first) return first;
+      }
+    }
+  }
+  return "درخواست به بک‌اند با وضعیت " + status + " پاسخ داده شد.";
+}
+
+async function omidApiCsrfToken() {
+  const result = await omidApiRequest("/api/v1/auth/csrf/", { method: "GET" });
+  if (!result.response.ok) throw new Error(omidApiErrorMessage(result.body, result.response.status));
+  if (!result.body || typeof result.body.csrfToken !== "string" || !result.body.csrfToken) {
+    throw new Error("توکن CSRF از بک‌اند دریافت نشد.");
+  }
+  return result.body.csrfToken;
+}
+
+function updateOmidSessionStatus(message) {
+  backendSessionMessage = message;
+  const element = document.getElementById("backend-session-status");
+  if (element) element.textContent = message;
+}
+
+function omidBackendUserSummary(user) {
+  const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ");
+  const name = fullName || user.username || "کاربر داخلی";
+  let message = "نشست فعال است: " + name + " (" + (user.username || "بدون نام کاربری") + ") · نقش: " + (user.role_label || user.role || "تعریف‌نشده");
+  if (user.must_change_password) message += " · تغییر گذرواژه الزامی است.";
+  return message;
+}
+
 window.addEventListener("error",function(event){
  try{
   var box=document.getElementById("omid-runtime-diagnostic");
