@@ -1,0 +1,28 @@
+name: Backend container build
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - "requirements.txt"
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/backend-container.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "requirements.txt"
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/backend-container.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production image (no push)
+        run: docker build --pull --tag omid-api:ci .
