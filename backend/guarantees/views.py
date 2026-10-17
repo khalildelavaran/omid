@@ -3,15 +3,20 @@ import uuid
 from django.db import transaction
 from django.db.models import Q
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.models import UserProfile
 from core.audit import record_audit
-from .models import GuaranteeRequest
+from .models import GuaranteeRequest, GuaranteeRequestEvent
 from .permissions import IsStaffGuaranteeOperator
-from .serializers import GuaranteeRequestSerializer
+from .serializers import (
+    GuaranteeRequestEventSerializer,
+    GuaranteeRequestSerializer,
+    GuaranteeTransitionSerializer,
+)
 
 
 def normalize_digits(value):
@@ -81,9 +86,21 @@ class GuaranteeRequestViewSet(viewsets.ModelViewSet):
             )
         return queryset
 
+    def get_serializer_class(self):
+        if getattr(self, "action", None) == "transition":
+            return GuaranteeTransitionSerializer
+        return GuaranteeRequestSerializer
+
     @transaction.atomic
     def perform_create(self, serializer):
         guarantee = serializer.save(created_by=self.request.user)
+        GuaranteeRequestEvent.objects.create(
+            guarantee_request=guarantee,
+            event_type=GuaranteeRequestEvent.EventType.CREATED,
+            new_status=guarantee.status,
+            note=guarantee.note,
+            actor=self.request.user,
+        )
         record_audit(
             self.request,
             "guarantee_request.created",
@@ -98,6 +115,92 @@ class GuaranteeRequestViewSet(viewsets.ModelViewSet):
                 ),
                 "status": guarantee.status,
             },
+        )
+
+    @action(detail=True, methods=["get"], url_path="events")
+    def events(self, request, pk=None):
+        guarantee = self.get_object()
+        events = guarantee.events.select_related("actor").all()
+        return Response(GuaranteeRequestEventSerializer(events, many=True).data)
+
+    @action(detail=True, methods=["post"], url_path="transition")
+    @transaction.atomic
+    def transition(self, request, pk=None):
+        guarantee = self.get_object()
+        guarantee = GuaranteeRequest.objects.select_for_update().get(pk=guarantee.pk)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        new_status = serializer.validated_data["status"]
+        reason = serializer.validated_data.get("reason", "").strip()
+        previous_status = guarantee.status
+        role = UserProfile.Role.SYSTEM_ADMIN if request.user.is_superuser else getattr(
+            getattr(request.user, "profile", None), "role", None
+        )
+
+        allowed_by_role = {
+            UserProfile.Role.SYSTEM_ADMIN: {
+                GuaranteeRequest.Status.REGISTERED: {
+                    GuaranteeRequest.Status.UNDER_REVIEW,
+                    GuaranteeRequest.Status.CANCELLED,
+                },
+                GuaranteeRequest.Status.UNDER_REVIEW: {GuaranteeRequest.Status.CANCELLED},
+            },
+            UserProfile.Role.INTAKE: {
+                GuaranteeRequest.Status.REGISTERED: {
+                    GuaranteeRequest.Status.UNDER_REVIEW,
+                    GuaranteeRequest.Status.CANCELLED,
+                },
+                GuaranteeRequest.Status.UNDER_REVIEW: {GuaranteeRequest.Status.CANCELLED},
+            },
+            UserProfile.Role.CASE_WORKER: {
+                GuaranteeRequest.Status.REGISTERED: {
+                    GuaranteeRequest.Status.UNDER_REVIEW,
+                    GuaranteeRequest.Status.CANCELLED,
+                },
+                GuaranteeRequest.Status.UNDER_REVIEW: {GuaranteeRequest.Status.CANCELLED},
+            },
+            UserProfile.Role.CREDIT_APPROVER: {
+                GuaranteeRequest.Status.UNDER_REVIEW: {
+                    GuaranteeRequest.Status.APPROVED,
+                    GuaranteeRequest.Status.REJECTED,
+                },
+            },
+            UserProfile.Role.FINANCE: {
+                GuaranteeRequest.Status.APPROVED: {GuaranteeRequest.Status.FULFILLED},
+            },
+        }
+        allowed = allowed_by_role.get(role, {}).get(previous_status, set())
+        if new_status not in allowed:
+            raise ValidationError({
+                "status": "این انتقال وضعیت برای نقش فعلی یا مرحله جاری مجاز نیست."
+            })
+
+        guarantee.status = new_status
+        guarantee.save(update_fields=["status", "updated_at"])
+        GuaranteeRequestEvent.objects.create(
+            guarantee_request=guarantee,
+            event_type=GuaranteeRequestEvent.EventType.STATUS_CHANGED,
+            previous_status=previous_status,
+            new_status=new_status,
+            note=reason,
+            actor=request.user,
+        )
+        record_audit(
+            request,
+            "guarantee_request.status_changed",
+            actor=request.user,
+            entity_type="guarantee_request",
+            entity_id=str(guarantee.pk),
+            metadata={
+                "previous_status": previous_status,
+                "new_status": new_status,
+                "reason_length": len(reason),
+            },
+        )
+        return Response(
+            GuaranteeRequestSerializer(guarantee, context=self.get_serializer_context()).data,
+            status=status.HTTP_200_OK,
         )
 
     def destroy(self, request, *args, **kwargs):
