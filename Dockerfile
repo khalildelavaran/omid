@@ -22,6 +22,9 @@ WORKDIR /app/backend
 # Build-time-only key is used for collectstatic; it is not a runtime secret.
 RUN DJANGO_SECRET_KEY=build-only-not-a-real-secret \
     DJANGO_DEBUG=False \
+    DJANGO_ALLOWED_HOSTS=localhost \
+    DJANGO_CSRF_TRUSTED_ORIGINS=https://omid.khalil-delavaran.workers.dev \
+    DATABASE_URL=postgres://build:build@127.0.0.1:5432/build-only \
     python manage.py collectstatic --noinput \
     && chown -R app:app /app/backend/staticfiles
 
