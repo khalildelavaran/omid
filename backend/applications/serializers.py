@@ -28,9 +28,9 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
             "id", "application_number", "customer", "customer_number",
             "customer_display_name", "product_type", "requested_amount", "status_note",
             "term_months", "status", "assigned_to", "purpose", "notes",
-            "created_at", "updated_at",
+            "created_at", "updated_at", "archived_at", "archived_by",
         ]
-        read_only_fields = ["id", "application_number", "assigned_to", "created_at", "updated_at"]
+        read_only_fields = ["id", "application_number", "assigned_to", "created_at", "updated_at", "archived_at", "archived_by"]
 
     def get_customer_display_name(self, obj):
         return str(obj.customer)
