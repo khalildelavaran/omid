@@ -12,7 +12,7 @@ test("generated Omid page contains browser scripts that parse successfully", asy
 
   assert.equal(response.status, 200);
   const html = await response.text();
-  const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)]
+  const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
     .map((match) => match[1])
     .filter((source) => source.trim().length > 0);
 
