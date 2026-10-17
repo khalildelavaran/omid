@@ -35,7 +35,7 @@
 | مشتریان | `/api/v1/customers/`, `/api/v1/customers/{id}/` |
 | پرونده‌ها | `/api/v1/cases/`, `/api/v1/cases/{id}/` |
 | تسهیلات | `/api/v1/applications/`, `/api/v1/applications/{id}/events/`, `/api/v1/applications/{id}/notes/` |
-| ضمانت | `/api/v1/guarantees/`, `/api/v1/guarantees/{id}/` (ثبت و مشاهده درخواست؛ درخواست‌دهنده می‌تواند با مشتری پرونده متفاوت باشد، اما هر دو باید در محدوده دسترسی کاربر باشند) |
+| ضمانت | `/api/v1/guarantees/`, `/api/v1/guarantees/{id}/`, `/api/v1/guarantees/{id}/transition/`, `/api/v1/guarantees/{id}/events/`؛ رد فقط با تأییدکننده اعتباری و دلیل اجباری، تکمیل فقط با نقش مالی |
 | خدمات و رسید | `/api/v1/services/catalog/`, `/api/v1/services/receipts/`؛ مدیریت تعرفه فقط برای مدیر سامانه، ثبت رسید برای نقش‌های داخلی مجاز، مبالغ در سمت سرور محاسبه می‌شوند، رسید حذف/ویرایش نمی‌شود و `Idempotency-Key` برای جلوگیری از ثبت تکراری پشتیبانی می‌شود |
 | وظایف | `/api/v1/tasks/`, `/api/v1/tasks/{id}/`, `/api/v1/tasks/{id}/assign/`, `/api/v1/tasks/{id}/events/`, `/api/v1/tasks/{id}/notes/`, `/api/v1/tasks/summary/`; فیلتر `overdue=true/false` و تاریخچه تغییرات (واگذاری فقط برای مدیر سامانه) |
 | اسناد | `/api/v1/documents/`, `/api/v1/documents/{id}/download/`, `/api/v1/documents/{id}/review/`, `/api/v1/documents/{id}/replace/` (فایل خصوصی، PDF/JPEG/PNG، حداکثر ۱۰ مگابایت؛ جایگزینی نسخه بدون حذف سابقه) |
