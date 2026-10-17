@@ -6,6 +6,14 @@ from accounts.models import UserProfile
 from .models import Customer, CustomerAddress, CustomerPhone
 
 
+def normalize_persian_digits(value):
+    translation = str.maketrans(
+        "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩",
+        "01234567890123456789",
+    )
+    return str(value or "").translate(translation)
+
+
 class CustomerAddressSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(required=False)
     value = serializers.CharField(source="address", max_length=1000)
@@ -22,6 +30,9 @@ class CustomerPhoneSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerPhone
         fields = ["id", "title", "number"]
+
+    def validate_number(self, value):
+        return normalize_persian_digits(value.strip())
 
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -51,14 +62,13 @@ class CustomerSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "customer_number", "assigned_to", "created_at", "updated_at"]
 
     def validate_national_id(self, value):
-        translation = str.maketrans(
-            "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩",
-            "01234567890123456789",
-        )
-        normalized = value.strip().translate(translation)
+        normalized = normalize_persian_digits(value.strip())
         if normalized and not normalized.isdigit():
             raise serializers.ValidationError("شناسه ملی یا کد ملی باید فقط شامل رقم باشد.")
         return normalized
+
+    def validate_phone_number(self, value):
+        return normalize_persian_digits(value.strip())
 
     def validate(self, attrs):
         customer_type = attrs.get(
