@@ -1,9 +1,21 @@
 from rest_framework import serializers
 
+from accounts.models import UserProfile
 from .models import Customer
 
 
 class CustomerSerializer(serializers.ModelSerializer):
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get("request")
+        user = getattr(request, "user", None) if request else None
+        profile = getattr(user, "profile", None) if user else None
+        role = getattr(profile, "role", None) if profile else None
+        # National identifiers are not needed for finance/audit read workflows.
+        if role in {UserProfile.Role.FINANCE, UserProfile.Role.AUDITOR}:
+            fields.pop("national_id", None)
+        return fields
+
     class Meta:
         model = Customer
         fields = [

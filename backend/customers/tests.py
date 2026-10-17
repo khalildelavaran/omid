@@ -127,6 +127,18 @@ class CustomerApiTests(TestCase):
         response = self.client.get(f"/api/v1/customers/{self.customer.pk}/")
         self.assertEqual(response.status_code, 404)
 
+    def test_finance_and_auditor_do_not_receive_national_id(self):
+        self.customer.national_id = "0012345678"
+        self.customer.save(update_fields=["national_id"])
+        for role in (UserProfile.Role.FINANCE, UserProfile.Role.AUDITOR):
+            user = User.objects.create_user(username=role, is_staff=True)
+            UserProfile.objects.create(user=user, role=role)
+            with self.subTest(role=role):
+                self.client.force_authenticate(user)
+                response = self.client.get("/api/v1/customers/")
+                self.assertEqual(response.status_code, 200)
+                self.assertNotIn("national_id", response.data["results"][0])
+
     def test_auditor_can_read_but_cannot_modify_customers(self):
         auditor = User.objects.create_user(username="auditor", is_staff=True)
         UserProfile.objects.create(user=auditor, role=UserProfile.Role.AUDITOR)
