@@ -103,12 +103,28 @@ jobs:
             --output /tmp/omid-csrf.json \
             http://127.0.0.1:8000/api/v1/auth/csrf/
           grep -q '"csrfToken":' /tmp/omid-csrf.json
-          grep -qi 'set-cookie: csrftoken=' /tmp/omid-csrf-headers.txt
+          grep -qiE 'set-cookie: csrftoken=.*secure' /tmp/omid-csrf-headers.txt
+          csrf_cookie=$(grep -i '^set-cookie: csrftoken=' /tmp/omid-csrf-headers.txt | head -n 1 | sed -E 's/^[^:]*:[[:space:]]*//; s/;.*$//')
+          csrf_token=$(python -c 'import json; print(json.load(open("/tmp/omid-csrf.json"))["csrfToken"])')
+          test -n "$csrf_cookie"
+          test -n "$csrf_token"
 
+          me_status=$(curl --silent --show-error \
+            --output /tmp/omid-me.json \
+            --write-out '%{http_code}' \
+            http://127.0.0.1:8000/api/v1/auth/me/)
+          if [ "$me_status" != "403" ]; then
+            echo "Expected unauthenticated current-user request to be rejected with 403; got $me_status"
+            cat /tmp/omid-me.json
+            exit 1
+          fi
+
+          # Send the cookie explicitly so curl cannot omit it due to its Secure flag on local HTTP.
+          # Without the X-CSRFToken header this request must fail even when the CSRF cookie is valid.
           login_status=$(curl --silent --show-error \
             --output /tmp/omid-login.json \
             --write-out '%{http_code}' \
-            --cookie /tmp/omid-cookies.txt \
+            --header "Cookie: $csrf_cookie" \
             --header 'Content-Type: application/json' \
             --request POST \
             --data '{}' \
@@ -116,6 +132,22 @@ jobs:
           if [ "$login_status" != "403" ]; then
             echo "Expected login without X-CSRFToken to be rejected with 403; got $login_status"
             cat /tmp/omid-login.json
+            exit 1
+          fi
+
+          # A valid CSRF token should pass middleware and reach login validation (400 for empty credentials).
+          valid_csrf_status=$(curl --silent --show-error \
+            --output /tmp/omid-valid-csrf-login.json \
+            --write-out '%{http_code}' \
+            --header "Cookie: $csrf_cookie" \
+            --header "X-CSRFToken: $csrf_token" \
+            --header 'Content-Type: application/json' \
+            --request POST \
+            --data '{}' \
+            http://127.0.0.1:8000/api/v1/auth/login/)
+          if [ "$valid_csrf_status" != "400" ]; then
+            echo "Expected valid CSRF token to reach login validation (400); got $valid_csrf_status"
+            cat /tmp/omid-valid-csrf-login.json
             exit 1
           fi
 
