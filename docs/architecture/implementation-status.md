@@ -89,4 +89,6 @@
 - [ ] hardening و تست امنیتی مستقل پیش از استقرار
 
 ## اعتبارسنجی
-در اجرای [GitHub Actions](https://github.com/khalildelavaran/omid/actions/runs/38984991037)، بررسی Django، `makemigrations --check --dry-run` و هر ۱۱۴ آزمون بک‌اند موفق بوده‌اند. محدودیت نرخ فعلی از cache پیش‌فرض محلی استفاده می‌کند؛ برای استقرار چندنمونه‌ای باید cache مشترک پیکربندی و در لبه نیز rate limit اعمال شود. این نسخه برای توسعه است و برای production آماده نیست.
+در اجرای [GitHub Actions](https://github.com/khalildelavaran/omid/actions/runs/38984991037)، بررسی Django، `makemigrations --check --dry-run` و هر ۱۱۴ آزمون بک‌اند موفق بوده‌اند.
+
+آزمون‌های پراکسی Worker نیز در [GitHub Actions](https://github.com/khalildelavaran/omid/actions/runs/39007806801) با ۵ تست موفق‌اند و [استقرار Worker](https://github.com/khalildelavaran/omid/actions/runs/39007878937) موفق شده است. در بررسی تنظیمات Cloudflare، `OMID_API_ORIGIN` هنوز تعریف نشده بود؛ ازاین‌رو این مرحله را استقرار زیرساخت پراکسی می‌دانیم، نه اتصال کامل رابط به پایگاه داده. محدودیت نرخ فعلی از cache پیش‌فرض محلی استفاده می‌کند؛ برای استقرار چندنمونه‌ای باید cache مشترک پیکربندی و در لبه نیز rate limit اعمال شود. این نسخه برای توسعه است و برای production آماده نیست.
