@@ -152,6 +152,9 @@ REST_FRAMEWORK = {
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False  # Django's CSRF token must be readable by the approved frontend flow.
 if not DEBUG:
+    # The Cloudflare Worker overwrites X-Forwarded-Proto before proxying to Django.
+    # Only trust this header when requests reach Django through that controlled proxy.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
