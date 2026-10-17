@@ -15,6 +15,12 @@ class CustomerSerializer(serializers.ModelSerializer):
             "organization_name",
             "phone_number",
             "email",
+            "national_id",
+            "birth_date",
+            "father_name",
+            "occupation",
+            "postal_code",
+            "sana_verified",
             "status",
             "assigned_to",
             "notes",
@@ -22,6 +28,16 @@ class CustomerSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "customer_number", "assigned_to", "created_at", "updated_at"]
+
+    def validate_national_id(self, value):
+        translation = str.maketrans(
+            "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩",
+            "01234567890123456789",
+        )
+        normalized = value.strip().translate(translation)
+        if normalized and not normalized.isdigit():
+            raise serializers.ValidationError("شناسه ملی یا کد ملی باید فقط شامل رقم باشد.")
+        return normalized
 
     def validate(self, attrs):
         customer_type = attrs.get(

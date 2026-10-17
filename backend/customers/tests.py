@@ -56,6 +56,44 @@ class CustomerApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], 1)
 
+    def test_extended_profile_fields_and_review_status_round_trip(self):
+        self.client.force_authenticate(self.staff_user)
+        response = self.client.patch(
+            f"/api/v1/customers/{self.customer.pk}/",
+            {
+                "national_id": "۰۰۱۲۳۴۵۶۷۸",
+                "birth_date": "1990-02-03",
+                "father_name": "نمونه",
+                "occupation": "کارمند",
+                "postal_code": "00123",
+                "sana_verified": True,
+                "status": "needs_review",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["national_id"], "0012345678")
+        self.assertEqual(response.data["birth_date"], "1990-02-03")
+        self.assertEqual(response.data["father_name"], "نمونه")
+        self.assertEqual(response.data["occupation"], "کارمند")
+        self.assertEqual(response.data["postal_code"], "00123")
+        self.assertTrue(response.data["sana_verified"])
+        self.assertEqual(response.data["status"], "needs_review")
+
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.national_id, "0012345678")
+        self.assertEqual(self.customer.status, Customer.Status.NEEDS_REVIEW)
+
+    def test_national_id_rejects_non_digit_characters(self):
+        self.client.force_authenticate(self.staff_user)
+        response = self.client.patch(
+            f"/api/v1/customers/{self.customer.pk}/",
+            {"national_id": "12A45"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("national_id", response.data)
+
     def test_customer_can_be_archived_without_deletion(self):
         self.client.force_authenticate(self.staff_user)
         response = self.client.post(f"/api/v1/customers/{self.customer.pk}/archive/")

@@ -12,6 +12,7 @@ class Customer(models.Model):
 
     class Status(models.TextChoices):
         ACTIVE = "active", "فعال"
+        NEEDS_REVIEW = "needs_review", "نیازمند بررسی"
         INACTIVE = "inactive", "غیرفعال"
         ARCHIVED = "archived", "بایگانی‌شده"
 
@@ -27,6 +28,12 @@ class Customer(models.Model):
     organization_name = models.CharField(max_length=200, blank=True)
     phone_number = models.CharField(max_length=32, blank=True, db_index=True)
     email = models.EmailField(blank=True)
+    national_id = models.CharField(max_length=20, blank=True)
+    birth_date = models.DateField(null=True, blank=True)
+    father_name = models.CharField(max_length=100, blank=True)
+    occupation = models.CharField(max_length=150, blank=True)
+    postal_code = models.CharField(max_length=20, blank=True)
+    sana_verified = models.BooleanField(default=False)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
     assigned_to = models.ForeignKey(
         settings.AUTH_USER_MODEL,
