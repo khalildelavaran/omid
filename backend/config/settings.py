@@ -9,7 +9,7 @@ import environ
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
-    DJANGO_ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1"]),
+    DJANGO_ALLOWED_HOSTS=(list, []),
     DJANGO_CSRF_TRUSTED_ORIGINS=(list, []),
 )
 environ.Env.read_env(BASE_DIR / ".env")
@@ -18,9 +18,17 @@ SECRET_KEY = env("DJANGO_SECRET_KEY", default="")
 DEBUG = env("DJANGO_DEBUG")
 ALLOWED_HOSTS = env("DJANGO_ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = env("DJANGO_CSRF_TRUSTED_ORIGINS")
+DATABASE_URL = env("DATABASE_URL", default="")
 
-if not SECRET_KEY and not DEBUG:
-    raise RuntimeError("DJANGO_SECRET_KEY must be set when DEBUG is disabled.")
+if not DEBUG:
+    if not SECRET_KEY:
+        raise RuntimeError("DJANGO_SECRET_KEY must be set when DEBUG is disabled.")
+    if not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS:
+        raise RuntimeError("Set DJANGO_ALLOWED_HOSTS to explicit production hostnames; wildcards are not allowed.")
+    if not CSRF_TRUSTED_ORIGINS:
+        raise RuntimeError("Set DJANGO_CSRF_TRUSTED_ORIGINS to the exact trusted HTTPS frontend origin(s).")
+    if not DATABASE_URL.startswith(("postgres://", "postgresql://")):
+        raise RuntimeError("DATABASE_URL must be a PostgreSQL URL when DEBUG is disabled.")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
