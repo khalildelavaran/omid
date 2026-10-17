@@ -60,3 +60,41 @@ class Customer(models.Model):
         if self.customer_type == self.CustomerType.ORGANIZATION:
             return self.organization_name or self.customer_number
         return f"{self.first_name} {self.last_name}".strip() or self.customer_number
+
+
+
+class CustomerAddress(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="addresses")
+    title = models.CharField(max_length=80, blank=True)
+    address = models.TextField(max_length=1000)
+    postal_code = models.CharField(max_length=20, blank=True)
+    is_active = models.BooleanField(default=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["customer", "is_active"], name="cust_addr_active_idx")]
+
+    def __str__(self):
+        return f"{self.customer.customer_number}:{self.title or self.address[:40]}"
+
+
+class CustomerPhone(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="phones")
+    title = models.CharField(max_length=80, blank=True)
+    number = models.CharField(max_length=32)
+    is_active = models.BooleanField(default=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["customer", "is_active"], name="cust_phone_active_idx")]
+
+    def __str__(self):
+        return f"{self.customer.customer_number}:{self.number}"
