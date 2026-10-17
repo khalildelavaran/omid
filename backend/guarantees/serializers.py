@@ -3,7 +3,7 @@ from rest_framework import serializers
 from accounts.models import UserProfile
 from applications.models import LoanApplication
 from customers.models import Customer
-from .models import GuaranteeRequest
+from .models import GuaranteeRequest, GuaranteeRequestEvent
 
 
 class GuaranteeRequestSerializer(serializers.ModelSerializer):
@@ -61,3 +61,40 @@ class GuaranteeRequestSerializer(serializers.ModelSerializer):
         if role in {UserProfile.Role.INTAKE, UserProfile.Role.CASE_WORKER} and value.assigned_to_id == user.id:
             return value
         raise serializers.ValidationError("به مشتری انتخاب‌شده به‌عنوان درخواست‌دهنده دسترسی ندارید.")
+
+class GuaranteeRequestEventSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source="actor.username", read_only=True, default=None)
+
+    class Meta:
+        model = GuaranteeRequestEvent
+        fields = [
+            "id", "guarantee_request", "event_type", "previous_status",
+            "new_status", "note", "actor", "actor_username", "created_at",
+        ]
+        read_only_fields = fields
+
+
+class GuaranteeTransitionSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=[
+        (GuaranteeRequest.Status.UNDER_REVIEW, "در حال بررسی"),
+        (GuaranteeRequest.Status.APPROVED, "تأیید شده"),
+        (GuaranteeRequest.Status.REJECTED, "رد شده"),
+        (GuaranteeRequest.Status.FULFILLED, "انجام‌شده"),
+        (GuaranteeRequest.Status.CANCELLED, "لغو شده"),
+    ])
+    reason = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=1000,
+        trim_whitespace=True,
+        default="",
+    )
+
+    def validate(self, attrs):
+        reason = attrs.get("reason", "").strip()
+        if attrs["status"] in {GuaranteeRequest.Status.REJECTED, GuaranteeRequest.Status.CANCELLED} and not reason:
+            raise serializers.ValidationError({
+                "reason": "برای رد یا لغو درخواست ضمانت، ثبت دلیل الزامی است."
+            })
+        return attrs
+
