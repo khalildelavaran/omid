@@ -657,7 +657,7 @@ function toast(message){const el=document.getElementById("toast");el.textContent
 document.addEventListener("input",e=>{const x=e.target;if(!x.matches('input:not([type="email"]):not([type="url"]):not([type="password"]):not([type="file"]):not([type="hidden"]),textarea'))return;const p=x.selectionStart,a=x.value,b=toFaDigits(a);if(a!==b){x.value=b;try{x.setSelectionRange(p+(b.length-a.length),p+(b.length-a.length));}catch(_){}}},true);
 document.addEventListener("submit",e=>{if(e.target.querySelectorAll)e.target.querySelectorAll('input:not([type="hidden"]):not([type="file"]):not([type="email"]):not([type="url"]):not([type="password"]),textarea').forEach(x=>x.value=toEnDigits(x.value));},true);
 document.addEventListener("click",e=>{const mb=e.target.closest("[data-jalali-month]");if(mb){const w=mb.closest(".jalali-picker"),p=w.querySelector(".jalali-calendar");let y=+p.dataset.year,m=+p.dataset.month+(+mb.dataset.jalaliMonth);if(m<1){m=12;y--;}if(m>12){m=1;y++;}p.dataset.year=y;p.dataset.month=m;drawJalaliCalendar(w);return;}const db=e.target.closest("[data-jalali-day]");if(db){const w=db.closest(".jalali-picker"),i=w.querySelector("[data-jalali-visible]"),h=w.querySelector("[data-jalali-hidden]");h.value=db.dataset.jalaliDay;i.dataset.isoValue=h.value;i.value=isoToFa(h.value);w.querySelector(".jalali-calendar").hidden=true;h.dispatchEvent(new Event("change",{bubbles:true}));return;}const tb=e.target.closest("[data-jalali-today]");if(tb){const w=tb.closest(".jalali-picker"),v=isoDay(new Date()),i=w.querySelector("[data-jalali-visible]");w.querySelector("[data-jalali-hidden]").value=v;i.dataset.isoValue=v;i.value=isoToFa(v);w.querySelector(".jalali-calendar").hidden=true;return;}const cb=e.target.closest("[data-jalali-clear]");if(cb){const w=cb.closest(".jalali-picker");w.querySelector("[data-jalali-hidden]").value="";w.querySelector("[data-jalali-visible]").value="";w.querySelector("[data-jalali-visible]").dataset.isoValue="";w.querySelector(".jalali-calendar").hidden=true;return;}const di=e.target.closest("[data-jalali-visible]");if(di){const w=di.closest(".jalali-picker"),p=w.querySelector(".jalali-calendar"),d=fromIso(di.dataset.isoValue),a=d?faParts(d):faParts(new Date());p.dataset.year=a.year;p.dataset.month=a.month;drawJalaliCalendar(w);p.hidden=false;return;}if(!e.target.closest(".jalali-picker"))document.querySelectorAll(".jalali-calendar").forEach(p=>p.hidden=true);},true);
-document.addEventListener("click",e=>{
+document.addEventListener("click",async e=>{
  const customerPick=e.target.closest('[data-action="select-application-customer"]');
  if(customerPick){
   const customer=customers.find(c=>c.id===customerPick.dataset.customerId);
@@ -738,19 +738,61 @@ document.addEventListener("click",e=>{
    if(selected&&hidden&&search&&results&&label){hidden.value=selected.id;search.value=selected.id;results.innerHTML=guaranteeApplicationResults("",selected.id);label.textContent="پرونده انتخاب‌شده: "+selected.id+" · "+selected.customer+" · "+selected.type;}
    return;
   }
+  if(act==="check-backend-session"){
+    if(!window.__OMID_API_PROXY_CONFIGURED){toast("ابتدا OMID_API_ORIGIN را در Worker تنظیم کنید.");return;}
+    try{
+      const result=await omidApiRequest("/api/v1/auth/me/",{method:"GET"});
+      if(result.response.ok&&result.body&&result.body.user){
+        backendSessionUser=result.body.user;
+        updateOmidSessionStatus(omidBackendUserSummary(backendSessionUser)+" رابط اصلی هنوز از داده‌های نمایشی استفاده می‌کند.");
+        toast("نشست کارکنان معتبر است؛ داده‌های برنامه هنوز به API متصل نیستند.");
+      }else if(result.response.status===401||result.response.status===403){
+        backendSessionUser=null;
+        updateOmidSessionStatus("نشست کارکنان فعال نیست؛ با حساب داخلی وارد شوید.");
+        toast("نشست فعالی پیدا نشد. ابتدا ورود به بک‌اند را انجام دهید.");
+      }else{
+        throw new Error(omidApiErrorMessage(result.body,result.response.status));
+      }
+    }catch(error){
+      const message=String(error&&error.message||"خطا در بررسی نشست.");
+      updateOmidSessionStatus("بررسی نشست ناموفق بود: "+message);
+      toast(message);
+    }
+    return;
+  }
+  if(act==="logout-backend-session"){
+    if(!window.__OMID_API_PROXY_CONFIGURED){toast("ابتدا OMID_API_ORIGIN را در Worker تنظیم کنید.");return;}
+    try{
+      const csrfToken=await omidApiCsrfToken();
+      const result=await omidApiRequest("/api/v1/auth/logout/",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","X-CSRFToken":csrfToken},
+        body:JSON.stringify({})
+      });
+      if(!result.response.ok)throw new Error(omidApiErrorMessage(result.body,result.response.status));
+      backendSessionUser=null;
+      updateOmidSessionStatus("از نشست بک‌اند خارج شدید. داده‌های نمایشی رابط تغییری نکرده‌اند.");
+      toast("از بک‌اند خارج شدید.");
+    }catch(error){
+      const message=String(error&&error.message||"خروج از بک‌اند ناموفق بود.");
+      updateOmidSessionStatus("خروج ناموفق بود: "+message);
+      toast(message);
+    }
+    return;
+  }
   if(act==="check-api-connection"){
     fetch("/api/v1/health/",{method:"GET",credentials:"same-origin",cache:"no-store",headers:{Accept:"application/json"}})
      .then(async response=>{
       let body={};
       try{body=await response.json();}catch(_error){}
-      if(response.ok)toast("بک‌اند پاسخ می‌دهد؛ برای تکمیل اتصال، ورود و همگام‌سازی داده‌ها باید فعال شود.");
+      if(response.ok)toast("بک‌اند پاسخ می‌دهد؛ اکنون امکان آزمون نشست کارکنان وجود دارد، اما همگام‌سازی داده‌ها هنوز فعال نشده است.");
       else if(response.status===503)toast(body.detail||"آدرس بک‌اند تنظیم نشده است؛ OMID_API_ORIGIN را در Worker تعریف کنید.");
       else toast("بک‌اند پاسخ داد، اما وضعیت "+response.status+" برگشت.");
      })
      .catch(()=>toast("اتصال شبکه برقرار نشد؛ origin بک‌اند و دسترس‌پذیری آن را بررسی کنید."));
     return;
-   }
-   if(act==="refresh"){render();toast("صفحه با داده‌های نمایشی فعلی به‌روزرسانی شد.");}
+  }
+  if(act==="refresh"){render();toast("صفحه با داده‌های نمایشی فعلی به‌روزرسانی شد.");}
   if(act==="delete-task"){const idx=Number(action.dataset.taskId);if(Number.isInteger(idx)&&idx>=0&&idx<tasks.length){tasks.splice(idx,1);persistDemoData();document.getElementById("content").innerHTML=renderWorkflow();toast("وظیفه حذف شد و در همین مرورگر ذخیره شد.");}}
   if(act==="customer-detail")navigate("/customers/"+encodeURIComponent(action.dataset.id));
   if(act==="advance-loan-stage"){const item=applications.find(a=>a.id===action.dataset.id);if(item){const w=getLoanWorkflow(item),next=w.definition.stages[getLoanStageIndex(item)+1];if(next&&setLoanStage(item,next.key)){render();toast("مرحله پرونده به «"+next.label+"» تغییر کرد.");}}return;}
