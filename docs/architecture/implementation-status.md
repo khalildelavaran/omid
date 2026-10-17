@@ -55,6 +55,7 @@
 - [x] schema ماشین‌خوان OpenAPI از مسیر `/api/v1/schema/` با دسترسی محدود به کارکنان دارای نقش داخلی
 - [x] پراکسی هم‌مبدأ API در Cloudflare Worker با تنظیم اختیاری `OMID_API_ORIGIN`، اجبار HTTPS، انتقال کوکی/CSRF، پاسخ‌های بدون cache و بازنویسی redirectهای هم‌مبدأ
 - [x] اعتماد Django به هدر `X-Forwarded-Proto` که Worker خودش بازنویسی می‌کند، همراه با تست CSRF روی مبدأ HTTPS مورد اعتماد
+- [x] فرم تشخیصی نشست کارکنان در تنظیمات: ورود با CSRF، مشاهده کاربر/نقش، بررسی نشست و خروج؛ فرم فقط بعد از تنظیم origin نمایش داده می‌شود و هنوز دسترسی صفحات اصلی را مسدود/کنترل نمی‌کند
 - [x] پنج آزمون مستقل برای پراکسی Worker در Node.js و CI؛ استقرار Worker با Wrangler v4 و شناسه حساب صریح
 - [x] Dockerfile برای API با کاربر non-root، Gunicorn، WhiteNoise، healthcheck و مسیر ذخیره‌سازی خصوصی اسناد
 - [x] اعتبارسنجی fail-closed تنظیمات production: کلید حداقل ۵۰ نویسه، host صریح بدون wildcard، originهای HTTPS برای CSRF و PostgreSQL اجباری
@@ -92,11 +93,11 @@
 - [ ] lint، dependency review و اسکن امنیتی وابستگی‌ها
 - [ ] تولید و انتشار schema نسخه‌بندی‌شده در CI به‌عنوان artifact و افزودن lint/validation قرارداد OpenAPI
 - [x] تست پراکسی Worker: [پنج آزمون سبز](https://github.com/khalildelavaran/omid/actions/runs/39007806801)
-- [x] استقرار Worker: [اجرای موفق Cloudflare Deploy](https://github.com/khalildelavaran/omid/actions/runs/39007878937)
+- [x] استقرار Worker: [اجرای موفق Cloudflare Deploy](https://github.com/khalildelavaran/omid/actions/runs/39011138779)
 - [ ] اتصال واقعی پیامک، پرداخت و امضا
 - [ ] hardening و تست امنیتی مستقل پیش از استقرار
 
 ## اعتبارسنجی
 در اجرای [GitHub Actions](https://github.com/khalildelavaran/omid/actions/runs/38984991037)، بررسی Django، `makemigrations --check --dry-run` و هر ۱۱۴ آزمون بک‌اند موفق بوده‌اند.
 
-آزمون‌های پراکسی Worker نیز در [GitHub Actions](https://github.com/khalildelavaran/omid/actions/runs/39007806801) با ۵ تست موفق‌اند و [استقرار Worker](https://github.com/khalildelavaran/omid/actions/runs/39007878937) موفق شده است. [ساخت Docker image بک‌اند](https://github.com/khalildelavaran/omid/actions/runs/39009302788) نیز موفق شده و [بررسی Django و ۱۱۴ آزمون بک‌اند](https://github.com/khalildelavaran/omid/actions/runs/39009296078) با موفقیت تمام شده‌اند. [آزمون یکپارچهٔ کانتینر با PostgreSQL، migration، کوکی CSRF امن و مبدأ HTTPS قابل اعتماد](https://github.com/khalildelavaran/omid/actions/runs/39010748284) نیز موفق است. در بررسی تنظیمات Cloudflare، `OMID_API_ORIGIN` هنوز تعریف نشده بود؛ ازاین‌رو این مرحله را استقرار زیرساخت پراکسی می‌دانیم، نه اتصال کامل رابط به پایگاه داده. محدودیت نرخ فعلی از cache پیش‌فرض محلی استفاده می‌کند؛ برای استقرار چندنمونه‌ای باید cache مشترک پیکربندی و در لبه نیز rate limit اعمال شود. این نسخه برای توسعه است و برای production آماده نیست.
+آزمون‌های پراکسی و بررسی نحوی اسکریپت رابط Worker در [GitHub Actions](https://github.com/khalildelavaran/omid/actions/runs/39011138691) با ۶ تست موفق‌اند و [استقرار Worker](https://github.com/khalildelavaran/omid/actions/runs/39007878937) موفق شده است. [ساخت Docker image بک‌اند](https://github.com/khalildelavaran/omid/actions/runs/39009302788) نیز موفق شده و [بررسی Django و ۱۱۴ آزمون بک‌اند](https://github.com/khalildelavaran/omid/actions/runs/39009296078) با موفقیت تمام شده‌اند. [آزمون یکپارچهٔ کانتینر با PostgreSQL، migration، کوکی CSRF امن و مبدأ HTTPS قابل اعتماد](https://github.com/khalildelavaran/omid/actions/runs/39010820454) نیز موفق است. در بررسی تنظیمات Cloudflare، `OMID_API_ORIGIN` هنوز تعریف نشده بود؛ ازاین‌رو این مرحله را استقرار زیرساخت پراکسی می‌دانیم، نه اتصال کامل رابط به پایگاه داده. محدودیت نرخ فعلی از cache پیش‌فرض محلی استفاده می‌کند؛ برای استقرار چندنمونه‌ای باید cache مشترک پیکربندی و در لبه نیز rate limit اعمال شود. این نسخه برای توسعه است و برای production آماده نیست.
