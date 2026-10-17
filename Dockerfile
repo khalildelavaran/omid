@@ -26,7 +26,7 @@ RUN DJANGO_SECRET_KEY=build-only-not-a-real-secret \
     DJANGO_CSRF_TRUSTED_ORIGINS=https://omid.khalil-delavaran.workers.dev \
     DATABASE_URL=postgres://build:build@127.0.0.1:5432/build-only \
     python manage.py collectstatic --noinput \
-    && chown -R app:app /app/backend/staticfiles
+    && chown -R app:app /app/staticfiles
 
 USER app
 
