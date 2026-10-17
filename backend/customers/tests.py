@@ -4,7 +4,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserProfile
 from core.models import AuditEvent
-from .models import Customer
+from .models import Customer, CustomerAddress, CustomerPhone
 
 User = get_user_model()
 
@@ -93,6 +93,73 @@ class CustomerApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("national_id", response.data)
+
+    def test_addresses_and_phones_round_trip_and_archive_without_delete(self):
+        self.client.force_authenticate(self.staff_user)
+        response = self.client.patch(
+            f"/api/v1/customers/{self.customer.pk}/",
+            {
+                "addresses": [
+                    {"title": "خانه", "value": "تهران، خیابان نمونه", "postal_code": "۱۲۳۴۵۶۷۸۹۰"}
+                ],
+                "phones": [
+                    {"title": "همراه اصلی", "number": "۰۹۱۲۱۲۳۴۵۶۷"},
+                    {"title": "محل کار", "number": "۰۲۱۱۲۳۴۵۶۷۸"},
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["addresses"]), 1)
+        self.assertEqual(response.data["addresses"][0]["value"], "تهران، خیابان نمونه")
+        self.assertEqual(response.data["addresses"][0]["postal_code"], "۱۲۳۴۵۶۷۸۹۰")
+        self.assertEqual(len(response.data["phones"]), 2)
+        self.assertEqual(response.data["phone_number"], "۰۹۱۲۱۲۳۴۵۶۷")
+        address_id = response.data["addresses"][0]["id"]
+        old_phone_ids = [item["id"] for item in response.data["phones"]]
+
+        update = self.client.patch(
+            f"/api/v1/customers/{self.customer.pk}/",
+            {
+                "addresses": [
+                    {"id": address_id, "title": "خانه", "value": "تهران، خیابان جدید", "postal_code": "۱۲۳۴۵۶۷۸۹۰"}
+                ],
+                "phones": [{"title": "همراه اصلی", "number": "۰۹۱۲۱۲۳۴۵۶۷"}],
+            },
+            format="json",
+        )
+        self.assertEqual(update.status_code, 200)
+        self.assertEqual(update.data["addresses"][0]["id"], address_id)
+        self.assertEqual(update.data["addresses"][0]["value"], "تهران، خیابان جدید")
+        self.assertEqual(len(update.data["phones"]), 1)
+        self.assertEqual(update.data["phone_number"], "۰۹۱۲۱۲۳۴۵۶۷")
+        self.assertTrue(CustomerAddress.objects.filter(pk=address_id, is_active=True).exists())
+        self.assertTrue(CustomerPhone.objects.filter(pk=old_phone_ids[1], is_active=False).exists())
+        self.assertTrue(CustomerPhone.objects.filter(pk=old_phone_ids[1]).exists())
+
+    def test_nested_records_cannot_be_attached_across_customers(self):
+        self.client.force_authenticate(self.staff_user)
+        first = self.client.patch(
+            f"/api/v1/customers/{self.customer.pk}/",
+            {"addresses": [{"title": "خانه", "value": "تهران"}]},
+            format="json",
+        )
+        self.assertEqual(first.status_code, 200)
+        address_id = first.data["addresses"][0]["id"]
+
+        second = self.client.post(
+            "/api/v1/customers/",
+            {"customer_type": "individual", "first_name": "مشتری", "last_name": "دوم"},
+            format="json",
+        )
+        self.assertEqual(second.status_code, 201)
+        response = self.client.patch(
+            f"/api/v1/customers/{second.data['id']}/",
+            {"addresses": [{"id": address_id, "title": "خانه", "value": "نشانی غیرمجاز"}]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(CustomerAddress.objects.get(pk=address_id).address, "تهران")
 
     def test_customer_can_be_archived_without_deletion(self):
         self.client.force_authenticate(self.staff_user)
