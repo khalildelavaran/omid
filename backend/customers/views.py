@@ -22,7 +22,7 @@ def normalize_digits(value):
 class CustomerViewSet(viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
     permission_classes = [IsAuthenticated, IsStaffCustomerOperator]
-    queryset = Customer.objects.select_related("assigned_to").all()
+    queryset = Customer.objects.select_related("assigned_to").prefetch_related("addresses", "phones").all()
     # Financial/customer records must never be hard-deleted through the API.
     http_method_names = ["get", "post", "put", "patch", "head", "options"]
 
