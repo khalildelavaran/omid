@@ -17,7 +17,13 @@ class IsStaffGuaranteeOperator(BasePermission):
         role = self._role(user)
         if role not in self.read_roles:
             return False
-        return request.method in SAFE_METHODS or role in self.write_roles
+        if request.method in SAFE_METHODS or role in self.write_roles:
+            return True
+        return (
+            request.method == "POST"
+            and getattr(view, "action", None) == "transition"
+            and role in {"credit_approver", "finance"}
+        )
 
     def has_object_permission(self, request, view, obj):
         role = self._role(request.user)
@@ -25,4 +31,6 @@ class IsStaffGuaranteeOperator(BasePermission):
             return True
         if role in {"intake", "case_worker"}:
             return obj.application.assigned_to_id == request.user.id
+        if role in {"credit_approver", "finance"} and getattr(view, "action", None) == "transition":
+            return True
         return request.method in SAFE_METHODS
