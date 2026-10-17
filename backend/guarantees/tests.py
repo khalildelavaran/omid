@@ -6,7 +6,7 @@ from accounts.models import UserProfile
 from applications.models import LoanApplication
 from customers.models import Customer
 from core.models import AuditEvent
-from .models import GuaranteeRequest
+from .models import GuaranteeRequest, GuaranteeRequestEvent
 
 
 User = get_user_model()
@@ -169,6 +169,134 @@ class GuaranteeRequestApiTests(TestCase):
         self.assertEqual(request.status, GuaranteeRequest.Status.REGISTERED)
         with self.assertRaises(ValueError):
             GuaranteeRequest.objects.filter(pk=request.pk).delete()
+
+    def test_guarantee_status_transition_is_role_separated_and_audited(self):
+        self.client.force_authenticate(self.staff)
+        created = self.client.post(
+            "/api/v1/guarantees/", self.payload(), format="json"
+        )
+        self.assertEqual(created.status_code, 201, created.data)
+        guarantee_id = created.data["id"]
+
+        review = self.client.post(
+            f"/api/v1/guarantees/{guarantee_id}/transition/",
+            {"status": GuaranteeRequest.Status.UNDER_REVIEW},
+            format="json",
+        )
+        self.assertEqual(review.status_code, 200, review.data)
+        self.assertEqual(review.data["status"], GuaranteeRequest.Status.UNDER_REVIEW)
+
+        # Even system administration cannot bypass credit approval authority.
+        admin = User.objects.create_user(
+            username="guarantee-system-admin", password="test-password-123", is_staff=True
+        )
+        UserProfile.objects.create(user=admin, role=UserProfile.Role.SYSTEM_ADMIN)
+        self.client.force_authenticate(admin)
+        bypass = self.client.post(
+            f"/api/v1/guarantees/{guarantee_id}/transition/",
+            {"status": GuaranteeRequest.Status.APPROVED},
+            format="json",
+        )
+        self.assertEqual(bypass.status_code, 400)
+
+        approver = User.objects.create_user(
+            username="guarantee-approver", password="test-password-123", is_staff=True
+        )
+        UserProfile.objects.create(user=approver, role=UserProfile.Role.CREDIT_APPROVER)
+        self.client.force_authenticate(approver)
+        reason = "شرایط ضمانت پس از بررسی احراز نشد."
+        missing_reason = self.client.post(
+            f"/api/v1/guarantees/{guarantee_id}/transition/",
+            {"status": GuaranteeRequest.Status.REJECTED},
+            format="json",
+        )
+        self.assertEqual(missing_reason.status_code, 400)
+        rejected = self.client.post(
+            f"/api/v1/guarantees/{guarantee_id}/transition/",
+            {"status": GuaranteeRequest.Status.REJECTED, "reason": reason},
+            format="json",
+        )
+        self.assertEqual(rejected.status_code, 200, rejected.data)
+        self.assertEqual(rejected.data["status"], GuaranteeRequest.Status.REJECTED)
+
+        event = GuaranteeRequestEvent.objects.get(
+            guarantee_request_id=guarantee_id,
+            event_type=GuaranteeRequestEvent.EventType.STATUS_CHANGED,
+            new_status=GuaranteeRequest.Status.REJECTED,
+        )
+        self.assertEqual(event.note, reason)
+        self.assertEqual(event.actor, approver)
+        audit = AuditEvent.objects.get(
+            action="guarantee_request.status_changed",
+            entity_id=guarantee_id,
+        )
+        self.assertEqual(audit.metadata["reason_length"], len(reason))
+        self.assertNotIn(reason, str(audit.metadata))
+
+    def test_approved_guarantee_can_be_fulfilled_by_finance_and_history_is_readable(self):
+        self.client.force_authenticate(self.staff)
+        created = self.client.post(
+            "/api/v1/guarantees/", self.payload(), format="json"
+        )
+        self.assertEqual(created.status_code, 201, created.data)
+        guarantee_id = created.data["id"]
+        self.client.post(
+            f"/api/v1/guarantees/{guarantee_id}/transition/",
+            {"status": GuaranteeRequest.Status.UNDER_REVIEW},
+            format="json",
+        )
+
+        approver = User.objects.create_user(
+            username="guarantee-approve-fulfill", password="test-password-123", is_staff=True
+        )
+        UserProfile.objects.create(user=approver, role=UserProfile.Role.CREDIT_APPROVER)
+        self.client.force_authenticate(approver)
+        approved = self.client.post(
+            f"/api/v1/guarantees/{guarantee_id}/transition/",
+            {"status": GuaranteeRequest.Status.APPROVED},
+            format="json",
+        )
+        self.assertEqual(approved.status_code, 200, approved.data)
+
+        finance = User.objects.create_user(
+            username="guarantee-finance", password="test-password-123", is_staff=True
+        )
+        UserProfile.objects.create(user=finance, role=UserProfile.Role.FINANCE)
+        self.client.force_authenticate(finance)
+        fulfilled = self.client.post(
+            f"/api/v1/guarantees/{guarantee_id}/transition/",
+            {"status": GuaranteeRequest.Status.FULFILLED},
+            format="json",
+        )
+        self.assertEqual(fulfilled.status_code, 200, fulfilled.data)
+        self.assertEqual(fulfilled.data["status"], GuaranteeRequest.Status.FULFILLED)
+
+        history = self.client.get(f"/api/v1/guarantees/{guarantee_id}/events/")
+        self.assertEqual(history.status_code, 200)
+        self.assertEqual(len(history.data), 4)
+        self.assertEqual(history.data[0]["event_type"], GuaranteeRequestEvent.EventType.CREATED)
+        self.assertEqual(history.data[-1]["new_status"], GuaranteeRequest.Status.FULFILLED)
+
+    def test_guarantee_event_history_is_append_only(self):
+        guarantee = GuaranteeRequest.objects.create(
+            application=self.application,
+            created_by=self.staff,
+        )
+        event = GuaranteeRequestEvent.objects.create(
+            guarantee_request=guarantee,
+            event_type=GuaranteeRequestEvent.EventType.CREATED,
+            new_status=GuaranteeRequest.Status.REGISTERED,
+            actor=self.staff,
+        )
+        event.note = "tampered"
+        with self.assertRaises(ValueError):
+            event.save()
+        with self.assertRaises(ValueError):
+            event.delete()
+        with self.assertRaises(ValueError):
+            GuaranteeRequestEvent.objects.filter(pk=event.pk).update(note="tampered")
+        with self.assertRaises(ValueError):
+            GuaranteeRequestEvent.objects.filter(pk=event.pk).delete()
 
     def test_invalid_status_filter_is_rejected(self):
         self.client.force_authenticate(self.staff)
