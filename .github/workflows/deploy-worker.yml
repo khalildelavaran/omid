@@ -7,6 +7,7 @@ on:
     paths:
       - "worker/**"
       - "wrangler.toml"
+      - ".github/workflows/deploy-worker.yml"
   workflow_dispatch:
 
 concurrency:
@@ -36,7 +37,8 @@ jobs:
           fi
 
       - name: Deploy Worker to Cloudflare
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: "1a43675f6af74d6c9d93fe824648729f"
           command: deploy
