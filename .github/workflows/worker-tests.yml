@@ -1,0 +1,25 @@
+name: Worker tests
+
+on:
+  push:
+    paths:
+      - "worker/**"
+      - ".github/workflows/worker-tests.yml"
+  pull_request:
+    paths:
+      - "worker/**"
+      - ".github/workflows/worker-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test Worker API proxy
+        working-directory: worker
+        run: npm test
