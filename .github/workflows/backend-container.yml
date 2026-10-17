@@ -1,4 +1,4 @@
-name: Backend container build
+name: Backend container build and smoke test
 
 on:
   push:
@@ -20,9 +20,114 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  build-and-smoke-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+
       - name: Build production image (no push)
         run: docker build --pull --tag omid-api:ci .
+
+      - name: Start isolated PostgreSQL for container tests
+        shell: bash
+        run: |
+          docker network create omid-ci
+          docker volume create omid-documents-ci
+          docker run --detach --name omid-db --network omid-ci \
+            --env POSTGRES_DB=omid_ci \
+            --env POSTGRES_USER=omid_ci \
+            --env POSTGRES_PASSWORD=ci-only-password \
+            postgres:17
+
+          ready=0
+          for attempt in $(seq 1 30); do
+            if docker exec omid-db pg_isready --username=omid_ci --dbname=omid_ci; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != "1" ]; then
+            docker logs omid-db
+            exit 1
+          fi
+
+      - name: Apply database migrations using production image
+        run: |
+          docker run --rm --network omid-ci \
+            --env DJANGO_SECRET_KEY=ci-only-not-a-production-secret-000000000000000000000000000000000000 \
+            --env DJANGO_DEBUG=False \
+            --env DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1 \
+            --env DJANGO_CSRF_TRUSTED_ORIGINS=https://omid.khalil-delavaran.workers.dev \
+            --env DATABASE_URL=postgres://omid_ci:ci-only-password@omid-db:5432/omid_ci \
+            --env PRIVATE_DOCUMENT_ROOT=/var/lib/omid/private-documents \
+            --volume omid-documents-ci:/var/lib/omid/private-documents \
+            omid-api:ci python manage.py migrate --noinput
+
+      - name: Start production container
+        run: |
+          docker run --detach --name omid-api --network omid-ci \
+            --publish 127.0.0.1:8000:8000 \
+            --env PORT=8000 \
+            --env DJANGO_SECRET_KEY=ci-only-not-a-production-secret-000000000000000000000000000000000000 \
+            --env DJANGO_DEBUG=False \
+            --env DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1 \
+            --env DJANGO_CSRF_TRUSTED_ORIGINS=https://omid.khalil-delavaran.workers.dev \
+            --env DATABASE_URL=postgres://omid_ci:ci-only-password@omid-db:5432/omid_ci \
+            --env PRIVATE_DOCUMENT_ROOT=/var/lib/omid/private-documents \
+            --volume omid-documents-ci:/var/lib/omid/private-documents \
+            omid-api:ci
+
+      - name: Smoke test health, CSRF cookie, and login CSRF protection
+        shell: bash
+        run: |
+          ready=0
+          for attempt in $(seq 1 30); do
+            if curl --silent --show-error --fail http://127.0.0.1:8000/api/v1/health/ --output /tmp/omid-health.json; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != "1" ]; then
+            docker logs omid-api
+            exit 1
+          fi
+          grep -q '"status": "ok"' /tmp/omid-health.json
+          grep -q '"service": "omid-api"' /tmp/omid-health.json
+
+          curl --silent --show-error --fail \
+            --cookie-jar /tmp/omid-cookies.txt \
+            --dump-header /tmp/omid-csrf-headers.txt \
+            --output /tmp/omid-csrf.json \
+            http://127.0.0.1:8000/api/v1/auth/csrf/
+          grep -q '"csrfToken":' /tmp/omid-csrf.json
+          grep -qi 'set-cookie: csrftoken=' /tmp/omid-csrf-headers.txt
+
+          login_status=$(curl --silent --show-error \
+            --output /tmp/omid-login.json \
+            --write-out '%{http_code}' \
+            --cookie /tmp/omid-cookies.txt \
+            --header 'Content-Type: application/json' \
+            --request POST \
+            --data '{}' \
+            http://127.0.0.1:8000/api/v1/auth/login/)
+          if [ "$login_status" != "403" ]; then
+            echo "Expected login without X-CSRFToken to be rejected with 403; got $login_status"
+            cat /tmp/omid-login.json
+            exit 1
+          fi
+
+      - name: Container logs on failure
+        if: failure()
+        run: |
+          docker logs omid-db || true
+          docker logs omid-api || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm --force omid-api omid-db 2>/dev/null || true
+          docker volume rm omid-documents-ci 2>/dev/null || true
+          docker network rm omid-ci 2>/dev/null || true
