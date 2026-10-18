@@ -215,7 +215,12 @@ class StageInstanceViewSet(viewsets.ModelViewSet):
         record_audit(
             request, "workflow_stage.transition", actor=request.user,
             entity_type="workflow_stage", entity_id=str(stage.pk),
-            metadata={"action": command, "status": stage.status, "reason_length": len(reason)},
+            metadata={
+                "action": command,
+                "status": stage.status,
+                "reason_length": len(reason),
+                "evidence_reference": stage.evidence_reference if command == "complete" and stage.code == StageInstance.Code.ACCOUNT else "",
+            },
         )
         return Response(self.get_serializer(stage).data, status=status.HTTP_200_OK)
 
