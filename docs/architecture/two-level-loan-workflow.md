@@ -15,8 +15,8 @@
 - `/api/v1/applications/stages/{id}/transition/` — عملیات `start`، `complete`، `hold` و `bypass`.
 - `/api/v1/applications/merat-assessments/` — ثبت و مشاهده اطلاعات اعتبارسنجی.
 - `/api/v1/applications/{id}/commission/` — تغییر نرخ کارمزد با بدنه `{ "rate": "22.50", "reason": "..." }`؛ فقط مدیر سامانه.
-- `/api/v1/applications/disbursements/ — ثبت مبلغ واقعی واریز به ریال؛ واریز ابتدا در وضعیت انتظار است.
-- `/api/v1/applications/disbursements/{id}/confirm/ — تأیید واریز توسط مالی یا مدیر سامانه، با مرجع بانکی و مرحله واریز در جریان. کارمزد فقط بر مبلغ واقعی واریز تأییدشده محاسبه می‌شود و رکورد تأییدشده تغییرناپذیر است.
+- `/api/v1/applications/disbursements/` — ثبت مبلغ واقعی واریز به ریال؛ واریز ابتدا در وضعیت انتظار است.
+- `/api/v1/applications/disbursements/{id}/confirm/` — تأیید واریز توسط مالی یا مدیر سامانه، با مرجع بانکی و مرحله واریز در جریان. کارمزد فقط بر مبلغ واقعی واریز تأییدشده محاسبه می‌شود و رکورد تأییدشده تغییرناپذیر است.
 
 ## گیت ثبت درخواست وام
 
