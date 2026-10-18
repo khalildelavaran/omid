@@ -3,11 +3,11 @@ from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.permissions import BasePermission, SAFE_METHODS
 from rest_framework.response import Response
 
 from core.audit import record_audit
 from .models import CaseParty, LoanApplication, MeratAssessment, StageInstance
-from .permissions import IsStaffApplicationOperator
 from .workflow_serializers import CasePartySerializer, MeratAssessmentSerializer, StageInstanceSerializer
 
 
