@@ -25,6 +25,8 @@ class LoanApplication(models.Model):
     customer = models.ForeignKey("customers.Customer", on_delete=models.PROTECT, related_name="loan_applications")
     product_type = models.CharField(max_length=24, choices=ProductType.choices)
     requested_amount = models.DecimalField(max_digits=18, decimal_places=0)
+    loan_commission_pct = models.DecimalField(max_digits=5, decimal_places=2, default="25.00")
+    commission_override_reason = models.CharField(max_length=500, blank=True)
     term_months = models.PositiveSmallIntegerField(null=True, blank=True)
     status = models.CharField(max_length=24, choices=Status.choices, default=Status.UNDER_REVIEW)
     assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="assigned_loan_applications")
