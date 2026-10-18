@@ -546,7 +546,7 @@ function renderLiveWorkflow(){
  const customerOptions=d.customers.map(c=>'<option value="'+esc(c.id)+'">'+esc((c.first_name||"")+" "+(c.last_name||"")+" · "+(c.customer_number||c.id))+'</option>').join("");
  const partyRows=parties.map(p=>{
   const ownStages=stages.filter(st=>String(st.party||"")===String(p.id));
-  return '<article class="case-party-card"><div class="case-party-head"><div><span class="pill '+(p.role==="applicant"?"doc":"gray")+'">'+esc(({applicant:"متقاضی اصلی",guarantor:"ضامن",representative:"نماینده"})[p.role]||p.role)+'</span><h3>'+esc(p.person_display||p.person)+'</h3><small>'+esc(p.membership_status||"")+' · '+esc(({unknown:"حساب بررسی‌نشده",existing_verified:"حساب موجود تأییدشده",needs_opening:"نیازمند افتتاح"})[p.account_status]||p.account_status||"")+'</small></div></div><div class="case-stage-list">'+ownStages.map(st=>'<div class="case-stage-row"><span>'+esc(liveStageLabel(st.code))+'</span><span class="pill '+(["completed","bypassed"].includes(st.status)?"":" wait")+'">'+esc(liveStatusLabel(st.status))+'</span><span class="live-stage-actions">'+(st.status==="pending"||st.status==="action_needed"?'<button class="btn" data-action="live-stage-transition" data-stage-id="'+esc(st.id)+'" data-transition="start">شروع</button>':"")+(st.status==="in_progress"?'<button class="btn primary" data-action="live-stage-transition" data-stage-id="'+esc(st.id)+'" data-transition="complete">تکمیل</button><button class="btn" data-action="live-stage-transition" data-stage-id="'+esc(st.id)+'" data-transition="hold">تعلیق</button>':"")+'</span></div>').join("")+'</div></article>';
+  return '<article class="case-party-card"><div class="case-party-head"><div><span class="pill '+(p.role==="applicant"?"doc":"gray")+'">'+esc(({applicant:"متقاضی اصلی",guarantor:"ضامن",representative:"نماینده"})[p.role]||p.role)+'</span><h3>'+esc(p.person_display||p.person)+'</h3><small>'+esc(p.membership_status||"")+' · '+esc(({unknown:"حساب بررسی‌نشده",existing_verified:"حساب موجود تأییدشده",needs_opening:"نیازمند افتتاح"})[p.account_status]||p.account_status||"")+'</small></div></div><div class="live-party-account"><label>وضعیت حساب</label><select class="field" data-account-status-select><option value="unknown" '+(p.account_status==="unknown"?"selected":"")+'>بررسی‌نشده</option><option value="existing_verified" '+(p.account_status==="existing_verified"?"selected":"")+'>حساب موجود و تأییدشده</option><option value="needs_opening" '+(p.account_status==="needs_opening"?"selected":"")+'>نیازمند افتتاح</option></select><button class="btn" data-action="save-party-account-status" data-party-id="'+esc(p.id)+'">ذخیره وضعیت حساب</button></div><div class="case-stage-list">'+ownStages.map(st=>'<div class="case-stage-row"><span>'+esc(liveStageLabel(st.code))+'</span><span class="pill '+(["completed","bypassed"].includes(st.status)?"":" wait")+'">'+esc(liveStatusLabel(st.status))+'</span><span class="live-stage-actions">'+(st.status==="pending"||st.status==="action_needed"?'<button class="btn" data-action="live-stage-transition" data-stage-id="'+esc(st.id)+'" data-transition="start">شروع</button>':"")+(st.code==="account"&&p.account_status==="existing_verified"&&backendSessionUser&&backendSessionUser.role==="system_admin"&&(st.status==="pending"||st.status==="action_needed")?'<button class="btn" data-action="live-stage-transition" data-stage-id="'+esc(st.id)+'" data-transition="bypass">عبور مجاز</button>':"")+(st.status==="in_progress"?'<button class="btn primary" data-action="live-stage-transition" data-stage-id="'+esc(st.id)+'" data-transition="complete">تکمیل</button><button class="btn" data-action="live-stage-transition" data-stage-id="'+esc(st.id)+'" data-transition="hold">تعلیق</button>':"")+'</span></div>').join("")+'</div></article>';
  }).join("");
  const caseStages=stages.filter(st=>!st.party);
  const meratRows=parties.filter(p=>p.membership_status==="active").map(p=>{
@@ -896,6 +896,12 @@ document.addEventListener("click",async e=>{
    catch(error){liveWorkflowData.loading=false;document.getElementById("content").innerHTML=renderWorkflow();toast(String(error&&error.message||"بارگذاری از بک‌اند ناموفق بود."));}
    return;
   }
+  if(act==="save-party-account-status"){
+   const partyId=action.dataset.partyId,card=action.closest(".case-party-card"),select=card?.querySelector("[data-account-status-select]");
+   if(!partyId||!select){toast("وضعیت حساب قابل خواندن نیست.");return;}
+   try{const result=await omidApiRequest("/api/v1/applications/parties/"+encodeURIComponent(partyId)+"/",{method:"PATCH",headers:{"Content-Type":"application/json","X-CSRFToken":await omidApiCsrfToken()},body:JSON.stringify({account_status:select.value})});if(!result.response.ok)throw new Error(omidApiErrorMessage(result.body,result.response.status));await refreshLiveWorkflowForApplication(liveWorkflowData.selectedId);toast("وضعیت حساب شخص در بک‌اند ذخیره شد.");}
+   catch(error){toast(String(error&&error.message||"ذخیره وضعیت حساب ناموفق بود."));}return;
+  }
   if(act==="confirm-live-disbursement"){
    const id=action.dataset.disbursementId;
    const bankReference=prompt("مرجع بانکی واریز تأییدشده را وارد کنید:");
@@ -907,7 +913,7 @@ document.addEventListener("click",async e=>{
   }
   if(act==="live-stage-transition"){
    const stageId=action.dataset.stageId,command=action.dataset.transition;let body={action:command};
-   if(command==="hold"){const reason=prompt("دلیل تعلیق مرحله را وارد کنید:");if(reason===null)return;if(!reason.trim()){toast("برای تعلیق، دلیل الزامی است.");return;}body.reason=reason.trim();}
+   if(command==="hold"||command==="bypass"){const reason=prompt(command==="bypass"?"دلیل مستند عبور از مرحله حساب را وارد کنید:":"دلیل تعلیق مرحله را وارد کنید:");if(reason===null)return;if(!reason.trim()){toast("دلیل این عملیات الزامی است.");return;}body.reason=reason.trim();}
    if(command==="complete"){
     const stage=liveWorkflowData.stages.find(x=>String(x.id)===String(stageId));
     if(stage&&stage.code==="account"){const evidence=prompt("مرجع مدرک تأیید حساب را وارد کنید (در صورت نیاز):","");if(evidence===null)return;if(evidence.trim())body.evidence_reference=evidence.trim();}
