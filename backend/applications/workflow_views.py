@@ -181,6 +181,23 @@ class StageInstanceViewSet(viewsets.ModelViewSet):
                 raise ValidationError({"action": "فقط مرحله در جریان قابل تکمیل است."})
             if stage.code == StageInstance.Code.LOAN_SUBMISSION:
                 _ensure_submission_ready(stage.application)
+            case_stage_prerequisites = {
+                StageInstance.Code.BANK_REVIEW: (StageInstance.Code.LOAN_SUBMISSION, "ثبت درخواست تسهیلات"),
+                StageInstance.Code.DISBURSEMENT: (StageInstance.Code.BANK_REVIEW, "بررسی بانک"),
+                StageInstance.Code.SETTLEMENT: (StageInstance.Code.DISBURSEMENT, "واریز تسهیلات"),
+                StageInstance.Code.HANDOVER: (StageInstance.Code.SETTLEMENT, "تسویه"),
+            }
+            prerequisite = case_stage_prerequisites.get(stage.code)
+            if prerequisite:
+                prerequisite_code, prerequisite_label = prerequisite
+                prerequisite_done = stage.application.stages.filter(
+                    code=prerequisite_code,
+                    status__in=[StageInstance.Status.COMPLETED, StageInstance.Status.BYPASSED],
+                ).exists()
+                if not prerequisite_done:
+                    raise ValidationError({
+                        "detail": f"تکمیل این مرحله تا تکمیل مرحله «{prerequisite_label}» مجاز نیست."
+                    })
             if stage.code == StageInstance.Code.DISBURSEMENT:
                 from .models import Disbursement
                 if not stage.application.disbursements.filter(status=Disbursement.Status.CONFIRMED).exists():
