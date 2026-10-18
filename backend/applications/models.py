@@ -152,6 +152,16 @@ class CaseParty(models.Model):
                 condition=~models.Q(role="applicant") | models.Q(sort_order=0),
                 name="party_applicant_order_zero",
             ),
+            models.UniqueConstraint(
+                fields=["application"],
+                condition=models.Q(role="applicant", membership_status="active"),
+                name="uniq_active_case_applicant",
+            ),
+            models.UniqueConstraint(
+                fields=["application", "person"],
+                condition=models.Q(membership_status="active"),
+                name="uniq_active_case_party_person",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -276,3 +286,82 @@ class MeratAssessment(models.Model):
 
     def __str__(self) -> str:
         return f"مرآت: {self.subject_id} ({self.result})"
+
+
+class DisbursementQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValueError("Disbursement records are immutable through bulk updates.")
+
+    def delete(self):
+        raise ValueError("Disbursement records are retained for audit.")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValueError("Disbursement records are immutable through bulk updates.")
+
+
+class Disbursement(models.Model):
+    objects = DisbursementQuerySet.as_manager()
+    """Actual disbursement evidence; commission is calculated only on confirmed amounts."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "در انتظار تأیید واریز"
+        CONFIRMED = "confirmed", "واریز تأییدشده"
+        FAILED = "failed", "واریز ناموفق"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    disbursement_number = models.CharField(max_length=40, unique=True, blank=True, default="")
+    application = models.ForeignKey(LoanApplication, on_delete=models.PROTECT, related_name="disbursements")
+    amount_rial = models.PositiveBigIntegerField()
+    commission_rate_pct = models.DecimalField(max_digits=5, decimal_places=2, default="25.00")
+    commission_amount_rial = models.PositiveBigIntegerField(default=0)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    bank_reference = models.CharField(max_length=120, blank=True)
+    evidence_reference = models.CharField(max_length=500, blank=True)
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="recorded_disbursements")
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["application", "status"], name="disburse_app_status_idx"),
+            models.Index(fields=["status", "confirmed_at"], name="disburse_status_confirmed_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(amount_rial__gt=0), name="disbursement_amount_positive"),
+            models.CheckConstraint(condition=models.Q(commission_rate_pct__gte=0, commission_rate_pct__lte=100), name="disbursement_commission_rate_range"),
+        ]
+
+    def save(self, *args, **kwargs):
+        from decimal import Decimal, ROUND_HALF_UP
+        from django.utils import timezone
+        if self.pk:
+            existing = type(self).objects.filter(pk=self.pk).first()
+            if existing and existing.status == self.Status.CONFIRMED:
+                raise ValueError("Confirmed disbursements are immutable.")
+        if not self.disbursement_number:
+            self.disbursement_number = f"DISB-{timezone.localdate():%Y%m%d}-{uuid.uuid4().hex[:10].upper()}"
+        if self.application_id and self._state.adding:
+            self.commission_rate_pct = self.application.loan_commission_pct
+        if self.status == self.Status.CONFIRMED:
+            if not self.bank_reference.strip():
+                raise ValueError("Confirmed disbursement requires a bank reference.")
+            # Snapshot the currently authorized case rate at confirmation, not when a pending record was drafted.
+            self.commission_rate_pct = self.application.loan_commission_pct
+            self.commission_amount_rial = int(
+                (Decimal(self.amount_rial) * self.commission_rate_pct / Decimal("100")).quantize(
+                    Decimal("1"), rounding=ROUND_HALF_UP
+                )
+            )
+            self.confirmed_at = self.confirmed_at or timezone.now()
+        else:
+            self.commission_amount_rial = 0
+            self.confirmed_at = None
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Disbursement records are retained for audit.")
+
+    def __str__(self) -> str:
+        return self.disbursement_number

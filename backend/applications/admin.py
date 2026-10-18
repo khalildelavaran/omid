@@ -10,7 +10,7 @@ class LoanApplicationAdmin(admin.ModelAdmin):
     list_display = ("application_number", "customer", "product_type", "requested_amount", "status", "assigned_to", "created_at")
     list_filter = ("status", "product_type", "created_at")
     search_fields = ("application_number", "customer__customer_number", "customer__first_name", "customer__last_name", "customer__organization_name")
-    readonly_fields = ("id", "created_at", "updated_at")
+    readonly_fields = ("id", "created_at", "updated_at", "loan_commission_pct", "commission_override_reason")
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)

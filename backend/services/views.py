@@ -86,7 +86,7 @@ class ServiceCatalogItemViewSet(viewsets.ModelViewSet):
             actor=self.request.user,
             entity_type="service_catalog_item",
             entity_id=str(item.pk),
-            metadata={"code": item.code, "price": str(item.price), "active": item.active},
+            metadata={"code": item.code, "price": str(item.price), "online_cost": str(item.online_cost), "active": item.active},
         )
 
     @transaction.atomic
@@ -102,6 +102,7 @@ class ServiceCatalogItemViewSet(viewsets.ModelViewSet):
                 "updated_fields": sorted(serializer.validated_data.keys()),
                 "active": item.active,
                 "price": str(item.price),
+                "online_cost": str(item.online_cost),
             },
         )
 
@@ -210,6 +211,8 @@ class ServiceRecordViewSet(viewsets.ModelViewSet):
         total = service.price - discount
         if paid > total:
             raise ValidationError({"paid": "مبلغ دریافتی نمی‌تواند از مبلغ نهایی خدمت بیشتر باشد."})
+        if total < service.online_cost:
+            raise ValidationError({"discount": "مبلغ نهایی مشتری نمی‌تواند از هزینه پرداخت آنلاین کمتر باشد."})
         serializer.validated_data["service"] = service
 
         try:
@@ -245,6 +248,8 @@ class ServiceRecordViewSet(viewsets.ModelViewSet):
                 "price": str(record.price),
                 "discount": str(record.discount),
                 "total": str(record.total),
+                "online_cost": str(record.online_cost),
+                "company_commission": str(record.company_commission),
                 "paid": str(record.paid),
                 "payment_method": record.payment_method,
             },
