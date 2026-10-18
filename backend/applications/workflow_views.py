@@ -115,7 +115,7 @@ class CasePartyViewSet(viewsets.ModelViewSet):
 
 class StageInstanceViewSet(viewsets.ModelViewSet):
     serializer_class = StageInstanceSerializer
-    permission_classes = [IsStaffApplicationOperator]
+    permission_classes = [IsWorkflowStaff]
     http_method_names = ["get", "post", "patch", "head", "options"]
 
     def get_queryset(self):
@@ -236,7 +236,7 @@ def _ensure_submission_ready(application):
 
 class MeratAssessmentViewSet(viewsets.ModelViewSet):
     serializer_class = MeratAssessmentSerializer
-    permission_classes = [IsStaffApplicationOperator]
+    permission_classes = [IsWorkflowStaff]
     http_method_names = ["get", "post", "patch", "head", "options"]
 
     def get_queryset(self):
