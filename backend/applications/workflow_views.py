@@ -190,7 +190,7 @@ class StageInstanceViewSet(viewsets.ModelViewSet):
             prerequisite = case_stage_prerequisites.get(stage.code)
             if prerequisite:
                 prerequisite_code, prerequisite_label = prerequisite
-                prerequisite_done = stage.application.stages.filter(
+                prerequisite_done = stage.application.stage_instances.filter(
                     code=prerequisite_code,
                     status__in=[StageInstance.Status.COMPLETED, StageInstance.Status.BYPASSED],
                 ).exists()
