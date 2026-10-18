@@ -347,6 +347,8 @@ class Disbursement(models.Model):
         if self.status == self.Status.CONFIRMED:
             if not self.bank_reference.strip():
                 raise ValueError("Confirmed disbursement requires a bank reference.")
+            if not self.evidence_reference.strip():
+                raise ValueError("Confirmed disbursement requires an evidence reference.")
             # Snapshot the currently authorized case rate at confirmation, not when a pending record was drafted.
             self.commission_rate_pct = self.application.loan_commission_pct
             self.commission_amount_rial = int(
