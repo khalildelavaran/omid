@@ -46,7 +46,6 @@ class TwoLevelWorkflowApiTests(TestCase):
                 StageInstance.Code.DOCUMENTS,
                 StageInstance.Code.ACCOUNT,
                 StageInstance.Code.MERAT,
-                StageInstance.Code.DIGITAL_BANKING,
                 StageInstance.Code.E_NOTE,
             },
         )
@@ -59,7 +58,7 @@ class TwoLevelWorkflowApiTests(TestCase):
         )
         for code in (
             StageInstance.Code.DOCUMENTS, StageInstance.Code.ACCOUNT, StageInstance.Code.MERAT,
-            StageInstance.Code.DIGITAL_BANKING, StageInstance.Code.E_NOTE,
+            StageInstance.Code.E_NOTE,
         ):
             StageInstance.objects.create(
                 application=self.application, party=party, code=code,
@@ -122,6 +121,140 @@ class TwoLevelWorkflowApiTests(TestCase):
         merat_results = merat_response.data.get("results", merat_response.data)
         self.assertEqual([str(item["id"]) for item in party_results], [str(party.pk)])
         self.assertEqual([str(item["id"]) for item in merat_results], [str(assessment.pk)])
+
+    def test_stage_identity_cannot_be_changed_after_creation(self):
+        party = CaseParty.objects.create(
+            application=self.application, person=self.customer, role=CaseParty.Role.APPLICANT,
+        )
+        stage = StageInstance.objects.create(
+            application=self.application, party=party, code=StageInstance.Code.DOCUMENTS,
+            status=StageInstance.Status.PENDING,
+        )
+        other_customer = Customer.objects.create(
+            customer_number="OM-WF-CUST-IMMUTABLE", customer_type=Customer.CustomerType.INDIVIDUAL,
+            first_name="شخص", last_name="دیگر", assigned_to=self.worker,
+        )
+        response = self.client.patch(
+            f"/api/v1/applications/stages/{stage.pk}/",
+            {"code": StageInstance.Code.ACCOUNT, "party": str(party.pk)},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        stage.refresh_from_db()
+        self.assertEqual(stage.code, StageInstance.Code.DOCUMENTS)
+        self.assertEqual(stage.party_id, party.pk)
+
+    def test_bank_review_cannot_start_before_loan_submission(self):
+        StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.LOAN_SUBMISSION,
+            status=StageInstance.Status.PENDING,
+        )
+        review = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.BANK_REVIEW,
+            status=StageInstance.Status.PENDING,
+        )
+        response = self.client.post(
+            f"/api/v1/applications/stages/{review.pk}/transition/",
+            {"action": "start"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        review.refresh_from_db()
+        self.assertEqual(review.status, StageInstance.Status.PENDING)
+
+    def test_disbursement_cannot_start_before_bank_review(self):
+        StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.BANK_REVIEW,
+            status=StageInstance.Status.PENDING,
+        )
+        disbursement = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.DISBURSEMENT,
+            status=StageInstance.Status.PENDING,
+        )
+        response = self.client.post(
+            f"/api/v1/applications/stages/{disbursement.pk}/transition/",
+            {"action": "start"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        disbursement.refresh_from_db()
+        self.assertEqual(disbursement.status, StageInstance.Status.PENDING)
+
+    def test_settlement_cannot_complete_before_disbursement_stage(self):
+        disbursement = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.DISBURSEMENT,
+            status=StageInstance.Status.PENDING,
+        )
+        settlement = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.SETTLEMENT,
+            status=StageInstance.Status.IN_PROGRESS,
+        )
+        response = self.client.post(
+            f"/api/v1/applications/stages/{settlement.pk}/transition/",
+            {"action": "complete"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        settlement.refresh_from_db()
+        self.assertEqual(settlement.status, StageInstance.Status.IN_PROGRESS)
+        self.assertEqual(disbursement.status, StageInstance.Status.PENDING)
+
+    def test_admin_cannot_bypass_settlement_before_disbursement_stage(self):
+        admin = User.objects.create_superuser(username="workflow-admin", password="test-pass-123")
+        StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.DISBURSEMENT,
+            status=StageInstance.Status.PENDING,
+        )
+        settlement = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.SETTLEMENT,
+            status=StageInstance.Status.PENDING,
+        )
+        self.client.force_authenticate(admin)
+        response = self.client.post(
+            f"/api/v1/applications/stages/{settlement.pk}/transition/",
+            {"action": "bypass", "reason": "آزمون"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        settlement.refresh_from_db()
+        self.assertEqual(settlement.status, StageInstance.Status.PENDING)
+
+    def test_handover_cannot_start_before_settlement_stage(self):
+        StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.SETTLEMENT,
+            status=StageInstance.Status.PENDING,
+        )
+        handover = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.HANDOVER,
+            status=StageInstance.Status.PENDING,
+        )
+        response = self.client.post(
+            f"/api/v1/applications/stages/{handover.pk}/transition/",
+            {"action": "start"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, StageInstance.Status.PENDING)
+
+    def test_handover_cannot_complete_before_settlement_stage(self):
+        settlement = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.SETTLEMENT,
+            status=StageInstance.Status.PENDING,
+        )
+        handover = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.HANDOVER,
+            status=StageInstance.Status.IN_PROGRESS,
+        )
+        response = self.client.post(
+            f"/api/v1/applications/stages/{handover.pk}/transition/",
+            {"action": "complete"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, StageInstance.Status.IN_PROGRESS)
+        self.assertEqual(settlement.status, StageInstance.Status.PENDING)
 
     def test_account_stage_completion_saves_required_opening_evidence(self):
         party = CaseParty.objects.create(

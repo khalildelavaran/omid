@@ -40,7 +40,6 @@ PERSON_STAGE_CODES = (
     StageInstance.Code.DOCUMENTS,
     StageInstance.Code.ACCOUNT,
     StageInstance.Code.MERAT,
-    StageInstance.Code.DIGITAL_BANKING,
     StageInstance.Code.E_NOTE,
 )
 CASE_STAGE_CODES = (
@@ -151,6 +150,15 @@ class StageInstanceViewSet(viewsets.ModelViewSet):
             metadata={"application_id": str(application.pk), "code": stage.code},
         )
 
+    @transaction.atomic
+    def perform_update(self, serializer):
+        stage = serializer.save()
+        record_audit(
+            self.request, "workflow_stage.updated", actor=self.request.user,
+            entity_type="workflow_stage", entity_id=str(stage.pk),
+            metadata={"updated_fields": sorted(serializer.validated_data.keys())},
+        )
+
     @action(detail=True, methods=["post"], url_path="transition")
     @transaction.atomic
     def transition(self, request, pk=None):
@@ -174,6 +182,7 @@ class StageInstanceViewSet(viewsets.ModelViewSet):
                 raise ValidationError({"action": "شروع فقط برای مرحله در انتظار یا نیازمند اقدام مجاز است."})
             if stage.code == StageInstance.Code.LOAN_SUBMISSION:
                 _ensure_submission_ready(stage.application)
+            _ensure_case_stage_prerequisite(stage)
             stage.status = StageInstance.Status.IN_PROGRESS
             stage.started_at = stage.started_at or timezone.now()
         elif command == "complete":
@@ -181,6 +190,7 @@ class StageInstanceViewSet(viewsets.ModelViewSet):
                 raise ValidationError({"action": "فقط مرحله در جریان قابل تکمیل است."})
             if stage.code == StageInstance.Code.LOAN_SUBMISSION:
                 _ensure_submission_ready(stage.application)
+            _ensure_case_stage_prerequisite(stage)
             if stage.code == StageInstance.Code.DISBURSEMENT:
                 from .models import Disbursement
                 if not stage.application.disbursements.filter(status=Disbursement.Status.CONFIRMED).exists():
@@ -201,6 +211,7 @@ class StageInstanceViewSet(viewsets.ModelViewSet):
                 raise PermissionDenied("عبور از مرحله فقط با مجوز مدیر سامانه ممکن است.")
             if not reason:
                 raise ValidationError({"reason": "برای عبور از مرحله، دلیل مستند الزامی است."})
+            _ensure_case_stage_prerequisite(stage)
             if stage.code == StageInstance.Code.ACCOUNT and stage.party_id:
                 if stage.party.account_status != CaseParty.AccountStatus.EXISTING_VERIFIED:
                     raise ValidationError({"action": "عبور از مرحله حساب فقط برای حساب موجودِ تأییدشده مجاز است."})
@@ -215,7 +226,12 @@ class StageInstanceViewSet(viewsets.ModelViewSet):
         record_audit(
             request, "workflow_stage.transition", actor=request.user,
             entity_type="workflow_stage", entity_id=str(stage.pk),
-            metadata={"action": command, "status": stage.status, "reason_length": len(reason)},
+            metadata={
+                "action": command,
+                "status": stage.status,
+                "reason_length": len(reason),
+                "evidence_reference": stage.evidence_reference if command == "complete" and stage.code == StageInstance.Code.ACCOUNT else "",
+            },
         )
         return Response(self.get_serializer(stage).data, status=status.HTTP_200_OK)
 
@@ -228,7 +244,6 @@ def _ensure_submission_ready(application):
         StageInstance.Code.DOCUMENTS,
         StageInstance.Code.ACCOUNT,
         StageInstance.Code.MERAT,
-        StageInstance.Code.DIGITAL_BANKING,
         StageInstance.Code.E_NOTE,
     }
     allowed = {StageInstance.Status.COMPLETED, StageInstance.Status.BYPASSED}
@@ -241,6 +256,27 @@ def _ensure_submission_ready(application):
                 "party_id": str(party.pk),
                 "incomplete_stages": missing,
             })
+
+
+def _ensure_case_stage_prerequisite(stage):
+    prerequisites = {
+        StageInstance.Code.BANK_REVIEW: (StageInstance.Code.LOAN_SUBMISSION, "ثبت درخواست تسهیلات"),
+        StageInstance.Code.DISBURSEMENT: (StageInstance.Code.BANK_REVIEW, "بررسی بانک"),
+        StageInstance.Code.SETTLEMENT: (StageInstance.Code.DISBURSEMENT, "واریز تسهیلات"),
+        StageInstance.Code.HANDOVER: (StageInstance.Code.SETTLEMENT, "تسویه"),
+    }
+    prerequisite = prerequisites.get(stage.code)
+    if not prerequisite:
+        return
+    prerequisite_code, prerequisite_label = prerequisite
+    prerequisite_done = stage.application.stage_instances.filter(
+        code=prerequisite_code,
+        status__in=[StageInstance.Status.COMPLETED, StageInstance.Status.BYPASSED],
+    ).exists()
+    if not prerequisite_done:
+        raise ValidationError({
+            "detail": f"این عملیات تا تکمیل مرحله «{prerequisite_label}» مجاز نیست."
+        })
 
 
 class MeratAssessmentViewSet(viewsets.ModelViewSet):

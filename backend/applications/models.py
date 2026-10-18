@@ -175,7 +175,6 @@ class StageInstance(models.Model):
         DOCUMENTS = "documents", "مدارک"
         ACCOUNT = "account", "وضعیت حساب"
         MERAT = "merat", "اعتبارسنجی مرآت"
-        DIGITAL_BANKING = "digital_banking", "بانکداری دیجیتال"
         E_NOTE = "e_note", "سفته الکترونیک"
         LOAN_SUBMISSION = "loan_submission", "ثبت درخواست وام"
         BANK_REVIEW = "bank_review", "بررسی بانک"
@@ -237,7 +236,7 @@ class StageInstance(models.Model):
             raise ValidationError({"party": "شخص باید متعلق به همین پرونده باشد."})
         if self.code in {
             self.Code.DOCUMENTS, self.Code.ACCOUNT, self.Code.MERAT,
-            self.Code.DIGITAL_BANKING, self.Code.E_NOTE,
+            self.Code.E_NOTE,
         } and not self.party_id:
             raise ValidationError({"party": "این مرحله باید به یک شخص پرونده متصل باشد."})
         if self.code in {
@@ -347,6 +346,8 @@ class Disbursement(models.Model):
         if self.status == self.Status.CONFIRMED:
             if not self.bank_reference.strip():
                 raise ValueError("Confirmed disbursement requires a bank reference.")
+            if not self.evidence_reference.strip():
+                raise ValueError("Confirmed disbursement requires an evidence reference.")
             # Snapshot the currently authorized case rate at confirmation, not when a pending record was drafted.
             self.commission_rate_pct = self.application.loan_commission_pct
             self.commission_amount_rial = int(

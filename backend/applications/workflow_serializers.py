@@ -75,6 +75,18 @@ class StageInstanceSerializer(serializers.ModelSerializer):
         return str(obj.party.person) if obj.party_id else None
 
     def validate(self, attrs):
+        if self.instance is not None:
+            immutable_fields = ("application", "party", "code")
+            changed_fields = [
+                field for field in immutable_fields
+                if field in attrs and getattr(self.instance, f"{field}_id" if field != "code" else field)
+                != getattr(attrs[field], "pk", attrs[field])
+            ]
+            if changed_fields:
+                raise serializers.ValidationError({
+                    field: "پس از ایجاد مرحله، پرونده، شخص و نوع مرحله قابل تغییر نیستند."
+                    for field in changed_fields
+                })
         application = attrs.get("application", getattr(self.instance, "application", None))
         party = attrs.get("party", getattr(self.instance, "party", None))
         code = attrs.get("code", getattr(self.instance, "code", None))

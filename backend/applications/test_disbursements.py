@@ -62,6 +62,24 @@ class DisbursementApiTests(TestCase):
         with self.assertRaises(ValueError):
             Disbursement.objects.filter(pk=record.pk).delete()
 
+    def test_finance_cannot_confirm_without_evidence_reference(self):
+        self.client.force_authenticate(self.worker)
+        created = self.client.post(
+            "/api/v1/applications/disbursements/",
+            {"application": str(self.application.pk), "amount_rial": 1000000},
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.data)
+        self.client.force_authenticate(self.finance)
+        response = self.client.post(
+            f"/api/v1/applications/disbursements/{created.data['id']}/confirm/",
+            {"bank_reference": "BANK-REF-1002", "evidence_reference": " "},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        record = Disbursement.objects.get(pk=created.data["id"])
+        self.assertEqual(record.status, Disbursement.Status.PENDING)
+
     def test_finance_cannot_confirm_without_bank_reference(self):
         self.client.force_authenticate(self.worker)
         created = self.client.post(

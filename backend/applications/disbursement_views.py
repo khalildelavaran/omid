@@ -84,8 +84,14 @@ class DisbursementViewSet(viewsets.ModelViewSet):
         evidence_reference = request.data.get("evidence_reference", "")
         if not isinstance(bank_reference, str) or not bank_reference.strip() or len(bank_reference.strip()) > 120:
             raise ValidationError({"bank_reference": "مرجع بانکی الزامی و حداکثر ۱۲۰ نویسه است."})
-        if not isinstance(evidence_reference, str) or len(evidence_reference.strip()) > 500:
-            raise ValidationError({"evidence_reference": "مرجع مدرک باید حداکثر ۵۰۰ نویسه باشد."})
+        if (
+            not isinstance(evidence_reference, str)
+            or not evidence_reference.strip()
+            or len(evidence_reference.strip()) > 500
+        ):
+            raise ValidationError({
+                "evidence_reference": "مرجع مدرک واریز الزامی و حداکثر ۵۰۰ نویسه است."
+            })
         stage = StageInstance.objects.select_for_update().filter(
             application=disbursement.application, party__isnull=True,
             code=StageInstance.Code.DISBURSEMENT,
