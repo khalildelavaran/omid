@@ -40,7 +40,6 @@ PERSON_STAGE_CODES = (
     StageInstance.Code.DOCUMENTS,
     StageInstance.Code.ACCOUNT,
     StageInstance.Code.MERAT,
-    StageInstance.Code.DIGITAL_BANKING,
     StageInstance.Code.E_NOTE,
 )
 CASE_STAGE_CODES = (
