@@ -571,7 +571,7 @@ async function loadLiveWorkflow(){
  if(!liveWorkflowData.selectedId||!liveWorkflowData.applications.some(a=>String(a.id)===String(liveWorkflowData.selectedId)))liveWorkflowData.selectedId=String(liveWorkflowData.applications[0]?.id||"");
  liveWorkflowData.parties=[];liveWorkflowData.stages=[];liveWorkflowData.meratAssessments=[];liveWorkflowData.disbursements=[];
  if(liveWorkflowData.selectedId){
-  const [partyRes,stageRes,meratRes,disbursementRes]=await Promise.all([omidApiRequest("/api/v1/applications/parties/?application="+encodeURIComponent(liveWorkflowData.selectedId)),omidApiRequest("/api/v1/applications/stages/?application="+encodeURIComponent(liveWorkflowData.selectedId)),omidApiRequest("/api/v1/applications/merat-assessments/"),omidApiRequest("/api/v1/applications/disbursements/?application="+encodeURIComponent(liveWorkflowData.selectedId))]);
+  const [partyRes,stageRes,meratRes,disbursementRes]=await Promise.all([omidApiRequest("/api/v1/applications/parties/?application="+encodeURIComponent(liveWorkflowData.selectedId)),omidApiRequest("/api/v1/applications/stages/?application="+encodeURIComponent(liveWorkflowData.selectedId)),omidApiRequest("/api/v1/applications/merat-assessments/?application="+encodeURIComponent(liveWorkflowData.selectedId)),omidApiRequest("/api/v1/applications/disbursements/?application="+encodeURIComponent(liveWorkflowData.selectedId))]);
   if(!partyRes.response.ok)throw new Error(omidApiErrorMessage(partyRes.body,partyRes.response.status));
   if(!stageRes.response.ok)throw new Error(omidApiErrorMessage(stageRes.body,stageRes.response.status));
   if(!meratRes.response.ok)throw new Error(omidApiErrorMessage(meratRes.body,meratRes.response.status));
@@ -581,7 +581,7 @@ async function loadLiveWorkflow(){
  liveWorkflowData.loaded=true;liveWorkflowData.loading=false;
 }
 async function refreshLiveWorkflowForApplication(appId){
- liveWorkflowData.selectedId=String(appId);const [partyRes,stageRes,meratRes,disbursementRes]=await Promise.all([omidApiRequest("/api/v1/applications/parties/?application="+encodeURIComponent(appId)),omidApiRequest("/api/v1/applications/stages/?application="+encodeURIComponent(appId)),omidApiRequest("/api/v1/applications/merat-assessments/"),omidApiRequest("/api/v1/applications/disbursements/?application="+encodeURIComponent(appId))]);
+ liveWorkflowData.selectedId=String(appId);const [partyRes,stageRes,meratRes,disbursementRes]=await Promise.all([omidApiRequest("/api/v1/applications/parties/?application="+encodeURIComponent(appId)),omidApiRequest("/api/v1/applications/stages/?application="+encodeURIComponent(appId)),omidApiRequest("/api/v1/applications/merat-assessments/?application="+encodeURIComponent(liveWorkflowData.selectedId)),omidApiRequest("/api/v1/applications/disbursements/?application="+encodeURIComponent(appId))]);
  if(!partyRes.response.ok)throw new Error(omidApiErrorMessage(partyRes.body,partyRes.response.status));
  if(!stageRes.response.ok)throw new Error(omidApiErrorMessage(stageRes.body,stageRes.response.status));
  if(!meratRes.response.ok)throw new Error(omidApiErrorMessage(meratRes.body,meratRes.response.status));

@@ -82,7 +82,11 @@ class CasePartyViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(application__assigned_to=self.request.user)
         elif role not in {"system_admin", "credit_approver", "finance", "auditor"}:
             return queryset.none()
-        return queryset.filter(application__archived_at__isnull=True)
+        queryset = queryset.filter(application__archived_at__isnull=True)
+        application_id = self.request.query_params.get("application")
+        if application_id:
+            queryset = queryset.filter(application_id=application_id)
+        return queryset
 
     @transaction.atomic
     def perform_create(self, serializer):
@@ -253,7 +257,11 @@ class MeratAssessmentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(stage__application__assigned_to=self.request.user)
         elif role not in {"system_admin", "credit_approver", "finance", "auditor"}:
             return queryset.none()
-        return queryset.filter(stage__application__archived_at__isnull=True)
+        queryset = queryset.filter(stage__application__archived_at__isnull=True)
+        application_id = self.request.query_params.get("application")
+        if application_id:
+            queryset = queryset.filter(stage__application_id=application_id)
+        return queryset
 
     @transaction.atomic
     def perform_create(self, serializer):
