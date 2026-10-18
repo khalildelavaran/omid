@@ -2,3 +2,6 @@ name = "omid"
 account_id = "1a43675f6af74d6c9d93fe824648729f"
 main = "worker/index.js"
 compatibility_date = "2026-10-16"
+
+# Required by `wrangler preview` for Cloudflare preview deployments.
+[previews]
