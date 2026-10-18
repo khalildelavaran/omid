@@ -123,6 +123,28 @@ class TwoLevelWorkflowApiTests(TestCase):
         self.assertEqual([str(item["id"]) for item in party_results], [str(party.pk)])
         self.assertEqual([str(item["id"]) for item in merat_results], [str(assessment.pk)])
 
+    def test_stage_identity_cannot_be_changed_after_creation(self):
+        party = CaseParty.objects.create(
+            application=self.application, person=self.customer, role=CaseParty.Role.APPLICANT,
+        )
+        stage = StageInstance.objects.create(
+            application=self.application, party=party, code=StageInstance.Code.DOCUMENTS,
+            status=StageInstance.Status.PENDING,
+        )
+        other_customer = Customer.objects.create(
+            customer_number="OM-WF-CUST-IMMUTABLE", customer_type=Customer.CustomerType.INDIVIDUAL,
+            first_name="شخص", last_name="دیگر", assigned_to=self.worker,
+        )
+        response = self.client.patch(
+            f"/api/v1/applications/stages/{stage.pk}/",
+            {"code": StageInstance.Code.ACCOUNT, "party": str(party.pk)},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        stage.refresh_from_db()
+        self.assertEqual(stage.code, StageInstance.Code.DOCUMENTS)
+        self.assertEqual(stage.party_id, party.pk)
+
     def test_settlement_cannot_complete_before_disbursement_stage(self):
         disbursement = StageInstance.objects.create(
             application=self.application, code=StageInstance.Code.DISBURSEMENT,

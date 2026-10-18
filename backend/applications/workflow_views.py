@@ -151,6 +151,15 @@ class StageInstanceViewSet(viewsets.ModelViewSet):
             metadata={"application_id": str(application.pk), "code": stage.code},
         )
 
+    @transaction.atomic
+    def perform_update(self, serializer):
+        stage = serializer.save()
+        record_audit(
+            self.request, "workflow_stage.updated", actor=self.request.user,
+            entity_type="workflow_stage", entity_id=str(stage.pk),
+            metadata={"updated_fields": sorted(serializer.validated_data.keys())},
+        )
+
     @action(detail=True, methods=["post"], url_path="transition")
     @transaction.atomic
     def transition(self, request, pk=None):
