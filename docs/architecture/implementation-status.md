@@ -99,6 +99,7 @@
 - [ ] تولید و انتشار schema نسخه‌بندی‌شده در CI به‌عنوان artifact و افزودن lint/validation قرارداد OpenAPI
 - [x] تست پراکسی Worker: [پنج آزمون سبز](https://github.com/khalildelavaran/omid/actions/runs/39007806801)
 - [x] استقرار Worker: [اجرای موفق Cloudflare Deploy](https://github.com/khalildelavaran/omid/actions/runs/39011138779)
+- [x] مستندسازی معماری اتصال POS از طریق RS-232: عامل محلی، وضعیت `unknown` در timeout، idempotency و تطبیق مالی؛ کد عامل و API پرداخت هنوز پیاده‌سازی نشده‌اند
 - [ ] اتصال واقعی پیامک، پرداخت و امضا
 - [ ] hardening و تست امنیتی مستقل پیش از استقرار
 
