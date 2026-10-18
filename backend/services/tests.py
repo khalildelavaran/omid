@@ -121,6 +121,28 @@ class ServiceApiTests(TestCase):
         with self.assertRaises(ValueError):
             ServiceCatalogItem.objects.filter(pk=self.service.pk).delete()
 
+    def test_receipt_financial_split_tracks_online_cost_and_company_commission(self):
+        self.service.online_cost = Decimal("20000")
+        self.service.save(update_fields=["online_cost"])
+        response = self.create_receipt()
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(str(response.data["total"]), "80000")
+        self.assertEqual(str(response.data["online_cost"]), "20000")
+        self.assertEqual(str(response.data["company_commission"]), "60000")
+        record = ServiceRecord.objects.get(pk=response.data["id"])
+        self.assertEqual(record.total, record.online_cost + record.company_commission)
+
+    def test_discount_cannot_make_customer_total_lower_than_online_cost(self):
+        self.service.online_cost = Decimal("90000")
+        self.service.save(update_fields=["online_cost"])
+        self.client.force_authenticate(self.worker)
+        response = self.client.post(
+            "/api/v1/services/receipts/",
+            self.receipt_payload(discount="20000", paid="50000"),
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
     def test_receipt_amount_is_calculated_by_server_and_audited_without_note_content(self):
         response = self.create_receipt()
         self.assertTrue(response.data["receipt_number"].startswith("RCPT-"))

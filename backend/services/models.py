@@ -19,6 +19,7 @@ class ServiceCatalogItem(models.Model):
     name = models.CharField(max_length=200)
     description = models.CharField(max_length=1000, blank=True)
     price = models.DecimalField(max_digits=18, decimal_places=0)
+    online_cost = models.DecimalField(max_digits=18, decimal_places=0, default=0)
     active = models.BooleanField(default=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -33,6 +34,8 @@ class ServiceCatalogItem(models.Model):
         constraints = [
             models.UniqueConstraint(Lower("name"), name="service_catalog_name_ci_uniq"),
             models.CheckConstraint(condition=models.Q(price__gte=0), name="service_catalog_price_nonnegative"),
+            models.CheckConstraint(condition=models.Q(online_cost__gte=0), name="service_catalog_online_cost_nonnegative"),
+            models.CheckConstraint(condition=models.Q(online_cost__lte=models.F("price")), name="service_catalog_online_cost_lte_price"),
         ]
 
     def save(self, *args, **kwargs):
@@ -89,6 +92,8 @@ class ServiceRecord(models.Model):
     price = models.DecimalField(max_digits=18, decimal_places=0)
     discount = models.DecimalField(max_digits=18, decimal_places=0, default=0)
     total = models.DecimalField(max_digits=18, decimal_places=0)
+    online_cost = models.DecimalField(max_digits=18, decimal_places=0, default=0)
+    company_commission = models.DecimalField(max_digits=18, decimal_places=0, default=0)
     paid = models.DecimalField(max_digits=18, decimal_places=0, default=0)
     payment_method = models.CharField(max_length=24, choices=PaymentMethod.choices)
     performed_by = models.ForeignKey(
@@ -123,6 +128,9 @@ class ServiceRecord(models.Model):
             models.CheckConstraint(condition=models.Q(paid__gte=0), name="service_receipt_paid_nonnegative"),
             models.CheckConstraint(condition=models.Q(discount__lte=models.F("price")), name="service_receipt_discount_lte_price"),
             models.CheckConstraint(condition=models.Q(total=models.F("price") - models.F("discount")), name="service_receipt_total_matches_price"),
+            models.CheckConstraint(condition=models.Q(online_cost__gte=0), name="service_receipt_online_cost_nonnegative"),
+            models.CheckConstraint(condition=models.Q(company_commission__gte=0), name="service_receipt_company_commission_nonnegative"),
+            models.CheckConstraint(condition=models.Q(total=models.F("online_cost") + models.F("company_commission")), name="service_receipt_financial_split_matches_total"),
             models.CheckConstraint(condition=models.Q(paid__lte=models.F("total")), name="service_receipt_paid_lte_total"),
         ]
 

@@ -15,7 +15,7 @@ class ServiceCatalogItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceCatalogItem
         fields = [
-            "id", "code", "name", "description", "price", "active",
+            "id", "code", "name", "description", "price", "online_cost", "active",
             "created_by", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "code", "created_by", "created_at", "updated_at"]
@@ -34,6 +34,25 @@ class ServiceCatalogItemSerializer(serializers.ModelSerializer):
     def validate_price(self, value):
         if value < 0:
             raise serializers.ValidationError("تعرفه خدمت نمی‌تواند منفی باشد.")
+        return value
+
+    def validate(self, attrs):
+        price = attrs.get("price", getattr(self.instance, "price", None))
+        online_cost = attrs.get("online_cost", getattr(self.instance, "online_cost", Decimal("0")))
+        if price is not None and online_cost > price:
+            raise serializers.ValidationError({"online_cost": "هزینه آنلاین نمی‌تواند از مبلغ کل مشتری بیشتر باشد."})
+        return attrs
+
+    def validate_online_cost(self, value):
+        if value < 0:
+            raise serializers.ValidationError("هزینه پرداخت آنلاین نمی‌تواند منفی باشد.")
+        price = self.initial_data.get("price", getattr(self.instance, "price", None))
+        if price is not None:
+            try:
+                if value > Decimal(str(price)):
+                    raise serializers.ValidationError("هزینه آنلاین نمی‌تواند از مبلغ کل مشتری بیشتر باشد.")
+            except (ValueError, TypeError):
+                pass
         return value
 
 
@@ -56,7 +75,7 @@ class ServiceRecordSerializer(serializers.ModelSerializer):
         fields = [
             "id", "receipt_number", "customer", "customer_name", "service",
             "service_code", "service_name", "service_description_snapshot",
-            "price", "discount", "total", "paid", "amount_due", "payment_method",
+            "price", "discount", "total", "online_cost", "company_commission", "paid", "amount_due", "payment_method",
             "performed_by", "performed_by_name", "note", "created_by",
             "created_by_username", "created_at",
         ]
@@ -106,6 +125,10 @@ class ServiceRecordCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError({"discount": "تخفیف نمی‌تواند از تعرفه خدمت بیشتر باشد."})
         if attrs["paid"] > total:
             raise serializers.ValidationError({"paid": "مبلغ دریافتی نمی‌تواند از مبلغ نهایی خدمت بیشتر باشد."})
+        if total < service.online_cost:
+            raise serializers.ValidationError({
+                "discount": "مبلغ نهایی مشتری نمی‌تواند از هزینه پرداخت آنلاین کمتر باشد."
+            })
         return attrs
 
     def create(self, validated_data):
@@ -125,6 +148,8 @@ class ServiceRecordCreateSerializer(serializers.Serializer):
             price=service.price,
             discount=discount,
             total=total,
+            online_cost=service.online_cost,
+            company_commission=total - service.online_cost,
             paid=paid,
             performed_by=performed_by,
             created_by=actor,
