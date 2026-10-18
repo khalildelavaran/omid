@@ -104,3 +104,30 @@ class TwoLevelWorkflowApiTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.application.refresh_from_db()
         self.assertEqual(str(self.application.loan_commission_pct), "25.00")
+
+    def test_system_admin_can_change_commission_with_reason(self):
+        admin = User.objects.create_user(username="workflow-admin", password="test-pass-123", is_staff=True)
+        UserProfile.objects.create(user=admin, role=UserProfile.Role.SYSTEM_ADMIN)
+        self.client.force_authenticate(admin)
+        response = self.client.post(
+            f"/api/v1/applications/{self.application.pk}/commission/",
+            {"rate": "22.50", "reason": "توافق مدیریتی برای این پرونده"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.application.refresh_from_db()
+        self.assertEqual(str(self.application.loan_commission_pct), "22.50")
+        self.assertEqual(self.application.commission_override_reason, "توافق مدیریتی برای این پرونده")
+
+    def test_commission_change_requires_a_reason(self):
+        admin = User.objects.create_user(username="workflow-admin-no-reason", password="test-pass-123", is_staff=True)
+        UserProfile.objects.create(user=admin, role=UserProfile.Role.SYSTEM_ADMIN)
+        self.client.force_authenticate(admin)
+        response = self.client.post(
+            f"/api/v1/applications/{self.application.pk}/commission/",
+            {"rate": "20.00", "reason": ""},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.application.refresh_from_db()
+        self.assertEqual(str(self.application.loan_commission_pct), "25.00")

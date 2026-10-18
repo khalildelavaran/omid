@@ -101,6 +101,14 @@ class MeratAssessmentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"stage": "ارزیابی باید به مرحله مرآت متصل باشد."})
         if stage and stage.party_id and subject and stage.party.person_id != subject.pk:
             raise serializers.ValidationError({"subject": "شخص موضوع اعتبارسنجی باید با شخص مرحله مرآت یکسان باشد."})
-        if requester and subject and not relationship.strip():
-            raise serializers.ValidationError({"relationship_to_applicant": "ثبت رابطه درخواست‌دهنده اعتبارسنجی با مشتری پرونده الزامی است."})
+        if stage and stage.application_id:
+            active_party_ids = set(stage.application.parties.filter(
+                membership_status="active"
+            ).values_list("person_id", flat=True))
+            if requester and requester.pk not in active_party_ids:
+                raise serializers.ValidationError({"requester": "درخواست‌دهنده باید از اشخاص فعال همین پرونده باشد."})
+            if subject and subject.pk not in active_party_ids:
+                raise serializers.ValidationError({"subject": "شخص موضوع اعتبارسنجی باید از اشخاص فعال همین پرونده باشد."})
+        if not relationship.strip():
+            raise serializers.ValidationError({"relationship_to_applicant": "ثبت رابطه با مشتری اصلی پرونده الزامی است."})
         return attrs
