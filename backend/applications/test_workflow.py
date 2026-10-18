@@ -78,6 +78,43 @@ class TwoLevelWorkflowApiTests(TestCase):
         submission.refresh_from_db()
         self.assertEqual(submission.status, StageInstance.Status.PENDING)
 
+    def test_account_stage_completion_saves_required_opening_evidence(self):
+        party = CaseParty.objects.create(
+            application=self.application, person=self.customer, role=CaseParty.Role.APPLICANT,
+            account_status=CaseParty.AccountStatus.NEEDS_OPENING,
+        )
+        stage = StageInstance.objects.create(
+            application=self.application, party=party, code=StageInstance.Code.ACCOUNT,
+            status=StageInstance.Status.IN_PROGRESS,
+        )
+        response = self.client.post(
+            f"/api/v1/applications/stages/{stage.pk}/transition/",
+            {"action": "complete", "evidence_reference": "ACCOUNT-OPENING-DOC-001"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        stage.refresh_from_db()
+        self.assertEqual(stage.status, StageInstance.Status.COMPLETED)
+        self.assertEqual(stage.evidence_reference, "ACCOUNT-OPENING-DOC-001")
+
+    def test_account_stage_cannot_complete_without_opening_evidence(self):
+        party = CaseParty.objects.create(
+            application=self.application, person=self.customer, role=CaseParty.Role.APPLICANT,
+            account_status=CaseParty.AccountStatus.NEEDS_OPENING,
+        )
+        stage = StageInstance.objects.create(
+            application=self.application, party=party, code=StageInstance.Code.ACCOUNT,
+            status=StageInstance.Status.IN_PROGRESS,
+        )
+        response = self.client.post(
+            f"/api/v1/applications/stages/{stage.pk}/transition/",
+            {"action": "complete"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        stage.refresh_from_db()
+        self.assertEqual(stage.status, StageInstance.Status.IN_PROGRESS)
+
     def test_case_worker_cannot_bypass_a_stage(self):
         party = CaseParty.objects.create(
             application=self.application, person=self.customer, role=CaseParty.Role.APPLICANT,

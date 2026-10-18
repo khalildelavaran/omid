@@ -159,6 +159,10 @@ class StageInstanceViewSet(viewsets.ModelViewSet):
         if not isinstance(reason, str) or len(reason.strip()) > 500:
             raise ValidationError({"reason": "دلیل باید متن و حداکثر ۵۰۰ نویسه باشد."})
         reason = reason.strip()
+        evidence_reference = request.data.get("evidence_reference", stage.evidence_reference)
+        if not isinstance(evidence_reference, str) or len(evidence_reference.strip()) > 500:
+            raise ValidationError({"evidence_reference": "مرجع مدرک باید متن و حداکثر ۵۰۰ نویسه باشد."})
+        evidence_reference = evidence_reference.strip()
         role = _role(request.user)
 
         if command == "start":
@@ -178,8 +182,9 @@ class StageInstanceViewSet(viewsets.ModelViewSet):
                 if not stage.application.disbursements.filter(status=Disbursement.Status.CONFIRMED).exists():
                     raise ValidationError({"detail": "تکمیل مرحله واریز به حداقل یک واریز تأییدشده نیاز دارد."})
             if stage.code == StageInstance.Code.ACCOUNT and stage.party.account_status == CaseParty.AccountStatus.NEEDS_OPENING:
-                if not stage.evidence_reference.strip():
+                if not evidence_reference:
                     raise ValidationError({"evidence_reference": "برای تأیید افتتاح حساب، مرجع مدرک الزامی است."})
+                stage.evidence_reference = evidence_reference
             stage.status = StageInstance.Status.COMPLETED
             stage.completed_at = timezone.now()
         elif command == "hold":
