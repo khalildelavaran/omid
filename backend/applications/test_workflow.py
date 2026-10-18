@@ -46,7 +46,6 @@ class TwoLevelWorkflowApiTests(TestCase):
                 StageInstance.Code.DOCUMENTS,
                 StageInstance.Code.ACCOUNT,
                 StageInstance.Code.MERAT,
-                StageInstance.Code.DIGITAL_BANKING,
                 StageInstance.Code.E_NOTE,
             },
         )
@@ -59,7 +58,7 @@ class TwoLevelWorkflowApiTests(TestCase):
         )
         for code in (
             StageInstance.Code.DOCUMENTS, StageInstance.Code.ACCOUNT, StageInstance.Code.MERAT,
-            StageInstance.Code.DIGITAL_BANKING, StageInstance.Code.E_NOTE,
+            StageInstance.Code.E_NOTE,
         ):
             StageInstance.objects.create(
                 application=self.application, party=party, code=code,
