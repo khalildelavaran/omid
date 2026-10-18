@@ -4,6 +4,16 @@ from customers.models import Customer
 from .models import CaseParty, MeratAssessment, StageInstance
 
 
+def _validate_application_scope(serializer, application):
+    request = serializer.context.get("request")
+    if not request or not request.user.is_authenticated:
+        raise serializers.ValidationError("احراز هویت الزامی است.")
+    user = request.user
+    role = "system_admin" if user.is_superuser else getattr(getattr(user, "profile", None), "role", None)
+    if role in {"intake", "case_worker"} and application.assigned_to_id != user.id:
+        raise serializers.ValidationError({"application": "به پرونده انتخاب‌شده دسترسی ندارید."})
+
+
 class CasePartySerializer(serializers.ModelSerializer):
     person_display = serializers.SerializerMethodField()
 
@@ -28,6 +38,8 @@ class CasePartySerializer(serializers.ModelSerializer):
         application = attrs.get("application", getattr(self.instance, "application", None))
         person = attrs.get("person", getattr(self.instance, "person", None))
         role = attrs.get("role", getattr(self.instance, "role", None))
+        if application:
+            _validate_application_scope(self, application)
         if application and person and role == CaseParty.Role.APPLICANT:
             duplicate = CaseParty.objects.filter(
                 application=application, role=CaseParty.Role.APPLICANT,
@@ -66,6 +78,8 @@ class StageInstanceSerializer(serializers.ModelSerializer):
         application = attrs.get("application", getattr(self.instance, "application", None))
         party = attrs.get("party", getattr(self.instance, "party", None))
         code = attrs.get("code", getattr(self.instance, "code", None))
+        if application:
+            _validate_application_scope(self, application)
         person_codes = {
             StageInstance.Code.DOCUMENTS, StageInstance.Code.ACCOUNT, StageInstance.Code.MERAT,
             StageInstance.Code.DIGITAL_BANKING, StageInstance.Code.E_NOTE,
@@ -99,6 +113,8 @@ class MeratAssessmentSerializer(serializers.ModelSerializer):
         )
         if stage and stage.code != StageInstance.Code.MERAT:
             raise serializers.ValidationError({"stage": "ارزیابی باید به مرحله مرآت متصل باشد."})
+        if stage:
+            _validate_application_scope(self, stage.application)
         if stage and stage.party_id and subject and stage.party.person_id != subject.pk:
             raise serializers.ValidationError({"subject": "شخص موضوع اعتبارسنجی باید با شخص مرحله مرآت یکسان باشد."})
         if stage and stage.application_id:
