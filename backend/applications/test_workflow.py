@@ -123,6 +123,44 @@ class TwoLevelWorkflowApiTests(TestCase):
         self.assertEqual([str(item["id"]) for item in party_results], [str(party.pk)])
         self.assertEqual([str(item["id"]) for item in merat_results], [str(assessment.pk)])
 
+    def test_settlement_cannot_complete_before_disbursement_stage(self):
+        disbursement = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.DISBURSEMENT,
+            status=StageInstance.Status.PENDING,
+        )
+        settlement = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.SETTLEMENT,
+            status=StageInstance.Status.IN_PROGRESS,
+        )
+        response = self.client.post(
+            f"/api/v1/applications/stages/{settlement.pk}/transition/",
+            {"action": "complete"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        settlement.refresh_from_db()
+        self.assertEqual(settlement.status, StageInstance.Status.IN_PROGRESS)
+        self.assertEqual(disbursement.status, StageInstance.Status.PENDING)
+
+    def test_handover_cannot_complete_before_settlement_stage(self):
+        settlement = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.SETTLEMENT,
+            status=StageInstance.Status.PENDING,
+        )
+        handover = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.HANDOVER,
+            status=StageInstance.Status.IN_PROGRESS,
+        )
+        response = self.client.post(
+            f"/api/v1/applications/stages/{handover.pk}/transition/",
+            {"action": "complete"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, StageInstance.Status.IN_PROGRESS)
+        self.assertEqual(settlement.status, StageInstance.Status.PENDING)
+
     def test_account_stage_completion_saves_required_opening_evidence(self):
         party = CaseParty.objects.create(
             application=self.application, person=self.customer, role=CaseParty.Role.APPLICANT,
