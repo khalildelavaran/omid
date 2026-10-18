@@ -11,7 +11,31 @@ from .permissions import IsStaffApplicationOperator
 from .workflow_serializers import CasePartySerializer, MeratAssessmentSerializer, StageInstanceSerializer
 
 
-PERSON_STAGE_CODES = (
+
+
+class IsWorkflowStaff(BasePermission):
+    read_roles = {"system_admin", "intake", "case_worker", "credit_approver", "finance", "auditor"}
+    write_roles = {"system_admin", "intake", "case_worker"}
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated or not user.is_staff:
+            return False
+        role = _role(user)
+        return role in self.read_roles and (request.method in SAFE_METHODS or role in self.write_roles)
+
+    def has_object_permission(self, request, view, obj):
+        role = _role(request.user)
+        if role == "system_admin":
+            return True
+        application = getattr(obj, "application", None)
+        if application is None and hasattr(obj, "stage"):
+            application = obj.stage.application
+        if role in {"intake", "case_worker"}:
+            return application is not None and application.assigned_to_id == request.user.id
+        return request.method in SAFE_METHODS
+
+\nPERSON_STAGE_CODES = (
     StageInstance.Code.DOCUMENTS,
     StageInstance.Code.ACCOUNT,
     StageInstance.Code.MERAT,
@@ -47,7 +71,7 @@ def _assert_application_access(user, application):
 
 class CasePartyViewSet(viewsets.ModelViewSet):
     serializer_class = CasePartySerializer
-    permission_classes = [IsStaffApplicationOperator]
+    permission_classes = [IsWorkflowStaff]
     http_method_names = ["get", "post", "patch", "head", "options"]
 
     def get_queryset(self):
