@@ -4,7 +4,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserProfile
 from customers.models import Customer
-from .models import CaseParty, LoanApplication, StageInstance
+from .models import CaseParty, LoanApplication, MeratAssessment, StageInstance
 
 User = get_user_model()
 
@@ -77,6 +77,51 @@ class TwoLevelWorkflowApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
         submission.refresh_from_db()
         self.assertEqual(submission.status, StageInstance.Status.PENDING)
+
+    def test_party_and_merat_lists_can_be_scoped_to_one_application(self):
+        party = CaseParty.objects.create(
+            application=self.application, person=self.customer, role=CaseParty.Role.APPLICANT,
+        )
+        stage = StageInstance.objects.create(
+            application=self.application, party=party, code=StageInstance.Code.MERAT,
+            status=StageInstance.Status.PENDING,
+        )
+        assessment = MeratAssessment.objects.create(
+            stage=stage, requester=self.customer, subject=self.customer,
+            relationship_to_applicant="خود متقاضی",
+        )
+        other_customer = Customer.objects.create(
+            customer_number="OM-WF-CUST-2", customer_type=Customer.CustomerType.INDIVIDUAL,
+            first_name="مشتری", last_name="دوم", assigned_to=self.worker,
+        )
+        other_application = LoanApplication.objects.create(
+            customer=other_customer, product_type=LoanApplication.ProductType.PERSONAL,
+            requested_amount=120000000, assigned_to=self.worker,
+        )
+        other_party = CaseParty.objects.create(
+            application=other_application, person=other_customer, role=CaseParty.Role.APPLICANT,
+        )
+        other_stage = StageInstance.objects.create(
+            application=other_application, party=other_party, code=StageInstance.Code.MERAT,
+            status=StageInstance.Status.PENDING,
+        )
+        MeratAssessment.objects.create(
+            stage=other_stage, requester=other_customer, subject=other_customer,
+            relationship_to_applicant="خود متقاضی",
+        )
+
+        parties_response = self.client.get(
+            "/api/v1/applications/parties/", {"application": str(self.application.pk)}
+        )
+        merat_response = self.client.get(
+            "/api/v1/applications/merat-assessments/", {"application": str(self.application.pk)}
+        )
+        self.assertEqual(parties_response.status_code, 200)
+        self.assertEqual(merat_response.status_code, 200)
+        party_results = parties_response.data.get("results", parties_response.data)
+        merat_results = merat_response.data.get("results", merat_response.data)
+        self.assertEqual([str(item["id"]) for item in party_results], [str(party.pk)])
+        self.assertEqual([str(item["id"]) for item in merat_results], [str(assessment.pk)])
 
     def test_account_stage_completion_saves_required_opening_evidence(self):
         party = CaseParty.objects.create(
