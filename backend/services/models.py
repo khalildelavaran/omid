@@ -143,6 +143,9 @@ class ServiceRecord(models.Model):
             raise ValueError("Service receipts are immutable.")
         if not self.receipt_number:
             self.receipt_number = f"RCPT-{timezone.localdate():%Y%m%d}-{uuid.uuid4().hex[:10].upper()}"
+        if self._state.adding and self.online_cost == 0 and self.company_commission == 0:
+            # Backward-compatible default for internal callers that predate the financial split.
+            self.company_commission = self.total
         if self.service_id:
             service = self.service
             self.service_code_snapshot = self.service_code_snapshot or service.code
