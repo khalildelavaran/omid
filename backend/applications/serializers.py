@@ -27,7 +27,8 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
         fields = [
             "id", "application_number", "customer", "customer_number",
             "customer_display_name", "product_type", "requested_amount", "status_note",
-            "term_months", "status", "assigned_to", "purpose", "notes",\n            "loan_commission_pct", "commission_override_reason",
+            "term_months", "status", "assigned_to", "purpose", "notes",
+            "loan_commission_pct", "commission_override_reason",
             "created_at", "updated_at", "archived_at", "archived_by",
         ]
         read_only_fields = ["id", "application_number", "assigned_to", "created_at", "updated_at", "archived_at", "archived_by", "loan_commission_pct", "commission_override_reason"]
