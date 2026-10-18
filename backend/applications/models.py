@@ -25,6 +25,8 @@ class LoanApplication(models.Model):
     customer = models.ForeignKey("customers.Customer", on_delete=models.PROTECT, related_name="loan_applications")
     product_type = models.CharField(max_length=24, choices=ProductType.choices)
     requested_amount = models.DecimalField(max_digits=18, decimal_places=0)
+    loan_commission_pct = models.DecimalField(max_digits=5, decimal_places=2, default="25.00")
+    commission_override_reason = models.CharField(max_length=500, blank=True)
     term_months = models.PositiveSmallIntegerField(null=True, blank=True)
     status = models.CharField(max_length=24, choices=Status.choices, default=Status.UNDER_REVIEW)
     assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="assigned_loan_applications")
@@ -108,3 +110,169 @@ class ApplicationEvent(models.Model):
 
     def __str__(self) -> str:
         return f"{self.application.application_number}: {self.event_type}"
+
+
+class CaseParty(models.Model):
+    """A person participating in a loan application as applicant or guarantor."""
+
+    class Role(models.TextChoices):
+        APPLICANT = "applicant", "متقاضی اصلی"
+        GUARANTOR = "guarantor", "ضامن"
+        REPRESENTATIVE = "representative", "نماینده"
+
+    class MembershipStatus(models.TextChoices):
+        ACTIVE = "active", "فعال"
+        REPLACED = "replaced", "جایگزین‌شده"
+        REMOVED = "removed", "خارج‌شده"
+
+    class AccountStatus(models.TextChoices):
+        UNKNOWN = "unknown", "بررسی‌نشده"
+        EXISTING_VERIFIED = "existing_verified", "حساب موجود تأییدشده"
+        NEEDS_OPENING = "needs_opening", "نیازمند افتتاح"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    application = models.ForeignKey(LoanApplication, on_delete=models.PROTECT, related_name="parties")
+    person = models.ForeignKey("customers.Customer", on_delete=models.PROTECT, related_name="loan_case_participations")
+    role = models.CharField(max_length=20, choices=Role.choices)
+    relationship_to_applicant = models.CharField(max_length=80, blank=True)
+    membership_status = models.CharField(max_length=16, choices=MembershipStatus.choices, default=MembershipStatus.ACTIVE)
+    account_status = models.CharField(max_length=24, choices=AccountStatus.choices, default=AccountStatus.UNKNOWN)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "created_at"]
+        indexes = [
+            models.Index(fields=["application", "membership_status"], name="party_app_status_idx"),
+            models.Index(fields=["person", "role"], name="party_person_role_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(role="applicant") | models.Q(sort_order=0),
+                name="party_applicant_order_zero",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.application.application_number}: {self.get_role_display()}"
+
+
+class StageInstance(models.Model):
+    """Independent workflow stage for either one case party or the whole application."""
+
+    class Code(models.TextChoices):
+        DOCUMENTS = "documents", "مدارک"
+        ACCOUNT = "account", "وضعیت حساب"
+        MERAT = "merat", "اعتبارسنجی مرآت"
+        DIGITAL_BANKING = "digital_banking", "بانکداری دیجیتال"
+        E_NOTE = "e_note", "سفته الکترونیک"
+        LOAN_SUBMISSION = "loan_submission", "ثبت درخواست وام"
+        BANK_REVIEW = "bank_review", "بررسی بانک"
+        DISBURSEMENT = "disbursement", "واریز تسهیلات"
+        SETTLEMENT = "settlement", "تسویه"
+        HANDOVER = "handover", "تحویل نهایی"
+
+    class Status(models.TextChoices):
+        LOCKED = "locked", "قفل‌شده"
+        PENDING = "pending", "در انتظار"
+        IN_PROGRESS = "in_progress", "در جریان"
+        ACTION_NEEDED = "action_needed", "نیازمند اقدام"
+        COMPLETED = "completed", "تکمیل‌شده"
+        BYPASSED = "bypassed", "عبور مجاز"
+        REJECTED = "rejected", "ردشده"
+        ON_HOLD = "on_hold", "تعلیق"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    application = models.ForeignKey(LoanApplication, on_delete=models.PROTECT, related_name="stage_instances")
+    party = models.ForeignKey(CaseParty, on_delete=models.PROTECT, null=True, blank=True, related_name="stage_instances")
+    code = models.CharField(max_length=24, choices=Code.choices)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.LOCKED)
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="assigned_stage_instances",
+    )
+    started_at = models.DateTimeField(null=True, blank=True)
+    due_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    outcome = models.CharField(max_length=120, blank=True)
+    hold_reason = models.CharField(max_length=500, blank=True)
+    evidence_reference = models.CharField(max_length=500, blank=True)
+    follow_up_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["application", "code", "status"], name="stage_app_code_status_idx"),
+            models.Index(fields=["assigned_to", "status", "due_at"], name="stage_owner_status_due_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["application", "party", "code"],
+                condition=models.Q(party__isnull=False),
+                name="uniq_party_stage_code",
+            ),
+            models.UniqueConstraint(
+                fields=["application", "code"],
+                condition=models.Q(party__isnull=True),
+                name="uniq_case_stage_code",
+            ),
+        ]
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.party_id and self.party.application_id != self.application_id:
+            raise ValidationError({"party": "شخص باید متعلق به همین پرونده باشد."})
+        if self.code in {
+            self.Code.DOCUMENTS, self.Code.ACCOUNT, self.Code.MERAT,
+            self.Code.DIGITAL_BANKING, self.Code.E_NOTE,
+        } and not self.party_id:
+            raise ValidationError({"party": "این مرحله باید به یک شخص پرونده متصل باشد."})
+        if self.code in {
+            self.Code.LOAN_SUBMISSION, self.Code.BANK_REVIEW, self.Code.DISBURSEMENT,
+            self.Code.SETTLEMENT, self.Code.HANDOVER,
+        } and self.party_id:
+            raise ValidationError({"party": "این مرحله در سطح کل پرونده اجرا می‌شود."})
+
+    def __str__(self) -> str:
+        return f"{self.application.application_number}: {self.code} / {self.status}"
+
+
+class MeratAssessment(models.Model):
+    """Manual, evidence-backed record of an external Merat assessment; no bank API is implied."""
+
+    class Result(models.TextChoices):
+        PENDING = "pending", "در انتظار نتیجه"
+        APPROVED = "approved", "تأیید"
+        REJECTED = "rejected", "رد"
+        NEEDS_CORRECTION = "needs_correction", "نیازمند اصلاح"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    stage = models.OneToOneField(StageInstance, on_delete=models.PROTECT, related_name="merat_assessment")
+    requester = models.ForeignKey("customers.Customer", on_delete=models.PROTECT, related_name="merat_requests_made")
+    subject = models.ForeignKey("customers.Customer", on_delete=models.PROTECT, related_name="merat_assessments_received")
+    relationship_to_applicant = models.CharField(max_length=80)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    external_reference = models.CharField(max_length=120, blank=True)
+    result = models.CharField(max_length=24, choices=Result.choices, default=Result.PENDING)
+    result_reason = models.CharField(max_length=500, blank=True)
+    reported_limit_rial = models.PositiveBigIntegerField(null=True, blank=True)
+    evidence_reference = models.CharField(max_length=500, blank=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="recorded_merat_assessments",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.stage_id and self.stage.code != StageInstance.Code.MERAT:
+            raise ValidationError({"stage": "ارزیابی مرآت باید به مرحله مرآت متصل باشد."})
+        if self.reported_limit_rial is not None and self.reported_limit_rial < 0:
+            raise ValidationError({"reported_limit_rial": "مبلغ نمی‌تواند منفی باشد."})
+
+    def __str__(self) -> str:
+        return f"مرآت: {self.subject_id} ({self.result})"
