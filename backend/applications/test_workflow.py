@@ -142,6 +142,24 @@ class TwoLevelWorkflowApiTests(TestCase):
         self.assertEqual(settlement.status, StageInstance.Status.IN_PROGRESS)
         self.assertEqual(disbursement.status, StageInstance.Status.PENDING)
 
+    def test_handover_cannot_start_before_settlement_stage(self):
+        StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.SETTLEMENT,
+            status=StageInstance.Status.PENDING,
+        )
+        handover = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.HANDOVER,
+            status=StageInstance.Status.PENDING,
+        )
+        response = self.client.post(
+            f"/api/v1/applications/stages/{handover.pk}/transition/",
+            {"action": "start"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, StageInstance.Status.PENDING)
+
     def test_handover_cannot_complete_before_settlement_stage(self):
         settlement = StageInstance.objects.create(
             application=self.application, code=StageInstance.Code.SETTLEMENT,
