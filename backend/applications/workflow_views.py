@@ -245,7 +245,6 @@ def _ensure_submission_ready(application):
         StageInstance.Code.DOCUMENTS,
         StageInstance.Code.ACCOUNT,
         StageInstance.Code.MERAT,
-        StageInstance.Code.DIGITAL_BANKING,
         StageInstance.Code.E_NOTE,
     }
     allowed = {StageInstance.Status.COMPLETED, StageInstance.Status.BYPASSED}
