@@ -172,6 +172,10 @@ class StageInstanceViewSet(viewsets.ModelViewSet):
                 raise ValidationError({"action": "فقط مرحله در جریان قابل تکمیل است."})
             if stage.code == StageInstance.Code.LOAN_SUBMISSION:
                 _ensure_submission_ready(stage.application)
+            if stage.code == StageInstance.Code.DISBURSEMENT:
+                from .models import Disbursement
+                if not stage.application.disbursements.filter(status=Disbursement.Status.CONFIRMED).exists():
+                    raise ValidationError({"detail": "تکمیل مرحله واریز به حداقل یک واریز تأییدشده نیاز دارد."})
             if stage.code == StageInstance.Code.ACCOUNT and stage.party.account_status == CaseParty.AccountStatus.NEEDS_OPENING:
                 if not stage.evidence_reference.strip():
                     raise ValidationError({"evidence_reference": "برای تأیید افتتاح حساب، مرجع مدرک الزامی است."})
