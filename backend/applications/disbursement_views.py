@@ -92,6 +92,9 @@ class DisbursementViewSet(viewsets.ModelViewSet):
         ).first()
         if stage is None or stage.status != StageInstance.Status.IN_PROGRESS:
             raise ValidationError({"detail": "برای تأیید واریز، مرحله واریز در سطح پرونده باید در جریان باشد."})
+        # Serialize confirmation against case-level commission changes.
+        application = LoanApplication.objects.select_for_update().get(pk=disbursement.application_id)
+        disbursement.application = application
         disbursement.bank_reference = bank_reference.strip()
         disbursement.evidence_reference = evidence_reference.strip()
         disbursement.status = Disbursement.Status.CONFIRMED
