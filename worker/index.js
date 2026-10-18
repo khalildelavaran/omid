@@ -920,7 +920,14 @@ document.addEventListener("click",async e=>{
    if(command==="hold"||command==="bypass"){const reason=prompt(command==="bypass"?"دلیل مستند عبور از مرحله حساب را وارد کنید:":"دلیل تعلیق مرحله را وارد کنید:");if(reason===null)return;if(!reason.trim()){toast("دلیل این عملیات الزامی است.");return;}body.reason=reason.trim();}
    if(command==="complete"){
     const stage=liveWorkflowData.stages.find(x=>String(x.id)===String(stageId));
-    if(stage&&stage.code==="account"){const evidence=prompt("مرجع مدرک تأیید حساب را وارد کنید (در صورت نیاز):","");if(evidence===null)return;if(evidence.trim())body.evidence_reference=evidence.trim();}
+    if(stage&&stage.code==="account"){
+     const party=liveWorkflowData.parties.find(x=>String(x.id)===String(stage.party||stage.party_id||stage.partyId));
+     const evidenceRequired=party&&party.account_status==="needs_opening";
+     const evidence=prompt(evidenceRequired?"مرجع مدرک افتتاح حساب الزامی است:":"مرجع مدرک تأیید حساب (در صورت نیاز):","");
+     if(evidence===null)return;
+     if(evidenceRequired&&!evidence.trim()){toast("برای تکمیل مرحله افتتاح حساب، مرجع مدرک الزامی است.");return;}
+     if(evidence.trim())body.evidence_reference=evidence.trim();
+    }
    }
    try{const result=await omidApiRequest("/api/v1/applications/stages/"+encodeURIComponent(stageId)+"/transition/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":await omidApiCsrfToken()},body:JSON.stringify(body)});if(!result.response.ok)throw new Error(omidApiErrorMessage(result.body,result.response.status));await refreshLiveWorkflowForApplication(liveWorkflowData.selectedId);toast("مرحله در بک‌اند به‌روزرسانی شد.");}
    catch(error){toast(String(error&&error.message||"تغییر مرحله ناموفق بود."));}
