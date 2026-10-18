@@ -35,7 +35,8 @@ class IsWorkflowStaff(BasePermission):
             return application is not None and application.assigned_to_id == request.user.id
         return request.method in SAFE_METHODS
 
-\nPERSON_STAGE_CODES = (
+
+PERSON_STAGE_CODES = (
     StageInstance.Code.DOCUMENTS,
     StageInstance.Code.ACCOUNT,
     StageInstance.Code.MERAT,
