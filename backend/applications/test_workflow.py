@@ -200,6 +200,26 @@ class TwoLevelWorkflowApiTests(TestCase):
         self.assertEqual(settlement.status, StageInstance.Status.IN_PROGRESS)
         self.assertEqual(disbursement.status, StageInstance.Status.PENDING)
 
+    def test_admin_cannot_bypass_settlement_before_disbursement_stage(self):
+        admin = User.objects.create_superuser(username="workflow-admin", password="test-pass-123")
+        StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.DISBURSEMENT,
+            status=StageInstance.Status.PENDING,
+        )
+        settlement = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.SETTLEMENT,
+            status=StageInstance.Status.PENDING,
+        )
+        self.client.force_authenticate(admin)
+        response = self.client.post(
+            f"/api/v1/applications/stages/{settlement.pk}/transition/",
+            {"action": "bypass", "reason": "آزمون"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        settlement.refresh_from_db()
+        self.assertEqual(settlement.status, StageInstance.Status.PENDING)
+
     def test_handover_cannot_start_before_settlement_stage(self):
         StageInstance.objects.create(
             application=self.application, code=StageInstance.Code.SETTLEMENT,
