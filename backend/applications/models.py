@@ -152,6 +152,16 @@ class CaseParty(models.Model):
                 condition=~models.Q(role="applicant") | models.Q(sort_order=0),
                 name="party_applicant_order_zero",
             ),
+            models.UniqueConstraint(
+                fields=["application"],
+                condition=models.Q(role="applicant", membership_status="active"),
+                name="uniq_active_case_applicant",
+            ),
+            models.UniqueConstraint(
+                fields=["application", "person"],
+                condition=models.Q(membership_status="active"),
+                name="uniq_active_case_party_person",
+            ),
         ]
 
     def __str__(self) -> str:
