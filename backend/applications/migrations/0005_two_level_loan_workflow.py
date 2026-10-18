@@ -39,6 +39,7 @@ class Migration(migrations.Migration):
             ],
             options={"ordering": ["sort_order", "created_at"]},
         ),
+        migrations.AddConstraint(model_name="caseparty", constraint=models.CheckConstraint(condition=~models.Q(role="applicant") | models.Q(sort_order=0), name="party_applicant_order_zero")),
         migrations.AddIndex(model_name="caseparty", index=models.Index(fields=["application", "membership_status"], name="party_app_status_idx")),
         migrations.AddIndex(model_name="caseparty", index=models.Index(fields=["person", "role"], name="party_person_role_idx")),
         migrations.CreateModel(

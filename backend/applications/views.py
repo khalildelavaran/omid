@@ -140,6 +140,37 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
                 },
             )
 
+    @action(detail=True, methods=["post"], url_path="commission")
+    @transaction.atomic
+    def commission(self, request, pk=None):
+        role = "system_admin" if request.user.is_superuser else getattr(
+            getattr(request.user, "profile", None), "role", None
+        )
+        if role != "system_admin":
+            return Response({"detail": "تغییر کارمزد فقط در اختیار مدیر سامانه است."}, status=status.HTTP_403_FORBIDDEN)
+        application = LoanApplication.objects.select_for_update().get(pk=self.get_object().pk)
+        raw_rate = request.data.get("rate")
+        reason = request.data.get("reason", "")
+        if not isinstance(reason, str) or not reason.strip() or len(reason.strip()) > 500:
+            raise ValidationError({"reason": "ثبت دلیل تغییر کارمزد الزامی است و حداکثر ۵۰۰ نویسه دارد."})
+        from decimal import Decimal, InvalidOperation
+        try:
+            rate = Decimal(str(raw_rate))
+        except (InvalidOperation, TypeError, ValueError):
+            raise ValidationError({"rate": "نرخ کارمزد باید عدد معتبر باشد."})
+        if not rate.is_finite() or rate < 0 or rate > 100:
+            raise ValidationError({"rate": "نرخ کارمزد باید بین صفر تا ۱۰۰ درصد باشد."})
+        previous_rate = application.loan_commission_pct
+        application.loan_commission_pct = rate
+        application.commission_override_reason = reason.strip()
+        application.save(update_fields=["loan_commission_pct", "commission_override_reason", "updated_at"])
+        record_audit(
+            request, "application.commission_changed", actor=request.user,
+            entity_type="loan_application", entity_id=str(application.pk),
+            metadata={"previous_rate": str(previous_rate), "new_rate": str(rate), "reason": reason.strip()},
+        )
+        return Response(self.get_serializer(application).data, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=["post"], url_path="archive")
     @transaction.atomic
     def archive(self, request, pk=None):
