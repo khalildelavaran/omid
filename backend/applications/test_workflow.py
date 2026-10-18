@@ -145,6 +145,42 @@ class TwoLevelWorkflowApiTests(TestCase):
         self.assertEqual(stage.code, StageInstance.Code.DOCUMENTS)
         self.assertEqual(stage.party_id, party.pk)
 
+    def test_bank_review_cannot_start_before_loan_submission(self):
+        StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.LOAN_SUBMISSION,
+            status=StageInstance.Status.PENDING,
+        )
+        review = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.BANK_REVIEW,
+            status=StageInstance.Status.PENDING,
+        )
+        response = self.client.post(
+            f"/api/v1/applications/stages/{review.pk}/transition/",
+            {"action": "start"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        review.refresh_from_db()
+        self.assertEqual(review.status, StageInstance.Status.PENDING)
+
+    def test_disbursement_cannot_start_before_bank_review(self):
+        StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.BANK_REVIEW,
+            status=StageInstance.Status.PENDING,
+        )
+        disbursement = StageInstance.objects.create(
+            application=self.application, code=StageInstance.Code.DISBURSEMENT,
+            status=StageInstance.Status.PENDING,
+        )
+        response = self.client.post(
+            f"/api/v1/applications/stages/{disbursement.pk}/transition/",
+            {"action": "start"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        disbursement.refresh_from_db()
+        self.assertEqual(disbursement.status, StageInstance.Status.PENDING)
+
     def test_settlement_cannot_complete_before_disbursement_stage(self):
         disbursement = StageInstance.objects.create(
             application=self.application, code=StageInstance.Code.DISBURSEMENT,
