@@ -59,6 +59,8 @@ class DisbursementApiTests(TestCase):
         record = Disbursement.objects.get(pk=created.data["id"])
         with self.assertRaises(ValueError):
             record.save()
+        with self.assertRaises(ValueError):
+            Disbursement.objects.filter(pk=record.pk).delete()
 
     def test_finance_cannot_confirm_without_bank_reference(self):
         self.client.force_authenticate(self.worker)

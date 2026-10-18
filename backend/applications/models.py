@@ -288,7 +288,19 @@ class MeratAssessment(models.Model):
         return f"مرآت: {self.subject_id} ({self.result})"
 
 
+class DisbursementQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValueError("Disbursement records are immutable through bulk updates.")
+
+    def delete(self):
+        raise ValueError("Disbursement records are retained for audit.")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValueError("Disbursement records are immutable through bulk updates.")
+
+
 class Disbursement(models.Model):
+    objects = DisbursementQuerySet.as_manager()
     """Actual disbursement evidence; commission is calculated only on confirmed amounts."""
 
     class Status(models.TextChoices):
