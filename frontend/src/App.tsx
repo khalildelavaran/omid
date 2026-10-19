@@ -286,7 +286,7 @@ function App(){
   setApplicationStatusSaving(true);setApplicationStatusError("");setApplicationStatusSuccess("");
   try{
    const csrf=await apiRequest("/api/v1/auth/csrf/");
-   const updated=await apiRequest("/api/v1/applications/"+selected.uuid+"/",{method:"PATCH",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({status:nextStatus,...(applicationDecisionNote.trim()?{status_note:applicationDecisionNote.trim()}:{})})});
+   const updated=await apiRequest("/api/v1/applications/"+selected.uuid+"/",{method:"PATCH",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({status:nextStatus,...(action.requiresReason?{status_note:applicationDecisionNote.trim()}:{})})});
    const mapped=mapApplication(updated);
    setSelected(mapped);
    setApps(current=>current.map(item=>item.uuid===mapped.uuid?mapped:item));
