@@ -788,6 +788,14 @@ function ApplicationStageWorkflow({selected,authUser}:{selected:Application;auth
   const prior=prerequisites[stage.code];
   return !prior||isPrerequisiteComplete(prior);
  }
+ function canBypassStage(stage:StageInstanceRow):boolean{
+  if(stage.code==="loan_submission"&&!areAllRequiredPersonStagesComplete())return false;
+  const prerequisites:Record<string,string>={bank_review:"loan_submission",disbursement:"bank_review",settlement:"disbursement",handover:"settlement"};
+  const prior=prerequisites[stage.code];
+  if(prior&&!isPrerequisiteComplete(prior))return false;
+  if(stage.code==="account"&&partyForStage(stage)?.account_status!=="existing_verified")return false;
+  return true;
+ }
  function partyForStage(stage:StageInstanceRow):CasePartyRow|undefined{
   return stage.party?parties.find(party=>party.id===stage.party):undefined;
  }
@@ -829,12 +837,12 @@ function ApplicationStageWorkflow({selected,authUser}:{selected:Application;auth
   if(canTransition&&canStartStage(stage))actions.push({action:"start",label:stage.status==="on_hold"?"ادامه مرحله":"شروع مرحله",variant:"primary"});
   if(canTransition&&stage.status==="in_progress")actions.push({action:"complete",label:"تکمیل مرحله",variant:"primary"});
   if(canTransition&&["pending","in_progress","action_needed"].includes(stage.status))actions.push({action:"hold",label:"تعلیق",variant:"secondary"});
-  if(isAdmin&&canTransition)actions.push({action:"bypass",label:"عبور با مجوز مدیر",variant:"secondary"});
+  if(isAdmin&&canTransition&&canBypassStage(stage))actions.push({action:"bypass",label:"عبور با مجوز مدیر",variant:"secondary"});
   return <article key={stage.id} style={{border:"1px solid #e8edf3",borderRadius:8,padding:12,background:"#fff"}}>
    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
     <div style={{minWidth:0,flex:1}}><b style={{fontSize:11,color:"#35465b"}}>{stageCodeLabels[stage.code]||stage.code}</b><div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center",marginTop:7}}><span style={{fontSize:9,color:stage.status==="completed"||stage.status==="bypassed"?"#24704f":stage.status==="on_hold"||stage.status==="action_needed"?"#a66b1f":"#718096",background:stage.status==="completed"||stage.status==="bypassed"?"#e8f7ef":stage.status==="on_hold"||stage.status==="action_needed"?"#fff4e5":"#f2f5f9",padding:"4px 7px",borderRadius:5}}>{stageStatusLabels[stage.status]||stage.status}</span>{stage.started_at&&<small style={{fontSize:9,color:"#8492a5"}}>شروع: {displayDateTime(stage.started_at)}</small>}{stage.completed_at&&<small style={{fontSize:9,color:"#8492a5"}}>پایان: {displayDateTime(stage.completed_at)}</small>}</div></div>
    </div>
-   {stage.hold_reason&&<p style={{fontSize:10,color:"#a66b1f",lineHeight:1.8,margin:"8px 0 0"}}>دلیل تعلیق/عبور: {stage.hold_reason}</p>}
+   {stage.hold_reason&&["on_hold","bypassed"].includes(stage.status)&&<p style={{fontSize:10,color:"#a66b1f",lineHeight:1.8,margin:"8px 0 0"}}>دلیل تعلیق/عبور: {stage.hold_reason}</p>}
    {stage.evidence_reference&&<p style={{fontSize:10,color:"#66758a",lineHeight:1.8,margin:"6px 0 0"}}>مرجع مدرک: {stage.evidence_reference}</p>}
    {actions.length>0&&<div style={{display:"flex",gap:7,flexWrap:"wrap",marginTop:11}}>{actions.map(item=><button key={item.action} type="button" className={"btn "+item.variant} disabled={transitionSavingId===stage.id} onClick={()=>startTransition(stage,item.action)}>{transitionSavingId===stage.id?"در حال ثبت…":item.label}</button>)}</div>}
    {transitionDraft?.stageId===stage.id&&<form onSubmit={event=>{event.preventDefault();void submitStageTransition(stage,transitionDraft.action,transitionReason,transitionEvidence);}} style={{marginTop:12,paddingTop:12,borderTop:"1px solid #edf1f6"}}>
@@ -864,7 +872,7 @@ function ApplicationStageWorkflow({selected,authUser}:{selected:Application;auth
     </form>}
     {!activeParties.length&&!partyFormOpen&&<p className="empty">هنوز شخص فعالی به گردش کار افزوده نشده است. ابتدا متقاضی اصلی را ثبت کنید.</p>}
     {parties.map(party=><article key={party.id} style={{marginTop:10,padding:12,border:"1px solid #edf1f6",borderRadius:8,background:party.membership_status==="active"?"#fff":"#f8fafd"}}>
-     <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"flex-start",flexWrap:"wrap"}}><div><b style={{fontSize:11,color:"#35465b"}}>{party.person_display}</b><div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:6}}><span style={{fontSize:9,color:"#8492a5"}}>{casePartyRoleLabels[party.role]||party.role}</span><span style={{fontSize:9,color:"#8492a5"}}>{membershipStatusLabels[party.membership_status]||party.membership_status}</span>{party.relationship_to_applicant&&<span style={{fontSize:9,color:"#8492a5"}}>نسبت: {party.relationship_to_applicant}</span>}</div></div>{canWrite&&party.membership_status==="active"&&<div className="form-row" style={{minWidth:220}}><label htmlFor={"party-account-"+party.id}>وضعیت حساب</label><select id={"party-account-"+party.id} className="field" value={party.account_status} disabled={partySavingId===party.id} onChange={event=>void updatePartyAccountStatus(party,event.target.value)}><option value="unknown">بررسی‌نشده</option><option value="existing_verified">حساب موجود تأییدشده</option><option value="needs_opening">نیازمند افتتاح</option></select>{partyErrors[party.id]&&<small role="alert" style={{color:"#b42318"}}>{partyErrors[party.id]}</small>}</div>}</div>
+     <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"flex-start",flexWrap:"wrap"}}><div><b style={{fontSize:11,color:"#35465b"}}>{party.person_display}</b><div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:6}}><span style={{fontSize:9,color:"#8492a5"}}>{casePartyRoleLabels[party.role]||party.role}</span><span style={{fontSize:9,color:"#8492a5"}}>{membershipStatusLabels[party.membership_status]||party.membership_status}</span><span style={{fontSize:9,color:"#8492a5"}}>وضعیت حساب: {accountStatusLabels[party.account_status]||party.account_status}</span>{party.relationship_to_applicant&&<span style={{fontSize:9,color:"#8492a5"}}>نسبت: {party.relationship_to_applicant}</span>}</div></div>{canWrite&&party.membership_status==="active"&&<div className="form-row" style={{minWidth:220}}><label htmlFor={"party-account-"+party.id}>وضعیت حساب</label><select id={"party-account-"+party.id} className="field" value={party.account_status} disabled={partySavingId===party.id} onChange={event=>void updatePartyAccountStatus(party,event.target.value)}><option value="unknown">بررسی‌نشده</option><option value="existing_verified">حساب موجود تأییدشده</option><option value="needs_opening">نیازمند افتتاح</option></select>{partyErrors[party.id]&&<small role="alert" style={{color:"#b42318"}}>{partyErrors[party.id]}</small>}</div>}</div>
      {party.membership_status==="active"&&<div style={{display:"grid",gap:8,marginTop:11}}>{personStageDefinitions.map(def=>{const stage=stages.find(row=>row.party===party.id&&row.code===def.code);return stage?renderStage(stage):<div key={def.code} style={{fontSize:9,color:"#a66b1f",padding:"6px 8px",background:"#fff4e5",borderRadius:5}}>مرحله «{def.label}» ایجاد نشده است؛ از «ایجاد/تکمیل ساختار مراحل» استفاده کنید.</div>;})}</div>}
     </article>)}
     {partyError&&!partyFormOpen&&<p role="alert" className="notice">{partyError}</p>}
