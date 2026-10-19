@@ -9,10 +9,16 @@ on:
       - "frontend/**"
       - "wrangler.toml"
       - ".github/workflows/deploy-worker.yml"
+  pull_request:
+    paths:
+      - "worker/**"
+      - "frontend/**"
+      - "wrangler.toml"
+      - ".github/workflows/deploy-worker.yml"
   workflow_dispatch:
 
 concurrency:
-  group: omid-cloudflare-deploy
+  group: omid-cloudflare-deploy-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -37,7 +43,12 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Run Worker tests
+        working-directory: worker
+        run: npm test
+
       - name: Validate Cloudflare credentials
+        if: github.event_name != 'pull_request'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
@@ -47,6 +58,7 @@ jobs:
           fi
 
       - name: Deploy Worker and built frontend assets to Cloudflare
+        if: github.event_name != 'pull_request'
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
