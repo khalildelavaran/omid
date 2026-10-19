@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "worker/**"
+      - "frontend/**"
       - "wrangler.toml"
       - ".github/workflows/deploy-worker.yml"
   workflow_dispatch:
@@ -16,8 +17,9 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy Omid frontend
+    name: Build frontend and deploy Omid
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -26,6 +28,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install --no-audit --no-fund
+
+      - name: Build and type-check frontend
+        working-directory: frontend
+        run: npm run build
 
       - name: Validate Cloudflare credentials
         env:
@@ -36,7 +46,7 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy Worker to Cloudflare
+      - name: Deploy Worker and built frontend assets to Cloudflare
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
