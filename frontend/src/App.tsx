@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import "./style.css";
 
 type NavKey = "dashboard" | "applications" | "customers" | "tasks" | "services" | "reports" | "settings";
@@ -929,9 +929,9 @@ function MeratDisbursementPanel({stage,selected,parties,authUser}:{stage:StageIn
   }catch(failure){setError((failure as Error).message||"دریافت اطلاعات ناموفق بود.");}
   finally{setLoading(false);}
  }
- useEffect(()=>{let active=true;setLoading(true);void (async()=>{await load();})();return()=>{active=false;};},[stage.id,selected.uuid]);
+ useEffect(()=>{setLoading(true);void load();},[stage.id,selected.uuid]);
  async function csrfToken(){const payload=await apiRequest("/api/v1/auth/csrf/");return String(payload.csrfToken||"");}
- async function saveAssessment(event:React.FormEvent<HTMLFormElement>){
+ async function saveAssessment(event:FormEvent<HTMLFormElement>){
   event.preventDefault();
   if(!applicant||!party){setError("متقاضی اصلی یا شخص مرحله در گردش کار موجود نیست.");return;}
   setSaving(true);setError("");setNotice("");
@@ -945,7 +945,7 @@ function MeratDisbursementPanel({stage,selected,parties,authUser}:{stage:StageIn
   }catch(failure){setError((failure as Error).message||"ثبت نتیجه مرآت ناموفق بود.");}
   finally{setSaving(false);}
  }
- async function recordDisbursement(event:React.FormEvent<HTMLFormElement>){
+ async function recordDisbursement(event:FormEvent<HTMLFormElement>){
   event.preventDefault();setSaving(true);setError("");setNotice("");
   try{
    const csrf=await csrfToken();
@@ -972,7 +972,7 @@ function MeratDisbursementPanel({stage,selected,parties,authUser}:{stage:StageIn
  return <div style={{marginTop:12,padding:12,border:"1px solid #dce5ef",borderRadius:8,background:"#f9fbfd"}}>
   <b style={{fontSize:11,color:"#35465b"}}>{stage.code==="merat"?"سوابق اعتبارسنجی مرآت":"عملیات و سوابق واریز"}</b>
   {loading?<p className="empty">در حال دریافت اطلاعات…</p>:stage.code==="merat"?<>
-   {assessments.length>0&&<div style={{display:"grid",gap:7,marginTop:9}}>{assessments.map(row=><div key={row.id} style={{padding:9,border:"1px solid #e8edf3",borderRadius:6,background:"#fff",fontSize:10,lineHeight:1.9}}><div><b>نتیجه:</b> {{pending:"در انتظار",approved:"تأیید",rejected:"رد",needs_correction:"نیازمند اصلاح"}[row.result]||row.result} <span style={{marginRight:12}}><b>سقف اعلامی:</b> {rial(row.reported_limit_rial)}</span></div>{row.external_reference&&<div>شماره پیگیری: {row.external_reference}</div>}{row.result_reason&&<div>توضیح: {row.result_reason}</div>}{row.evidence_reference&&<div>مرجع مدرک: {row.evidence_reference}</div>}</div>)}</div>}
+   {assessments.length>0&&<div style={{display:"grid",gap:7,marginTop:9}}>{assessments.map(row=><div key={row.id} style={{padding:9,border:"1px solid #e8edf3",borderRadius:6,background:"#fff",fontSize:10,lineHeight:1.9}}><div><b>نتیجه:</b> {(row.result==="pending"?"در انتظار":row.result==="approved"?"تأیید":row.result==="rejected"?"رد":row.result==="needs_correction"?"نیازمند اصلاح":row.result)} <span style={{marginRight:12}}><b>سقف اعلامی:</b> {rial(row.reported_limit_rial)}</span></div>{row.external_reference&&<div>شماره پیگیری: {row.external_reference}</div>}{row.result_reason&&<div>توضیح: {row.result_reason}</div>}{row.evidence_reference&&<div>مرجع مدرک: {row.evidence_reference}</div>}</div>)}</div>}
    {canRecord&&stage.status==="in_progress"&&<form onSubmit={saveAssessment} style={{display:"grid",gap:9,marginTop:10}}>
     <div className="form-grid"><div className="form-row"><label>شماره پیگیری مرآت</label><input className="field" maxLength={120} value={externalReference} onChange={e=>setExternalReference(e.target.value)} /></div><div className="form-row"><label>نتیجه *</label><select className="field" required value={result} onChange={e=>setResult(e.target.value)}><option value="pending">در انتظار</option><option value="approved">تأیید</option><option value="rejected">رد</option><option value="needs_correction">نیازمند اصلاح</option></select></div><div className="form-row"><label>سقف اعلامی (ریال)</label><input className="field" type="number" min="0" step="1" value={reportedLimit} onChange={e=>setReportedLimit(e.target.value)} /></div><div className="form-row"><label>مرجع مدرک</label><input className="field" maxLength={500} value={evidenceReference} onChange={e=>setEvidenceReference(e.target.value)} /></div></div>
     <div className="form-row"><label>توضیح نتیجه</label><textarea className="field" rows={2} maxLength={2000} value={resultReason} onChange={e=>setResultReason(e.target.value)} /></div>
