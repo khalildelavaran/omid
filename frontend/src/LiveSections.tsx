@@ -29,7 +29,14 @@ const priorityLabel: Record<string,string> = {low:"کم",normal:"عادی",high:
 async function request<T>(path:string, init:RequestInit={}):Promise<T>{
   const headers = new Headers(init.headers); headers.set("Accept","application/json");
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type","application/json");
-  const response = await fetch(path,{...init,headers,credentials:"same-origin"});
+  const method = (init.method || "GET").toUpperCase();
+  if (!["GET","HEAD","OPTIONS","TRACE"].includes(method) && !headers.has("X-CSRFToken")) {
+    const csrfResponse = await fetch("/api/v1/auth/csrf/", {credentials:"same-origin",headers:{Accept:"application/json"}});
+    let csrfPayload:any = {}; try { csrfPayload = await csrfResponse.json(); } catch {}
+    if (!csrfResponse.ok || !csrfPayload.csrfToken) throw new Error(csrfPayload.detail || "دریافت توکن امنیتی ناموفق بود.");
+    headers.set("X-CSRFToken", String(csrfPayload.csrfToken));
+  }
+  const response = await fetch(path,{...init,method,headers,credentials:"same-origin"});
   let data:any={}; try { data=await response.json(); } catch {}
   if(!response.ok){const e=new Error(data.detail || Object.values(data).flat().join(" ") || "درخواست ناموفق بود.") as ApiError;e.status=response.status;throw e;}
   return data as T;
