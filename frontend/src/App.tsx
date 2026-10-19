@@ -470,7 +470,7 @@ function App(){
     if((error as ApiError).status===503||(error as ApiError).status===502)setApiState("error");
    } finally {setAuthSubmitting(false);}
   }} style={{width:"100%",maxWidth:420,padding:32,background:"#fff",border:"1px solid #e8edf3",borderRadius:16,boxShadow:"0 12px 40px #172c4a0d"}}>
-   <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}><div style={{width:48,height:48,display:"grid",placeItems:"center",borderRadius:13,background:"#204a7b",color:"#fff",fontSize:26,fontWeight:800}}>ا</div><div><h1 style={{fontSize:22,margin:0,color:"#1b2b43"}}>سامانه امید</h1><p style={{margin:"5px 0 0",fontSize:12,color:"#8492a5"}}>ورود امن کارکنان</p></div></div>
+   <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}><div style={{width:48,height:48,display:"grid",placeItems:"center",borderRadius:13,background:"#204a7b",color:"#fff",fontSize:26,fontWeight:800}}>ا</div><div><h1 style={{fontSize:22,margin:0,color:"#1b2b43"}}>سامانه امید</h1></div></div>
    <label style={{display:"block",fontSize:12,marginBottom:7,color:"#526176"}} htmlFor="omid-username">نام کاربری</label>
    <input id="omid-username" autoComplete="username" required value={username} onChange={event=>setUsername(event.target.value)} style={{width:"100%",height:44,padding:"0 12px",border:"1px solid #dce3ed",borderRadius:8,marginBottom:16}}/>
    <label style={{display:"block",fontSize:12,marginBottom:7,color:"#526176"}} htmlFor="omid-password">گذرواژه</label>
