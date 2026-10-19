@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import "./style.css";
 
 type NavKey = "dashboard" | "applications" | "customers" | "tasks" | "services" | "reports" | "settings";
@@ -52,6 +52,8 @@ type TaskEventRow = { id:string; task:string; event_type:string; previous_status
 type FollowUpSuggestion = { key:string; title:string; description:string; priority:string };
 type CasePartyRow = { id:string; application:string; person:string; person_display:string; role:string; relationship_to_applicant:string; membership_status:string; account_status:string; sort_order:number };
 type StageInstanceRow = { id:string; application:string; application_number:string; party:string|null; party_person:string|null; code:string; status:string; assigned_to:number|string|null; started_at:string|null; due_at:string|null; completed_at:string|null; outcome:string; hold_reason:string; evidence_reference:string; follow_up_count:number };
+type MeratAssessmentRow = {id:string;stage:string;requester:string;subject:string;relationship_to_applicant:string;submitted_at:string|null;external_reference:string;result:string;result_reason:string;reported_limit_rial:string|number|null;evidence_reference:string;recorded_by:string|null;created_at:string;updated_at:string};
+type DisbursementRow = {id:string;disbursement_number:string;application:string;application_number:string;amount_rial:string|number;commission_rate_pct:string|number;commission_amount_rial:string|number;status:string;bank_reference:string;evidence_reference:string;recorded_by:string|null;confirmed_at:string|null;created_at:string;updated_at:string};
 type OperationsReport = { generated_at:string; scope:string; customers:{total:number;active:number;inactive:number;archived:number}; applications:{total:number;by_status:Record<string,number>}; tasks:{total:number;open:number;in_progress:number;completed:number;cancelled:number;overdue:number;due_today:number}; guarantees:{total:number;by_status:Record<string,number>}; service_receipts:{count:number;gross_total:string;paid_total:string;outstanding_total:string} };
 const nav: {key:NavKey;label:string;icon:string;group:string}[] = [
  {key:"dashboard",label:"داشبورد",icon:"▦",group:"فضای کاری"},
@@ -844,6 +846,7 @@ function ApplicationStageWorkflow({selected,authUser}:{selected:Application;auth
    </div>
    {stage.hold_reason&&["on_hold","bypassed"].includes(stage.status)&&<p style={{fontSize:10,color:"#a66b1f",lineHeight:1.8,margin:"8px 0 0"}}>دلیل تعلیق/عبور: {stage.hold_reason}</p>}
    {stage.evidence_reference&&<p style={{fontSize:10,color:"#66758a",lineHeight:1.8,margin:"6px 0 0"}}>مرجع مدرک: {stage.evidence_reference}</p>}
+   {(stage.code==="merat"||stage.code==="disbursement")&&<MeratDisbursementPanel stage={stage} selected={selected} parties={parties} authUser={authUser}/> }
    {actions.length>0&&<div style={{display:"flex",gap:7,flexWrap:"wrap",marginTop:11}}>{actions.map(item=><button key={item.action} type="button" className={"btn "+item.variant} disabled={transitionSavingId===stage.id} onClick={()=>startTransition(stage,item.action)}>{transitionSavingId===stage.id?"در حال ثبت…":item.label}</button>)}</div>}
    {transitionDraft?.stageId===stage.id&&<form onSubmit={event=>{event.preventDefault();void submitStageTransition(stage,transitionDraft.action,transitionReason,transitionEvidence);}} style={{marginTop:12,paddingTop:12,borderTop:"1px solid #edf1f6"}}>
     {["hold","bypass"].includes(transitionDraft.action)&&<div className="form-row"><label htmlFor={"stage-reason-"+stage.id}>دلیل مستند *</label><textarea id={"stage-reason-"+stage.id} className="field" rows={2} maxLength={500} required value={transitionReason} onChange={event=>setTransitionReason(event.target.value)} style={{minHeight:65,resize:"vertical"}}/></div>}
@@ -883,6 +886,111 @@ function ApplicationStageWorkflow({selected,authUser}:{selected:Application;auth
    </section>
   </>}
  </section>;
+}
+
+function MeratDisbursementPanel({stage,selected,parties,authUser}:{stage:StageInstanceRow;selected:Application;parties:CasePartyRow[];authUser:ApiUser|null}){
+ const [assessments,setAssessments]=useState<MeratAssessmentRow[]>([]);
+ const [disbursements,setDisbursements]=useState<DisbursementRow[]>([]);
+ const [loading,setLoading]=useState(true);
+ const [saving,setSaving]=useState(false);
+ const [error,setError]=useState("");
+ const [notice,setNotice]=useState("");
+ const [externalReference,setExternalReference]=useState("");
+ const [result,setResult]=useState("pending");
+ const [resultReason,setResultReason]=useState("");
+ const [reportedLimit,setReportedLimit]=useState("");
+ const [evidenceReference,setEvidenceReference]=useState("");
+ const [amountRial,setAmountRial]=useState("");
+ const [bankReferences,setBankReferences]=useState<Record<string,string>>({});
+ const [confirmationEvidence,setConfirmationEvidence]=useState<Record<string,string>>({});
+ const role=authUser?.role||"";
+ const canRecord=["system_admin","intake","case_worker"].includes(role);
+ const canConfirm=["system_admin","finance"].includes(role);
+ const applicant=parties.find(p=>p.membership_status==="active"&&p.role==="applicant");
+ const party=stage.party?parties.find(p=>p.id===stage.party):undefined;
+ const relation=party?.role==="applicant"?"متقاضی اصلی":(party?.relationship_to_applicant||"شخص پرونده");
+ async function load(){
+  setError("");
+  try{
+   if(stage.code==="merat"){
+    const payload=await apiRequest("/api/v1/applications/merat-assessments/?application="+encodeURIComponent(selected.uuid));
+    const rows=Array.isArray(payload)?payload:payload.results;
+    if(!Array.isArray(rows))throw new Error("ساختار پاسخ سوابق مرآت معتبر نیست.");
+    const own=(rows as MeratAssessmentRow[]).filter(row=>row.stage===stage.id);
+    setAssessments(own);
+    const latest=own[0];
+    if(latest){setExternalReference(latest.external_reference||"");setResult(latest.result||"pending");setResultReason(latest.result_reason||"");setReportedLimit(latest.reported_limit_rial==null?"":String(latest.reported_limit_rial));setEvidenceReference(latest.evidence_reference||"");}
+   }else{
+    const payload=await apiRequest("/api/v1/applications/disbursements/?application="+encodeURIComponent(selected.uuid));
+    const rows=Array.isArray(payload)?payload:payload.results;
+    if(!Array.isArray(rows))throw new Error("ساختار پاسخ سوابق واریز معتبر نیست.");
+    setDisbursements(rows as DisbursementRow[]);
+   }
+  }catch(failure){setError((failure as Error).message||"دریافت اطلاعات ناموفق بود.");}
+  finally{setLoading(false);}
+ }
+ useEffect(()=>{setLoading(true);void load();},[stage.id,selected.uuid]);
+ async function csrfToken(){const payload=await apiRequest("/api/v1/auth/csrf/");return String(payload.csrfToken||"");}
+ async function saveAssessment(event:FormEvent<HTMLFormElement>){
+  event.preventDefault();
+  if(!applicant||!party){setError("متقاضی اصلی یا شخص مرحله در گردش کار موجود نیست.");return;}
+  setSaving(true);setError("");setNotice("");
+  try{
+   const csrf=await csrfToken();
+   const body={stage:stage.id,requester:applicant.person,subject:party.person,relationship_to_applicant:relation,external_reference:externalReference.trim(),result,result_reason:resultReason.trim(),reported_limit_rial:reportedLimit.trim()?Number(reportedLimit):null,evidence_reference:evidenceReference.trim()};
+   const existing=assessments[0];
+   const row=await apiRequest("/api/v1/applications/merat-assessments/"+(existing?existing.id+"/":""),{method:existing?"PATCH":"POST",headers:{"Content-Type":"application/json","X-CSRFToken":csrf},body:JSON.stringify(body)}) as MeratAssessmentRow;
+   setAssessments(current=>[row,...current.filter(item=>item.id!==row.id)]);
+   setNotice(existing?"نتیجهٔ مرآت به‌روزرسانی شد.":"نتیجهٔ مرآت ثبت شد. این ثبت دستی است و اتصال مستقیم به سرویس مرآت محسوب نمی‌شود.");
+  }catch(failure){setError((failure as Error).message||"ثبت نتیجه مرآت ناموفق بود.");}
+  finally{setSaving(false);}
+ }
+ async function recordDisbursement(event:FormEvent<HTMLFormElement>){
+  event.preventDefault();setSaving(true);setError("");setNotice("");
+  try{
+   const csrf=await csrfToken();
+   const row=await apiRequest("/api/v1/applications/disbursements/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":csrf},body:JSON.stringify({application:selected.uuid,amount_rial:Number(amountRial)})}) as DisbursementRow;
+   setDisbursements(current=>[row,...current]);setAmountRial("");
+   setNotice("واریز ثبت شد؛ تا زمانی که مالی یا مدیر سامانه آن را تأیید نکند، واریز نهایی محسوب نمی‌شود.");
+  }catch(failure){setError((failure as Error).message||"ثبت واریز ناموفق بود.");}
+  finally{setSaving(false);}
+ }
+ async function confirmDisbursement(row:DisbursementRow){
+  const bankReference=(bankReferences[row.id]||"").trim();
+  const evidence=(confirmationEvidence[row.id]||"").trim();
+  if(!bankReference||!evidence){setError("برای تأیید واریز، مرجع بانکی و مرجع مدرک را وارد کنید.");return;}
+  setSaving(true);setError("");setNotice("");
+  try{
+   const csrf=await csrfToken();
+   const updated=await apiRequest("/api/v1/applications/disbursements/"+row.id+"/confirm/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":csrf},body:JSON.stringify({bank_reference:bankReference,evidence_reference:evidence})}) as DisbursementRow;
+   setDisbursements(current=>current.map(item=>item.id===updated.id?updated:item));
+   setNotice("واریز تأیید شد و مرجع بانکی ثبت گردید.");
+  }catch(failure){setError((failure as Error).message||"تأیید واریز ناموفق بود.");}
+  finally{setSaving(false);}
+ }
+ const rial=(value:string|number|null|undefined)=>value==null||value===""?"—":Number(value).toLocaleString("fa-IR")+" ریال";
+ return <div style={{marginTop:12,padding:12,border:"1px solid #dce5ef",borderRadius:8,background:"#f9fbfd"}}>
+  <b style={{fontSize:11,color:"#35465b"}}>{stage.code==="merat"?"سوابق اعتبارسنجی مرآت":"عملیات و سوابق واریز"}</b>
+  {loading?<p className="empty">در حال دریافت اطلاعات…</p>:stage.code==="merat"?<>
+   {assessments.length>0&&<div style={{display:"grid",gap:7,marginTop:9}}>{assessments.map(row=><div key={row.id} style={{padding:9,border:"1px solid #e8edf3",borderRadius:6,background:"#fff",fontSize:10,lineHeight:1.9}}><div><b>نتیجه:</b> {(row.result==="pending"?"در انتظار":row.result==="approved"?"تأیید":row.result==="rejected"?"رد":row.result==="needs_correction"?"نیازمند اصلاح":row.result)} <span style={{marginRight:12}}><b>سقف اعلامی:</b> {rial(row.reported_limit_rial)}</span></div>{row.external_reference&&<div>شماره پیگیری: {row.external_reference}</div>}{row.result_reason&&<div>توضیح: {row.result_reason}</div>}{row.evidence_reference&&<div>مرجع مدرک: {row.evidence_reference}</div>}</div>)}</div>}
+   {canRecord&&stage.status==="in_progress"&&<form onSubmit={saveAssessment} style={{display:"grid",gap:9,marginTop:10}}>
+    <div className="form-grid"><div className="form-row"><label>شماره پیگیری مرآت</label><input className="field" maxLength={120} value={externalReference} onChange={e=>setExternalReference(e.target.value)} /></div><div className="form-row"><label>نتیجه *</label><select className="field" required value={result} onChange={e=>setResult(e.target.value)}><option value="pending">در انتظار</option><option value="approved">تأیید</option><option value="rejected">رد</option><option value="needs_correction">نیازمند اصلاح</option></select></div><div className="form-row"><label>سقف اعلامی (ریال)</label><input className="field" type="number" min="0" step="1" value={reportedLimit} onChange={e=>setReportedLimit(e.target.value)} /></div><div className="form-row"><label>مرجع مدرک</label><input className="field" maxLength={500} value={evidenceReference} onChange={e=>setEvidenceReference(e.target.value)} /></div></div>
+    <div className="form-row"><label>توضیح نتیجه</label><textarea className="field" rows={2} maxLength={2000} value={resultReason} onChange={e=>setResultReason(e.target.value)} /></div>
+    <button className="btn primary" type="submit" disabled={saving||!applicant||!party}>{saving?"در حال ثبت…":assessments.length?"به‌روزرسانی نتیجه مرآت":"ثبت نتیجه مرآت"}</button>
+   </form>}
+   {canRecord&&stage.status!=="in_progress"&&<p style={{fontSize:10,color:"#8492a5",marginTop:8}}>برای ثبت نتیجه، ابتدا مرحلهٔ مرآت را شروع کنید.</p>}
+   {!canRecord&&<p style={{fontSize:10,color:"#8492a5",marginTop:8}}>دسترسی ثبت نتیجه برای نقش فعلی فعال نیست.</p>}
+  </>:<>
+   {stage.status!=="in_progress"&&<p style={{fontSize:10,color:"#8492a5",marginTop:8}}>ثبت واریز فقط هنگامی فعال است که مرحلهٔ واریز در جریان باشد.</p>}
+   {canRecord&&stage.status==="in_progress"&&<form onSubmit={recordDisbursement} style={{display:"flex",gap:8,alignItems:"end",flexWrap:"wrap",marginTop:10}}><div className="form-row" style={{flex:"1 1 220px"}}><label>مبلغ واقعی واریز (ریال) *</label><input className="field" required type="number" min="1" step="1" value={amountRial} onChange={e=>setAmountRial(e.target.value)} /></div><button className="btn primary" type="submit" disabled={saving||!amountRial}>{saving?"در حال ثبت…":"ثبت واریز"}</button></form>}
+   {disbursements.length>0?<div style={{display:"grid",gap:8,marginTop:10}}>{disbursements.map(row=><article key={row.id} style={{padding:10,border:"1px solid #e8edf3",borderRadius:6,background:"#fff",fontSize:10,lineHeight:1.9}}><div style={{display:"flex",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}><b>{row.disbursement_number||"واریز"}</b><b>{row.status==="confirmed"?"تأییدشده":row.status==="failed"?"ناموفق":"در انتظار تأیید"}</b></div><div>مبلغ: {rial(row.amount_rial)}</div><div>کارمزد ({Number(row.commission_rate_pct).toLocaleString("fa-IR")}٪): {rial(row.commission_amount_rial)}</div>{row.bank_reference&&<div>مرجع بانکی: {row.bank_reference}</div>}{row.evidence_reference&&<div>مرجع مدرک: {row.evidence_reference}</div>}{row.confirmed_at&&<div>زمان تأیید: {displayDateTime(row.confirmed_at)}</div>}
+    {canConfirm&&row.status==="pending"&&<div style={{display:"grid",gap:7,marginTop:9,paddingTop:9,borderTop:"1px solid #edf1f6"}}><div className="form-grid"><div className="form-row"><label>مرجع بانکی *</label><input className="field" required value={bankReferences[row.id]||""} onChange={e=>setBankReferences(current=>({...current,[row.id]:e.target.value}))}/></div><div className="form-row"><label>مرجع مدرک *</label><input className="field" required value={confirmationEvidence[row.id]||""} onChange={e=>setConfirmationEvidence(current=>({...current,[row.id]:e.target.value}))}/></div></div><button type="button" className="btn primary" disabled={saving} onClick={()=>void confirmDisbursement(row)}>{saving?"در حال تأیید…":"تأیید واریز"}</button></div>}
+   </article>)}</div>:<p className="empty" style={{marginTop:8}}>هنوز واریزی ثبت نشده است.</p>}
+   <p style={{fontSize:9,color:"#8492a5",marginTop:8}}>کارمزد از پاسخ سرور نمایش داده می‌شود؛ مقدار آن در مرورگر محاسبه نمی‌شود.</p>
+  </>}
+  {error&&<p role="alert" className="notice" style={{marginTop:9}}>{error}</p>}
+  {notice&&<p role="status" className="note" style={{marginTop:9}}>{notice}</p>}
+ </div>;
 }
 
 function ApplicationDocuments({selected,authUser}:{selected:Application;authUser:ApiUser|null}){
