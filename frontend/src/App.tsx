@@ -5,13 +5,6 @@ type NavKey = "dashboard" | "applications" | "customers" | "tasks" | "reports" |
 type Application = { id: string; customer: string; type: string; amount: string; stage: string; status: string; date: string };
 type ApiUser = { id: number; username: string; first_name: string; last_name: string; role: string | null; role_label: string | null; must_change_password: boolean };
 type ApiError = Error & { status?: number };
-const initialApplications: Application[] = [
- { id:"OM-1405-0248", customer:"شرکت آریا گستر", type:"تسهیلات سرمایه در گردش", amount:"۱۲,۰۰۰,۰۰۰,۰۰۰", stage:"بررسی مدارک", status:"در حال بررسی", date:"۱۴۰۵/۰۷/۲۵" },
- { id:"OM-1405-0247", customer:"پارس تجارت ایرانیان", type:"تسهیلات توسعه کسب‌وکار", amount:"۸,۵۰۰,۰۰۰,۰۰۰", stage:"تکمیل پرونده", status:"نیازمند اقدام", date:"۱۴۰۵/۰۷/۲۴" },
- { id:"OM-1405-0246", customer:"گروه صنعتی سپهر", type:"تأمین مالی شرکتی", amount:"۲۰,۰۰۰,۰۰۰,۰۰۰", stage:"تصمیم اعتباری", status:"در انتظار", date:"۱۴۰۵/۰۷/۲۲" },
- { id:"OM-1405-0245", customer:"نگین سازه", type:"تسهیلات سرمایه در گردش", amount:"۵,۰۰۰,۰۰۰,۰۰۰", stage:"پرداخت تسهیلات", status:"تکمیل شده", date:"۱۴۰۵/۰۷/۲۰" },
- { id:"OM-1405-0244", customer:"توسعه بازرگانی آریا", type:"تسهیلات توسعه کسب‌وکار", amount:"۳,۲۰۰,۰۰۰,۰۰۰", stage:"ثبت درخواست", status:"در حال بررسی", date:"۱۴۰۵/۰۷/۱۸" },
-];
 const nav: {key:NavKey;label:string;icon:string;group:string}[] = [
  {key:"dashboard",label:"داشبورد",icon:"▦",group:"فضای کاری"},
  {key:"applications",label:"پرونده‌های تسهیلاتی",icon:"▤",group:"فضای کاری"},
@@ -98,7 +91,7 @@ function App(){
    if(active){setApps(rows);setApiState("connected");setApiError("");}
   }).catch((error:ApiError)=>{
    if(!active) return;
-   if(error.status!==401){setApiState("error");setApiError(error.message);}
+   if(error.status!==401&&error.status!==403){setApiState("error");setApiError(error.message);}
   }).finally(()=>{if(active)setAuthChecking(false);});
   return ()=>{active=false;};
  },[]);
@@ -114,8 +107,9 @@ function App(){
    try {
     const csrf=await apiRequest("/api/v1/auth/csrf/");
     const result=await apiRequest("/api/v1/auth/login/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({username,password})});
-    setAuthUser(result.user);setPassword("");setApiError("");
-    const rows=await getApplications();setApps(rows);setApiState("connected");
+    setAuthUser(result.user);setPassword("");setAuthError("");setApiError("");
+    try { const rows=await getApplications();setApps(rows);setApiState("connected"); }
+    catch(dataError) { setApps([]);setApiState("error");setApiError((dataError as Error).message || "دریافت پرونده‌ها ناموفق بود."); }
    } catch(error) {
     const err=error as Error;setAuthError(err.message || "ورود ناموفق بود.");
     if((error as ApiError).status===503||(error as ApiError).status===502)setApiState("error");
@@ -127,7 +121,7 @@ function App(){
    <label style={{display:"block",fontSize:12,marginBottom:7,color:"#526176"}} htmlFor="omid-password">گذرواژه</label>
    <input id="omid-password" type="password" autoComplete="current-password" required value={password} onChange={event=>setPassword(event.target.value)} style={{width:"100%",height:44,padding:"0 12px",border:"1px solid #dce3ed",borderRadius:8,marginBottom:16}}/>
    {(authError||apiError)&&<p role="alert" style={{fontSize:12,lineHeight:1.8,color:"#b42318",background:"#fff1f0",padding:10,borderRadius:8}}>{authError||apiError}</p>}
-   <button type="submit" disabled={authSubmitting} style={{width:"100%",height:44,border:0,borderRadius:8,background:"#204a7b",color:"#fff",fontWeight:700,opacity:authSubmitting?.7:1}}>{authSubmitting?"در حال ورود…":"ورود به سامانه"}</button>
+   <button type="submit" disabled={authSubmitting} style={{width:"100%",height:44,border:0,borderRadius:8,background:"#204a7b",color:"#fff",fontWeight:700,opacity:authSubmitting ? 0.7 : 1}}>{authSubmitting?"در حال ورود…":"ورود به سامانه"}</button>
    <p style={{fontSize:11,lineHeight:1.9,color:"#8492a5",margin:"18px 0 0"}}>ورود فقط برای حساب‌های داخلی فعال‌شده در بک‌اند مجاز است.</p>
   </form>
  </div>;
