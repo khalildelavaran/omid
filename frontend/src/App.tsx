@@ -50,7 +50,7 @@ const nav: {key:NavKey;label:string;icon:string;group:string}[] = [
  {key:"reports",label:"گزارش‌ها",icon:"▥",group:"عملیات"},
  {key:"settings",label:"تنظیمات",icon:"⚙",group:"مدیریت"},
 ];
-const stages = ["ثبت درخواست","تکمیل پرونده","بررسی مدارک","بررسی اعتباری","تصمیم اعتباری","قرارداد","پرداخت تسهیلات"];
+
 const apiBase = ""; // Same-origin only: Vite proxies /api locally and Cloudflare Worker proxies it in production.
 const statusLabels: Record<string, string> = {
  under_review: "در حال بررسی",
@@ -90,12 +90,12 @@ const apiFieldLabels: Record<string, string> = {
  organization_name: "نام سازمان", phone_number: "شماره تلفن", email: "ایمیل",
  national_id: "کد ملی / شناسه ملی", birth_date: "تاریخ تولد",
  father_name: "نام پدر", occupation: "شغل", postal_code: "کدپستی",
- sana_verified: "وضعیت احراز ثنا", status: "وضعیت", notes: "یادداشت",
+ sana_verified: "وضعیت احراز ثنا", status: "وضعیت پرونده", notes: "یادداشت",
  customer: "مشتری", product_type: "نوع تسهیلات", requested_amount: "مبلغ درخواستی",
  term_months: "مدت بازپرداخت", title: "عنوان", application: "پرونده",
  priority: "اولویت", due_at: "موعد انجام", description: "شرح وظیفه",
  current_password: "گذرواژه فعلی", new_password: "گذرواژه جدید",
- status: "وضعیت پرونده", status_note: "دلیل تصمیم",
+ status_note: "دلیل تصمیم",
 };
 function getApiErrorMessage(payload: any): string {
  if (typeof payload?.detail === "string") return payload.detail;
@@ -241,6 +241,11 @@ function App(){
   }).finally(()=>{if(active)setAuthChecking(false);});
   return ()=>{active=false;};
  },[]);
+ useEffect(()=>{
+  setApplicationDecisionNote("");
+  setApplicationStatusError("");
+  setApplicationStatusSuccess("");
+ },[selected?.uuid]);
  useEffect(()=>{
   if(!authUser || !["dashboard","customers","tasks","reports"].includes(page)) return;
   let active=true;
