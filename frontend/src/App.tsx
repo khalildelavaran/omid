@@ -629,6 +629,254 @@ function App(){
    </div></main>
  </div>
 }
+function ApplicationStageWorkflow({selected,authUser}:{selected:Application;authUser:ApiUser|null}){
+ const [parties,setParties]=useState<CasePartyRow[]>([]);
+ const [stages,setStages]=useState<StageInstanceRow[]>([]);
+ const [customers,setCustomers]=useState<CustomerRow[]>([]);
+ const [loading,setLoading]=useState(true);
+ const [loadError,setLoadError]=useState("");
+ const [customerError,setCustomerError]=useState("");
+ const [message,setMessage]=useState("");
+ const [partyFormOpen,setPartyFormOpen]=useState(false);
+ const [partyPerson,setPartyPerson]=useState("");
+ const [partyRole,setPartyRole]=useState("guarantor");
+ const [partyRelationship,setPartyRelationship]=useState("");
+ const [partyError,setPartyError]=useState("");
+ const [partySaving,setPartySaving]=useState(false);
+ const [partySavingId,setPartySavingId]=useState<string|null>(null);
+ const [partyErrors,setPartyErrors]=useState<Record<string,string>>({});
+ const [structureSaving,setStructureSaving]=useState(false);
+ const [transitionDraft,setTransitionDraft]=useState<{stageId:string;action:string}|null>(null);
+ const [transitionReason,setTransitionReason]=useState("");
+ const [transitionEvidence,setTransitionEvidence]=useState("");
+ const [transitionSavingId,setTransitionSavingId]=useState<string|null>(null);
+ const [transitionErrors,setTransitionErrors]=useState<Record<string,string>>({});
+ const role=authUser?.role||"";
+ const canWrite=["system_admin","intake","case_worker"].includes(role);
+ const isAdmin=role==="system_admin";
+
+ async function fetchWorkflowData(){
+  const [partyPayload,stagePayload]=await Promise.all([
+   apiRequest("/api/v1/applications/parties/?application="+encodeURIComponent(selected.uuid)),
+   apiRequest("/api/v1/applications/stages/?application="+encodeURIComponent(selected.uuid))
+  ]);
+  const partyRows=Array.isArray(partyPayload)?partyPayload:partyPayload.results;
+  const stageRows=Array.isArray(stagePayload)?stagePayload:stagePayload.results;
+  if(!Array.isArray(partyRows)||!Array.isArray(stageRows))throw new Error("ساختار پاسخ مراحل گردش کار معتبر نیست.");
+  setParties(partyRows as CasePartyRow[]);
+  setStages(stageRows as StageInstanceRow[]);
+ }
+
+ async function reloadWorkflow(){
+  setLoadError("");
+  try{await fetchWorkflowData();}
+  catch(failure){setLoadError((failure as Error).message||"به‌روزرسانی مراحل گردش کار ناموفق بود.");}
+ }
+
+ useEffect(()=>{
+  let active=true;
+  setLoading(true);setLoadError("");setMessage("");setTransitionDraft(null);
+  setParties([]);setStages([]);
+  void Promise.all([
+   apiRequest("/api/v1/applications/parties/?application="+encodeURIComponent(selected.uuid)),
+   apiRequest("/api/v1/applications/stages/?application="+encodeURIComponent(selected.uuid))
+  ]).then(([partyPayload,stagePayload])=>{
+   const partyRows=Array.isArray(partyPayload)?partyPayload:partyPayload.results;
+   const stageRows=Array.isArray(stagePayload)?stagePayload:stagePayload.results;
+   if(!Array.isArray(partyRows)||!Array.isArray(stageRows))throw new Error("ساختار پاسخ مراحل گردش کار معتبر نیست.");
+   if(active){setParties(partyRows as CasePartyRow[]);setStages(stageRows as StageInstanceRow[]);}
+  }).catch(failure=>{
+   if(active)setLoadError((failure as Error).message||"دریافت مراحل گردش کار ناموفق بود.");
+  }).finally(()=>{if(active)setLoading(false);});
+  if(canWrite){
+   setCustomerError("");
+   void getCustomers().then(rows=>{if(active)setCustomers(rows);}).catch(failure=>{
+    if(active)setCustomerError((failure as Error).message||"دریافت فهرست مشتریان ناموفق بود.");
+   });
+  }else{setCustomers([]);setCustomerError("");}
+  return ()=>{active=false;};
+ },[selected.uuid,canWrite]);
+
+ const activeParties=parties.filter(party=>party.membership_status==="active");
+ const activeApplicant=activeParties.find(party=>party.role==="applicant");
+ const missingCustomerOptions=customers.filter(customer=>customer.status==="active"&&!activeParties.some(party=>party.person===customer.id));
+ const activeStageKeys=new Set(stages.filter(stage=>stage.party).map(stage=>String(stage.party)+":"+stage.code));
+ const activeCaseStageCodes=new Set(stages.filter(stage=>!stage.party).map(stage=>stage.code));
+
+ async function createMainApplicant(){
+  if(!selected.customerId){setPartyError("شناسه مشتری اصلی پرونده در پاسخ سرور موجود نیست.");return;}
+  setPartySaving(true);setPartyError("");setMessage("");
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   await apiRequest("/api/v1/applications/parties/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({
+    application:selected.uuid,person:selected.customerId,role:"applicant",relationship_to_applicant:"",membership_status:"active",account_status:"unknown",sort_order:0
+   })});
+   setMessage("متقاضی اصلی به گردش کار پرونده اضافه شد و مراحل فردی ساخته شدند.");
+   await reloadWorkflow();
+  }catch(failure){setPartyError((failure as Error).message||"ثبت متقاضی اصلی در گردش کار ناموفق بود.");}
+  finally{setPartySaving(false);}
+ }
+
+ async function createOtherParty(){
+  if(!partyPerson){setPartyError("شخص موردنظر را انتخاب کنید.");return;}
+  if(partyRole==="guarantor"&&!partyRelationship.trim()){setPartyError("نسبت ضامن با متقاضی اصلی را وارد کنید.");return;}
+  setPartySaving(true);setPartyError("");setMessage("");
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   await apiRequest("/api/v1/applications/parties/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({
+    application:selected.uuid,person:partyPerson,role:partyRole,relationship_to_applicant:partyRelationship.trim(),membership_status:"active",account_status:"unknown",sort_order:activeParties.length
+   })});
+   setPartyPerson("");setPartyRole("guarantor");setPartyRelationship("");setPartyFormOpen(false);
+   setMessage("شخص جدید به پرونده افزوده شد و مراحل فردی او ایجاد شدند.");
+   await reloadWorkflow();
+  }catch(failure){setPartyError((failure as Error).message||"افزودن شخص به پرونده ناموفق بود.");}
+  finally{setPartySaving(false);}
+ }
+
+ async function updatePartyAccountStatus(party:CasePartyRow,nextStatus:string){
+  setPartySavingId(party.id);setPartyErrors(current=>({...current,[party.id]:""}));setMessage("");
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const updated=await apiRequest("/api/v1/applications/parties/"+party.id+"/",{method:"PATCH",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({account_status:nextStatus})}) as CasePartyRow;
+   setParties(current=>current.map(item=>item.id===updated.id?updated:item));
+   setMessage("وضعیت حساب شخص به‌روزرسانی شد.");
+  }catch(failure){setPartyErrors(current=>({...current,[party.id]:(failure as Error).message||"به‌روزرسانی وضعیت حساب ناموفق بود."}));}
+  finally{setPartySavingId(null);}
+ }
+
+ async function ensureWorkflowStructure(){
+  setStructureSaving(true);setMessage("");setLoadError("");
+  let createdCount=0;
+  try{
+   const missing:Array<{code:string;party:string|null}>=[];
+   for(const party of activeParties){
+    for(const def of personStageDefinitions){
+     if(!activeStageKeys.has(party.id+":"+def.code))missing.push({code:def.code,party:party.id});
+    }
+   }
+   for(const def of caseStageDefinitions){
+    if(!activeCaseStageCodes.has(def.code))missing.push({code:def.code,party:null});
+   }
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   for(const item of missing){
+    const body:{application:string;code:string;party?:string}={application:selected.uuid,code:item.code};
+    if(item.party)body.party=item.party;
+    const created=await apiRequest("/api/v1/applications/stages/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify(body)}) as StageInstanceRow;
+    setStages(current=>[...current.filter(stage=>stage.id!==created.id),created]);
+    createdCount++;
+   }
+   setMessage(createdCount?createdCount.toLocaleString("fa-IR")+" مرحلهٔ گردش کار ایجاد شد.":"همه مراحل موردنیاز قبلاً ایجاد شده‌اند.");
+   await reloadWorkflow();
+  }catch(failure){
+   setLoadError((failure as Error).message||"ایجاد مراحل گردش کار ناموفق بود؛ مراحل ثبت‌شده حفظ شده‌اند.");
+   await reloadWorkflow();
+  }finally{setStructureSaving(false);}
+ }
+
+ function isPrerequisiteComplete(code:string):boolean{
+  return stages.some(stage=>!stage.party&&stage.code===code&&completedStageStatuses.includes(stage.status));
+ }
+ function areAllRequiredPersonStagesComplete():boolean{
+  return activeParties.some(party=>party.role==="applicant")&&activeParties.every(party=>
+   personStageDefinitions.every(def=>stages.some(stage=>stage.party===party.id&&stage.code===def.code&&completedStageStatuses.includes(stage.status)))
+  );
+ }
+ function canStartStage(stage:StageInstanceRow):boolean{
+  if(!["locked","pending","action_needed","on_hold"].includes(stage.status))return false;
+  if(stage.code==="loan_submission")return areAllRequiredPersonStagesComplete();
+  const prerequisites:Record<string,string>={bank_review:"loan_submission",disbursement:"bank_review",settlement:"disbursement",handover:"settlement"};
+  const prior=prerequisites[stage.code];
+  return !prior||isPrerequisiteComplete(prior);
+ }
+ function partyForStage(stage:StageInstanceRow):CasePartyRow|undefined{
+  return stage.party?parties.find(party=>party.id===stage.party):undefined;
+ }
+
+ function startTransition(stage:StageInstanceRow,action:string){
+  if(action==="start"||(action==="complete"&&!(stage.code==="account"&&partyForStage(stage)?.account_status==="needs_opening"))){
+   void submitStageTransition(stage,action,"","");
+   return;
+  }
+  setTransitionDraft({stageId:stage.id,action});
+  setTransitionReason("");setTransitionEvidence("");
+  setTransitionErrors(current=>({...current,[stage.id]:""}));
+ }
+
+ async function submitStageTransition(stage:StageInstanceRow,action:string,reason:string,evidenceReference:string){
+  if(["hold","bypass"].includes(action)&&!reason.trim()){
+   setTransitionErrors(current=>({...current,[stage.id]:"برای تعلیق یا عبور از مرحله، ثبت دلیل الزامی است."}));
+   return;
+  }
+  if(action==="complete"&&stage.code==="account"&&partyForStage(stage)?.account_status==="needs_opening"&&!evidenceReference.trim()){
+   setTransitionErrors(current=>({...current,[stage.id]:"برای تأیید افتتاح حساب، مرجع مدرک الزامی است."}));
+   return;
+  }
+  setTransitionSavingId(stage.id);setTransitionErrors(current=>({...current,[stage.id]:""}));setMessage("");
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const updated=await apiRequest("/api/v1/applications/stages/"+stage.id+"/transition/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({action,reason,evidence_reference:evidenceReference})}) as StageInstanceRow;
+   setStages(current=>current.map(item=>item.id===updated.id?updated:item));
+   setTransitionDraft(null);setTransitionReason("");setTransitionEvidence("");
+   setMessage("مرحلهٔ «"+(stageCodeLabels[updated.code]||updated.code)+"» به‌روزرسانی شد.");
+  }catch(failure){setTransitionErrors(current=>({...current,[stage.id]:(failure as Error).message||"تغییر وضعیت مرحله ناموفق بود."}));}
+  finally{setTransitionSavingId(null);}
+ }
+
+ function renderStage(stage:StageInstanceRow){
+  const canTransition=canWrite&&stage.status!=="completed"&&stage.status!=="bypassed"&&stage.status!=="rejected";
+  const needsAccountEvidence=stage.code==="account"&&partyForStage(stage)?.account_status==="needs_opening";
+  const actions:Array<{action:string;label:string;variant:"primary"|"secondary"}>=[];
+  if(canTransition&&canStartStage(stage))actions.push({action:"start",label:stage.status==="on_hold"?"ادامه مرحله":"شروع مرحله",variant:"primary"});
+  if(canTransition&&stage.status==="in_progress")actions.push({action:"complete",label:"تکمیل مرحله",variant:"primary"});
+  if(canTransition&&["pending","in_progress","action_needed"].includes(stage.status))actions.push({action:"hold",label:"تعلیق",variant:"secondary"});
+  if(isAdmin&&canTransition)actions.push({action:"bypass",label:"عبور با مجوز مدیر",variant:"secondary"});
+  return <article key={stage.id} style={{border:"1px solid #e8edf3",borderRadius:8,padding:12,background:"#fff"}}>
+   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
+    <div style={{minWidth:0,flex:1}}><b style={{fontSize:11,color:"#35465b"}}>{stageCodeLabels[stage.code]||stage.code}</b><div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center",marginTop:7}}><span style={{fontSize:9,color:stage.status==="completed"||stage.status==="bypassed"?"#24704f":stage.status==="on_hold"||stage.status==="action_needed"?"#a66b1f":"#718096",background:stage.status==="completed"||stage.status==="bypassed"?"#e8f7ef":stage.status==="on_hold"||stage.status==="action_needed"?"#fff4e5":"#f2f5f9",padding:"4px 7px",borderRadius:5}}>{stageStatusLabels[stage.status]||stage.status}</span>{stage.started_at&&<small style={{fontSize:9,color:"#8492a5"}}>شروع: {displayDateTime(stage.started_at)}</small>}{stage.completed_at&&<small style={{fontSize:9,color:"#8492a5"}}>پایان: {displayDateTime(stage.completed_at)}</small>}</div></div>
+   </div>
+   {stage.hold_reason&&<p style={{fontSize:10,color:"#a66b1f",lineHeight:1.8,margin:"8px 0 0"}}>دلیل تعلیق/عبور: {stage.hold_reason}</p>}
+   {stage.evidence_reference&&<p style={{fontSize:10,color:"#66758a",lineHeight:1.8,margin:"6px 0 0"}}>مرجع مدرک: {stage.evidence_reference}</p>}
+   {actions.length>0&&<div style={{display:"flex",gap:7,flexWrap:"wrap",marginTop:11}}>{actions.map(item=><button key={item.action} type="button" className={"btn "+item.variant} disabled={transitionSavingId===stage.id} onClick={()=>startTransition(stage,item.action)}>{transitionSavingId===stage.id?"در حال ثبت…":item.label}</button>)}</div>}
+   {transitionDraft?.stageId===stage.id&&<form onSubmit={event=>{event.preventDefault();void submitStageTransition(stage,transitionDraft.action,transitionReason,transitionEvidence);}} style={{marginTop:12,paddingTop:12,borderTop:"1px solid #edf1f6"}}>
+    {["hold","bypass"].includes(transitionDraft.action)&&<div className="form-row"><label htmlFor={"stage-reason-"+stage.id}>دلیل مستند *</label><textarea id={"stage-reason-"+stage.id} className="field" rows={2} maxLength={500} required value={transitionReason} onChange={event=>setTransitionReason(event.target.value)} style={{minHeight:65,resize:"vertical"}}/></div>}
+    {transitionDraft.action==="complete"&&needsAccountEvidence&&<div className="form-row"><label htmlFor={"stage-evidence-"+stage.id}>مرجع مدرک افتتاح حساب *</label><input id={"stage-evidence-"+stage.id} className="field" maxLength={500} required value={transitionEvidence} onChange={event=>setTransitionEvidence(event.target.value)} placeholder="شماره پیگیری یا مرجع مدرک"/></div>}
+    {transitionErrors[stage.id]&&<p role="alert" className="notice">{transitionErrors[stage.id]}</p>}
+    <div style={{display:"flex",gap:8,marginTop:10}}><button className="btn primary" type="submit" disabled={transitionSavingId===stage.id}>{transitionSavingId===stage.id?"در حال ثبت…":"تأیید عملیات"}</button><button type="button" className="btn secondary" disabled={transitionSavingId===stage.id} onClick={()=>setTransitionDraft(null)}>انصراف</button></div>
+   </form>}
+   {transitionErrors[stage.id]&&transitionDraft?.stageId!==stage.id&&<p role="alert" className="notice" style={{marginTop:9}}>{transitionErrors[stage.id]}</p>}
+  </article>;
+ }
+
+ const completeCount=stages.filter(stage=>completedStageStatuses.includes(stage.status)).length;
+ const caseStages=stages.filter(stage=>!stage.party).sort((a,b)=>caseStageDefinitions.findIndex(def=>def.code===a.code)-caseStageDefinitions.findIndex(def=>def.code===b.code));
+ return <section className="card" style={{marginTop:16,padding:22}}>
+  <div className="card-head"><div><h2>گردش کار عملیاتی تسهیلات</h2><p>مراحل به تفکیک اشخاص پرونده و کل پرونده؛ پیش‌نیازها و مجوز نهایی در بک‌اند کنترل می‌شوند.</p></div><span style={{fontSize:10,color:"#8492a5"}}>{completeCount.toLocaleString("fa-IR")} از {stages.length.toLocaleString("fa-IR")} مرحله تکمیل‌شده</span></div>
+  {canWrite&&<div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:16}}><button type="button" className="btn secondary" disabled={structureSaving} onClick={()=>void ensureWorkflowStructure()}>{structureSaving?"در حال ایجاد مراحل…":"ایجاد/تکمیل ساختار مراحل"}</button><small style={{fontSize:9,color:"#8492a5"}}>مراحل موجود تکرار نمی‌شوند؛ ساخت مرحله فقط از API رسمی انجام می‌شود.</small></div>}
+  {loadError&&<p role="alert" className="notice">{loadError}</p>}
+  {message&&<p role="status" className="note">{message}</p>}
+  {loading?<p className="empty">در حال دریافت گردش کار…</p>:<>
+   <section style={{border:"1px solid #edf1f6",borderRadius:9,padding:15,marginBottom:18}}>
+    <div className="card-head"><div><h3 style={{margin:0,fontSize:12,color:"#35465b"}}>اشخاص پرونده</h3><p>متقاضی اصلی، ضامن‌ها و نمایندگان؛ مراحل فردی برای هر شخص فعال نگهداری می‌شوند.</p></div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{canWrite&&!activeApplicant&&<button type="button" className="btn primary" disabled={partySaving} onClick={()=>void createMainApplicant()}>{partySaving?"در حال ثبت…":"ثبت متقاضی اصلی"}</button>}{canWrite&&<button type="button" className="btn secondary" onClick={()=>{setPartyFormOpen(current=>!current);setPartyError("");}}>{partyFormOpen?"بستن":"＋ افزودن ضامن/نماینده"}</button>}</div></div>
+    {partyFormOpen&&canWrite&&<form onSubmit={event=>{event.preventDefault();void createOtherParty();}} style={{marginTop:12,padding:14,border:"1px solid #edf1f6",borderRadius:8,background:"#fcfdff"}}>
+     <div className="form-grid"><div className="form-row"><label htmlFor="workflow-party-person">شخص *</label><select id="workflow-party-person" className="field" required value={partyPerson} onChange={event=>setPartyPerson(event.target.value)}><option value="">انتخاب مشتری</option>{missingCustomerOptions.map(customer=><option key={customer.id} value={customer.id}>{customer.customer_number+" — "+(customer.customer_type==="organization"?customer.organization_name:[customer.first_name,customer.last_name].filter(Boolean).join(" ")||"مشتری")}</option>)}</select>{customerError&&<small role="alert" style={{color:"#b42318"}}>{customerError}</small>}</div><div className="form-row"><label htmlFor="workflow-party-role">نقش *</label><select id="workflow-party-role" className="field" value={partyRole} onChange={event=>setPartyRole(event.target.value)}><option value="guarantor">ضامن</option><option value="representative">نماینده</option></select></div><div className="form-row"><label htmlFor="workflow-party-relationship">{partyRole==="guarantor"?"نسبت ضامن با متقاضی *":"رابطه با متقاضی"}</label><input id="workflow-party-relationship" className="field" maxLength={80} required={partyRole==="guarantor"} value={partyRelationship} onChange={event=>setPartyRelationship(event.target.value)} /></div></div>
+     {partyError&&<p role="alert" className="notice">{partyError}</p>}
+     <div style={{display:"flex",gap:8,marginTop:10}}><button type="submit" className="btn primary" disabled={partySaving||!partyPerson}>{partySaving?"در حال ثبت…":"افزودن شخص"}</button><button type="button" className="btn secondary" disabled={partySaving} onClick={()=>setPartyFormOpen(false)}>انصراف</button></div>
+    </form>}
+    {!activeParties.length&&!partyFormOpen&&<p className="empty">هنوز شخص فعالی به گردش کار افزوده نشده است. ابتدا متقاضی اصلی را ثبت کنید.</p>}
+    {parties.map(party=><article key={party.id} style={{marginTop:10,padding:12,border:"1px solid #edf1f6",borderRadius:8,background:party.membership_status==="active"?"#fff":"#f8fafd"}}>
+     <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"flex-start",flexWrap:"wrap"}}><div><b style={{fontSize:11,color:"#35465b"}}>{party.person_display}</b><div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:6}}><span style={{fontSize:9,color:"#8492a5"}}>{casePartyRoleLabels[party.role]||party.role}</span><span style={{fontSize:9,color:"#8492a5"}}>{membershipStatusLabels[party.membership_status]||party.membership_status}</span>{party.relationship_to_applicant&&<span style={{fontSize:9,color:"#8492a5"}}>نسبت: {party.relationship_to_applicant}</span>}</div></div>{canWrite&&party.membership_status==="active"&&<div className="form-row" style={{minWidth:220}}><label htmlFor={"party-account-"+party.id}>وضعیت حساب</label><select id={"party-account-"+party.id} className="field" value={party.account_status} disabled={partySavingId===party.id} onChange={event=>void updatePartyAccountStatus(party,event.target.value)}><option value="unknown">بررسی‌نشده</option><option value="existing_verified">حساب موجود تأییدشده</option><option value="needs_opening">نیازمند افتتاح</option></select>{partyErrors[party.id]&&<small role="alert" style={{color:"#b42318"}}>{partyErrors[party.id]}</small>}</div>}</div>
+     {party.membership_status==="active"&&<div style={{display:"grid",gap:8,marginTop:11}}>{personStageDefinitions.map(def=>{const stage=stages.find(row=>row.party===party.id&&row.code===def.code);return stage?renderStage(stage):<div key={def.code} style={{fontSize:9,color:"#a66b1f",padding:"6px 8px",background:"#fff4e5",borderRadius:5}}>مرحله «{def.label}» ایجاد نشده است؛ از «ایجاد/تکمیل ساختار مراحل» استفاده کنید.</div>;})}</div>}
+    </article>)}
+    {partyError&&!partyFormOpen&&<p role="alert" className="notice">{partyError}</p>}
+   </section>
+   <section style={{border:"1px solid #edf1f6",borderRadius:9,padding:15}}>
+    <div className="card-head"><div><h3 style={{margin:0,fontSize:12,color:"#35465b"}}>مراحل کل پرونده</h3><p>بررسی بانک، واریز، تسویه و تحویل فقط پس از تکمیل پیش‌نیاز مربوط امکان‌پذیر است.</p></div></div>
+    {caseStages.length?<div style={{display:"grid",gap:8}}>{caseStages.map(renderStage)}</div>:<p className="empty">مراحل کل پرونده هنوز ساخته نشده‌اند.</p>}
+   </section>
+  </>}
+ </section>;
+}
+
 function ApplicationDocuments({selected,authUser}:{selected:Application;authUser:ApiUser|null}){
  const [documents,setDocuments]=useState<ApplicationDocumentRow[]>([]);
  const [loading,setLoading]=useState(true);
