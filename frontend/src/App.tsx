@@ -441,7 +441,7 @@ function App(){
  const normalizedQuery=query.trim().toLocaleLowerCase("fa-IR");
  const filteredCustomers=useMemo(()=>customers.filter(customer=>{
   const name=customer.customer_type==="organization"?customer.organization_name:[customer.first_name,customer.last_name].filter(Boolean).join(" ");
-  return [customer.customer_number,name,customer.phone_number,customer.email,customer.national_id].some(value=>String(value||"").toLocaleLowerCase("fa-IR").includes(normalizedQuery));
+  return [customer.customer_number,name,customer.phone_number,customer.email].some(value=>String(value||"").toLocaleLowerCase("fa-IR").includes(normalizedQuery));
  }),[customers,normalizedQuery]);
  const filteredTasks=useMemo(()=>tasks.filter(task=>
   [task.task_number,task.title,task.application_number,task.assigned_to_username,task.created_by_username,task.description].some(value=>String(value||"").toLocaleLowerCase("fa-IR").includes(normalizedQuery))
