@@ -4,6 +4,7 @@ import "./style.css";
 type NavKey = "dashboard" | "applications" | "customers" | "tasks" | "reports" | "settings";
 type Application = { uuid: string; id: string; customer: string; type: string; amount: string; stage: string; status: string; statusKey: string; date: string };
 type ApplicationStatusAction = { status: string; label: string; variant: "primary" | "secondary"; requiresReason?: boolean };
+type ApplicationEventRow = { id: string | number; event_type: string; previous_status: string | null; new_status: string | null; note: string; actor_username: string | null; created_at: string };
 const workflowStages = [
  {key:"under_review",label:"بررسی اولیه"},
  {key:"awaiting_documents",label:"تکمیل مدارک"},
@@ -60,6 +61,7 @@ const statusLabels: Record<string, string> = {
  rejected: "رد شده",
  cancelled: "لغو شده",
 };
+const applicationEventLabels: Record<string, string> = { created: "ثبت پرونده", status_changed: "تغییر وضعیت", note_added: "یادداشت پیگیری", archived: "بایگانی پرونده" };
 const productLabels: Record<string, string> = {
  working_capital: "تسهیلات سرمایه در گردش",
  personal: "تسهیلات شخصی",
@@ -151,6 +153,17 @@ async function getApplications(): Promise<Application[]> {
  if (!Array.isArray(rows)) throw new Error("ساختار پاسخ فهرست پرونده‌ها معتبر نیست.");
  return rows.map(mapApplication);
 }
+async function getApplicationEvents(applicationId: string): Promise<ApplicationEventRow[]> {
+ const payload = await apiRequest("/api/v1/applications/" + applicationId + "/events/");
+ const rows = Array.isArray(payload) ? payload : payload.results;
+ if (!Array.isArray(rows)) throw new Error("ساختار پاسخ تاریخچه پرونده معتبر نیست.");
+ return rows as ApplicationEventRow[];
+}
+function displayDateTime(value: unknown): string {
+ if (!value) return "—";
+ const date = new Date(String(value));
+ return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat("fa-IR", {year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit"}).format(date);
+}
 async function getCustomers(): Promise<CustomerRow[]> {
  const payload = await apiRequest("/api/v1/customers/");
  const rows = Array.isArray(payload) ? payload : payload.results;
@@ -203,6 +216,13 @@ function App(){
  const [applicationStatusError,setApplicationStatusError]=useState("");
  const [applicationStatusSuccess,setApplicationStatusSuccess]=useState("");
  const [applicationDecisionNote,setApplicationDecisionNote]=useState("");
+ const [applicationEvents,setApplicationEvents]=useState<ApplicationEventRow[]>([]);
+ const [applicationEventsLoading,setApplicationEventsLoading]=useState(false);
+ const [applicationEventsError,setApplicationEventsError]=useState("");
+ const [applicationNote,setApplicationNote]=useState("");
+ const [applicationNoteSaving,setApplicationNoteSaving]=useState(false);
+ const [applicationNoteError,setApplicationNoteError]=useState("");
+ const [applicationNoteSuccess,setApplicationNoteSuccess]=useState("");
  const [showCustomerForm,setShowCustomerForm]=useState(false);
  const [customerSaving,setCustomerSaving]=useState(false);
  const [customerFormError,setCustomerFormError]=useState("");
@@ -245,6 +265,23 @@ function App(){
   setApplicationDecisionNote("");
   setApplicationStatusError("");
   setApplicationStatusSuccess("");
+ },[selected?.uuid]);
+ useEffect(()=>{
+  const applicationId=selected?.uuid;
+  setApplicationEvents([]);
+  setApplicationEventsError("");
+  setApplicationNote("");
+  setApplicationNoteError("");
+  setApplicationNoteSuccess("");
+  if(!applicationId){setApplicationEventsLoading(false);return;}
+  let active=true;
+  setApplicationEventsLoading(true);
+  void getApplicationEvents(applicationId).then(rows=>{
+   if(active){setApplicationEvents(rows);setApplicationEventsError("");}
+  }).catch(error=>{
+   if(active)setApplicationEventsError((error as Error).message||"دریافت تاریخچه پرونده ناموفق بود.");
+  }).finally(()=>{if(active)setApplicationEventsLoading(false);});
+  return ()=>{active=false;};
  },[selected?.uuid]);
  useEffect(()=>{
   if(!authUser || !["dashboard","customers","tasks","reports"].includes(page)) return;
@@ -291,11 +328,33 @@ function App(){
    setSelected(mapped);
    setApps(current=>current.map(item=>item.uuid===mapped.uuid?mapped:item));
    setApplicationDecisionNote("");
+   try {
+    setApplicationEvents(await getApplicationEvents(mapped.uuid));
+    setApplicationEventsError("");
+   } catch(historyError) {
+    setApplicationEventsError("وضعیت تغییر کرد، اما تاریخچه تازه نشد: "+((historyError as Error).message||"خطای نامشخص"));
+   }
    setApplicationStatusSuccess("وضعیت پرونده با موفقیت به «"+mapped.status+"» تغییر کرد.");
    setApiState("connected");setApiError("");
   }catch(error){
    setApplicationStatusError((error as Error).message||"تغییر وضعیت پرونده ناموفق بود.");
   }finally{setApplicationStatusSaving(false);}
+ }
+ async function addApplicationNote(){
+  if(!selected)return;
+  const note=applicationNote.trim();
+  if(!note){setApplicationNoteError("متن یادداشت را وارد کنید.");return;}
+  setApplicationNoteSaving(true);setApplicationNoteError("");setApplicationNoteSuccess("");
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const created=await apiRequest("/api/v1/applications/"+selected.uuid+"/notes/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({note})});
+   setApplicationEvents(current=>[...current,created as ApplicationEventRow]);
+   setApplicationNote("");
+   setApplicationNoteSuccess("یادداشت پیگیری ثبت شد.");
+   setApiState("connected");setApiError("");
+  }catch(error){
+   setApplicationNoteError((error as Error).message||"ثبت یادداشت پیگیری ناموفق بود.");
+  }finally{setApplicationNoteSaving(false);}
  }
  async function changeTaskStatus(task:TaskRow,nextStatus:string){
   try{const csrf=await apiRequest("/api/v1/auth/csrf/");await apiRequest("/api/v1/tasks/"+task.id+"/",{method:"PATCH",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({status:nextStatus})});setTasks(await getTasks());setSectionError("");}catch(error){setSectionError((error as Error).message||"به‌روزرسانی وضعیت وظیفه ناموفق بود.");}
@@ -378,6 +437,25 @@ function App(){
    {getApplicationStatusActions(selected,authUser?.role||null).map(action=><button key={action.status} className={"btn "+action.variant+" full"} disabled={applicationStatusSaving||(action.requiresReason&&!applicationDecisionNote.trim())} onClick={()=>void changeApplicationStatus(action.status)}>{applicationStatusSaving?"در حال ثبت…":action.label}</button>)}
    {getApplicationStatusActions(selected,authUser?.role||null).length===0&&<p className="note">برای نقش فعلی یا وضعیت این پرونده، تغییر وضعیت مجازی وجود ندارد.</p>}
    <button className="btn secondary full" onClick={()=>window.print()}>چاپ خلاصه پرونده</button></aside></section>}
+   {selected&&<section className="card" style={{marginTop:16,padding:22}}>
+    <div className="card-head"><div><h2>تاریخچه و یادداشت‌های پیگیری</h2><p>رویدادهای ثبت‌شده در بک‌اند؛ یادداشت‌های پیگیری به سابقه پرونده اضافه می‌شوند.</p></div><span style={{fontSize:10,color:"#8492a5"}}>{applicationEvents.length.toLocaleString("fa-IR")} رویداد</span></div>
+    {applicationEventsLoading&&<p className="empty">در حال دریافت تاریخچه پرونده…</p>}
+    {applicationEventsError&&<p role="alert" style={{fontSize:11,lineHeight:1.9,color:"#b42318",background:"#fff1f0",padding:10,borderRadius:8}}>{applicationEventsError}</p>}
+    {!applicationEventsLoading&&!applicationEventsError&&applicationEvents.length===0&&<p className="empty">هنوز رویدادی برای این پرونده ثبت نشده است.</p>}
+    {applicationEvents.length>0&&<div style={{display:"grid",gap:10}}>{[...applicationEvents].reverse().map(item=><article key={item.id} style={{border:"1px solid #edf1f6",borderRadius:8,padding:14,background:"#fcfdff"}}>
+     <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><b style={{fontSize:11,color:"#35465b"}}>{applicationEventLabels[item.event_type]||item.event_type}</b><small style={{fontSize:9,color:"#91a0b2"}}>{displayDateTime(item.created_at)}</small></div>
+     {item.previous_status&&item.new_status?<p style={{fontSize:10,color:"#66758a",margin:"9px 0 0"}}>وضعیت: {statusLabels[item.previous_status]||item.previous_status} ← {statusLabels[item.new_status]||item.new_status}</p>:item.new_status?<p style={{fontSize:10,color:"#66758a",margin:"9px 0 0"}}>وضعیت ثبت‌شده: {statusLabels[item.new_status]||item.new_status}</p>:null}
+     {item.note&&<p style={{fontSize:11,lineHeight:2,color:"#526176",whiteSpace:"pre-wrap",overflowWrap:"anywhere",margin:"9px 0"}}>{item.note}</p>}
+     <small style={{fontSize:9,color:"#91a0b2"}}>ثبت توسط: {item.actor_username||"کاربر سامانه"}</small>
+    </article>)}</div>}
+    {["system_admin","intake","case_worker"].includes(authUser?.role||"")&&<form onSubmit={event=>{event.preventDefault();void addApplicationNote();}} style={{marginTop:20,paddingTop:18,borderTop:"1px solid #edf1f6"}}>
+     <div className="form-row"><label htmlFor="application-followup-note">ثبت یادداشت پیگیری</label><textarea id="application-followup-note" className="field" required rows={4} maxLength={5000} value={applicationNote} onChange={event=>setApplicationNote(event.target.value)} placeholder="یادداشت مرتبط با پیگیری پرونده را بنویسید." style={{minHeight:100,resize:"vertical"}}/></div>
+     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",marginTop:12}}><small style={{fontSize:9,color:"#91a0b2"}}>{applicationNote.length.toLocaleString("fa-IR")} از ۵۰۰۰ نویسه</small><button className="btn primary" type="submit" disabled={applicationNoteSaving||!applicationNote.trim()}>{applicationNoteSaving?"در حال ثبت…":"ثبت یادداشت"}</button></div>
+     {applicationNoteError&&<p role="alert" style={{fontSize:11,lineHeight:1.9,color:"#b42318",background:"#fff1f0",padding:10,borderRadius:8,marginTop:10}}>{applicationNoteError}</p>}
+     {applicationNoteSuccess&&<p role="status" style={{fontSize:11,lineHeight:1.9,color:"#24704f",background:"#e8f7ef",padding:10,borderRadius:8,marginTop:10}}>{applicationNoteSuccess}</p>}
+    </form>}
+    {!["system_admin","intake","case_worker"].includes(authUser?.role||"")&&<p className="note">دسترسی این نقش فقط برای مشاهده تاریخچه پرونده مجاز است.</p>}
+   </section>}
    {page==="customers"&&!selected&&showCustomerForm&&<section className="card" style={{marginBottom:18,padding:22}}>
     <div className="card-head"><div><h2>ثبت مشتری جدید</h2><p>اطلاعات در بک‌اند ذخیره و شماره مشتری به‌صورت خودکار تولید می‌شود.</p></div><button type="button" className="btn secondary" onClick={()=>setShowCustomerForm(false)}>بستن</button></div>
     {customerFormError&&<p role="alert" className="notice">{customerFormError}</p>}
