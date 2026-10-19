@@ -32,6 +32,25 @@ const productLabels: Record<string, string> = {
  corporate_credit: "اعتباری شرکتی",
  equipment: "خرید تجهیزات",
 };
+const apiFieldLabels: Record<string, string> = {
+ customer_type: "نوع مشتری", first_name: "نام", last_name: "نام خانوادگی",
+ organization_name: "نام سازمان", phone_number: "شماره تلفن", email: "ایمیل",
+ national_id: "کد ملی / شناسه ملی", birth_date: "تاریخ تولد",
+ father_name: "نام پدر", occupation: "شغل", postal_code: "کدپستی",
+ sana_verified: "وضعیت احراز ثنا", status: "وضعیت", notes: "یادداشت",
+ customer: "مشتری", product_type: "نوع تسهیلات", requested_amount: "مبلغ درخواستی",
+ term_months: "مدت بازپرداخت", title: "عنوان", application: "پرونده",
+ priority: "اولویت", due_at: "موعد انجام",
+};
+function getApiErrorMessage(payload: any): string {
+ if (typeof payload?.detail === "string") return payload.detail;
+ if (!payload || typeof payload !== "object") return "";
+ return Object.entries(payload).flatMap(([field, value]) => {
+  const entries = Array.isArray(value) ? value : [value];
+  return entries.filter((entry): entry is string => typeof entry === "string")
+   .map(entry => field === "non_field_errors" ? entry : `${apiFieldLabels[field] || field}: ${entry}`);
+ }).join("؛ ");
+}
 async function apiRequest(path: string, init: RequestInit = {}): Promise<any> {
  const headers = new Headers(init.headers);
  headers.set("Accept", "application/json");
@@ -43,7 +62,7 @@ async function apiRequest(path: string, init: RequestInit = {}): Promise<any> {
  let payload: any = {};
  try { payload = await response.json(); } catch { /* Some error responses have no JSON body. */ }
  if (!response.ok) {
-  const error = new Error(payload.detail || "درخواست به سرور ناموفق بود.") as ApiError;
+  const error = new Error(getApiErrorMessage(payload) || "درخواست به سرور ناموفق بود.") as ApiError;
   error.status = response.status;
   throw error;
  }
