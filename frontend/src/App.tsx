@@ -385,21 +385,22 @@ function App(){
   return ()=>{active=false;};
  },[selected?.uuid]);
  useEffect(()=>{
-  if(!authUser || !["dashboard","customers","tasks","reports"].includes(page)) return;
+  if(!authUser || !["dashboard","applications","customers","tasks","reports"].includes(page)) return;
   let active=true;
   setSectionLoading(true);setSectionError("");
   const load=async()=>{
    try {
-    if(page==="customers"){
+    if(page==="customers" || page==="applications"){
      const rows=await getCustomers();
      if(active)setCustomers(rows);
-    } else if(page==="tasks"){
+    }
+    if(page==="tasks"){
      const rows=await getTasks();
      if(active)setTasks(rows);
     } else if(page==="dashboard"){
      const [liveReport,liveTasks]=await Promise.all([getOperationsReport(),getTasks()]);
      if(active){setReport(liveReport);setTasks(liveTasks);}
-    } else {
+    } else if(page==="reports"){
      const liveReport=await getOperationsReport();
      if(active)setReport(liveReport);
     }
