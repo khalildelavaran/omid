@@ -477,7 +477,6 @@ function App(){
    <input id="omid-password" type="password" autoComplete="current-password" required value={password} onChange={event=>setPassword(event.target.value)} style={{width:"100%",height:44,padding:"0 12px",border:"1px solid #dce3ed",borderRadius:8,marginBottom:16}}/>
    {(authError||apiError)&&<p role="alert" style={{fontSize:12,lineHeight:1.8,color:"#b42318",background:"#fff1f0",padding:10,borderRadius:8}}>{authError||apiError}</p>}
    <button type="submit" disabled={authSubmitting} style={{width:"100%",height:44,border:0,borderRadius:8,background:"#204a7b",color:"#fff",fontWeight:700,opacity:authSubmitting ? 0.7 : 1}}>{authSubmitting?"در حال ورود…":"ورود به سامانه"}</button>
-   <p style={{fontSize:11,lineHeight:1.9,color:"#8492a5",margin:"18px 0 0"}}>ورود فقط برای حساب‌های داخلی فعال‌شده در بک‌اند مجاز است.</p>
   </form>
  </div>;
  if(authUser.must_change_password) return <PasswordChangeForm required onSuccess={()=>setAuthUser(current=>current?{...current,must_change_password:false}:current)}/>;
