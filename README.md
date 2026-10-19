@@ -13,13 +13,14 @@
 - [استقرار، پشتیبان‌گیری و مشاهده‌پذیری](docs/architecture/operations.md)
 - [نقشه راه پیاده‌سازی](docs/architecture/roadmap.md)
 - [وضعیت پیاده‌سازی و کارهای باقی‌مانده](docs/architecture/implementation-status.md)
+- [فهرست طراحی صفحات و معیارهای پذیرش](docs/design/page-inventory.md)
 - [راهنمای اجرای backend](backend/README.md)
 
 ## فناوری‌های فعلی
 
 - Backend: Python + Django + Django REST Framework
 - Database: PostgreSQL برای توسعه از طریق Docker Compose؛ SQLite به‌عنوان fallback تنظیمات محلی
-- Frontend: Next.js + TypeScript (هنوز ایجاد نشده)
+- Frontend: React 19 + Vite + TypeScript
 - معماری: Modular Monolith
 
 ## شروع سریع backend
