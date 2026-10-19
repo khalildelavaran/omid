@@ -3,5 +3,12 @@ account_id = "1a43675f6af74d6c9d93fe824648729f"
 main = "worker/index.js"
 compatibility_date = "2026-10-16"
 
+# Serve the React/Vite production build from the same Worker as the API proxy.
+[assets]
+directory = "./frontend/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
 # Required by `wrangler preview` for Cloudflare preview deployments.
 [previews]
