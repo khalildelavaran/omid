@@ -105,6 +105,38 @@ class ServiceApiTests(TestCase):
             ).exists()
         )
 
+    def test_catalog_price_edit_updates_future_receipts_without_changing_existing_receipts(self):
+        original_receipt = self.create_receipt()
+        self.client.force_authenticate(self.admin)
+        updated = self.client.patch(
+            f"/api/v1/services/catalog/{self.service.pk}/",
+            {"price": "125000", "online_cost": "25000"},
+            format="json",
+        )
+        self.assertEqual(updated.status_code, 200, updated.data)
+        self.assertEqual(str(updated.data["price"]), "125000")
+        self.assertEqual(str(updated.data["online_cost"]), "25000")
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action="service_catalog.updated",
+                entity_id=str(self.service.pk),
+                actor=self.admin,
+            ).exists()
+        )
+
+        old_record = ServiceRecord.objects.get(pk=original_receipt.data["id"])
+        self.assertEqual(old_record.price, Decimal("100000"))
+        self.assertEqual(old_record.total, Decimal("80000"))
+        self.client.force_authenticate(self.worker)
+        next_receipt = self.client.post(
+            "/api/v1/services/receipts/",
+            self.receipt_payload(discount="25000", paid="50000"),
+            format="json",
+        )
+        self.assertEqual(next_receipt.status_code, 201, next_receipt.data)
+        self.assertEqual(str(next_receipt.data["price"]), "125000")
+        self.assertEqual(str(next_receipt.data["total"]), "100000")
+
     def test_catalog_names_are_unique_case_insensitively(self):
         self.client.force_authenticate(self.admin)
         response = self.client.post(
