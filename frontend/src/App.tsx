@@ -323,9 +323,9 @@ function App(){
        notes:customerNotes.trim(),
        ...(phones.length?{phones}:{})
       };
-      await apiRequest("/api/v1/customers/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify(payload)});
-      setCustomers(await getCustomers());
-      setShowCustomerForm(false);setCustomerType("individual");setCustomerFirstName("");setCustomerLastName("");setCustomerOrganizationName("");setCustomerPhone("");setCustomerEmail("");setCustomerNationalId("");setCustomerBirthDate("");setCustomerFatherName("");setCustomerOccupation("");setCustomerPostalCode("");setCustomerSanaVerified(false);setCustomerStatus("active");setCustomerNotes("");setApiState("connected");setApiError("");
+      const createdCustomer=await apiRequest("/api/v1/customers/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify(payload)});
+      setCustomers(current=>[createdCustomer as CustomerRow,...current.filter(customer=>customer.id!==String(createdCustomer.id))]);
+      setShowCustomerForm(false);setCustomerType("individual");setCustomerFirstName("");setCustomerLastName("");setCustomerOrganizationName("");setCustomerPhone("");setCustomerEmail("");setCustomerNationalId("");setCustomerBirthDate("");setCustomerFatherName("");setCustomerOccupation("");setCustomerPostalCode("");setCustomerSanaVerified(false);setCustomerStatus("active");setCustomerNotes("");setApiState("connected");setApiError("");setSectionError("");
      }catch(error){setCustomerFormError((error as Error).message||"ثبت مشتری ناموفق بود.");}
      finally{setCustomerSaving(false);}
     }}>
