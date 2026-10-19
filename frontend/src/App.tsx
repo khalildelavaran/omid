@@ -281,6 +281,8 @@ function App(){
    setApplicationStatusError("برای رد درخواست، ثبت دلیل تصمیم الزامی است.");
    return;
   }
+  if(nextStatus==="cancelled"&&!window.confirm("آیا از لغو این پرونده مطمئن هستید؟ پس از لغو، تغییر وضعیت عادی ممکن نخواهد بود."))return;
+  if(nextStatus==="rejected"&&!window.confirm("آیا از ثبت تصمیم نهایی رد درخواست مطمئن هستید؟"))return;
   setApplicationStatusSaving(true);setApplicationStatusError("");setApplicationStatusSuccess("");
   try{
    const csrf=await apiRequest("/api/v1/auth/csrf/");
