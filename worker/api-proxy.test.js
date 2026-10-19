@@ -9,6 +9,39 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
+test("serves the built frontend through the ASSETS binding instead of the legacy demo", async () => {
+  let requestedUrl;
+  const assets = {
+    fetch: async (request) => {
+      requestedUrl = request.url;
+      return new Response("<main>React application</main>", {
+        status: 200,
+        headers: { "Content-Type": "text/html; charset=utf-8" }
+      });
+    }
+  };
+
+  const response = await worker.fetch(
+    new Request("https://omid.example/"),
+    { ASSETS: assets }
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(requestedUrl, "https://omid.example/");
+  assert.match(await response.text(), /React application/);
+});
+
+test("API requests are handled by the API proxy before static assets", async () => {
+  let assetCalled = false;
+  const response = await worker.fetch(
+    new Request("https://omid.example/api/v1/health/"),
+    { ASSETS: { fetch: async () => { assetCalled = true; return new Response("asset"); } } }
+  );
+
+  assert.equal(response.status, 503);
+  assert.equal(assetCalled, false);
+});
+
 test("API routes return a non-cacheable 503 until backend origin is configured", async () => {
   const request = new Request("https://omid.example/api/v1/health/");
   const response = await worker.fetch(request, {});
