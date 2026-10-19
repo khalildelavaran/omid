@@ -76,7 +76,7 @@ const guaranteeEventLabels: Record<string,string> = { created:"ثبت درخوا
 const paymentMethodLabels: Record<string,string> = { pos:"کارت‌خوان", cash:"نقدی", bank_transfer:"واریز بانکی", other:"سایر" };
 function parseIntegerMoney(value:string):bigint|null {
  const normalized=String(value||"").trim();
- if(!/^\\d+$/.test(normalized))return null;
+ if(!/^\d+$/.test(normalized))return null;
  try{return BigInt(normalized);}catch{return null;}
 }
 function createReceiptIdempotencyKey():string {
@@ -123,7 +123,7 @@ const apiFieldLabels: Record<string, string> = {
  national_id: "کد ملی / شناسه ملی", birth_date: "تاریخ تولد",
  father_name: "نام پدر", occupation: "شغل", postal_code: "کدپستی",
  sana_verified: "وضعیت احراز ثنا", status: "وضعیت پرونده", notes: "یادداشت",
- customer: "مشتری", product_type: "نوع تسهیلات", requested_amount: "مبلغ درخواستی",
+ customer: "مشتری", product_type: "نوع تسهیلات", requested_amount: "مبلغ درخواستی", service: "خدمت", discount: "تخفیف", paid: "مبلغ دریافتی", payment_method: "روش پرداخت", price: "تعرفه خدمت", online_cost: "هزینه آنلاین",
  term_months: "مدت بازپرداخت", title: "عنوان", application: "پرونده",
  priority: "اولویت", due_at: "موعد انجام", description: "شرح وظیفه",
  current_password: "گذرواژه فعلی", new_password: "گذرواژه جدید",
