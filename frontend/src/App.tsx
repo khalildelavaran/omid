@@ -5,6 +5,7 @@ type NavKey = "dashboard" | "applications" | "customers" | "tasks" | "reports" |
 type Application = { uuid: string; id: string; customer: string; type: string; amount: string; stage: string; status: string; statusKey: string; date: string };
 type ApplicationStatusAction = { status: string; label: string; variant: "primary" | "secondary"; requiresReason?: boolean };
 type ApplicationEventRow = { id: string | number; event_type: string; previous_status: string | null; new_status: string | null; note: string; actor_username: string | null; created_at: string };
+type ApplicationDocumentRow = { id:string; document_number:string; application:string; application_number:string; document_type:string; replaces_document:string|null; replaces_document_number:string|null; original_filename:string; content_type:string; size_bytes:number; sha256:string; status:string; review_note:string; uploaded_by:string; uploaded_by_username:string; reviewed_by:string|null; reviewed_by_username:string|null; reviewed_at:string|null; created_at:string; updated_at:string };
 const workflowStages = [
  {key:"under_review",label:"بررسی اولیه"},
  {key:"awaiting_documents",label:"تکمیل مدارک"},
@@ -62,6 +63,8 @@ const statusLabels: Record<string, string> = {
  cancelled: "لغو شده",
 };
 const applicationEventLabels: Record<string, string> = { created: "ثبت پرونده", status_changed: "تغییر وضعیت", note_added: "یادداشت پیگیری", archived: "بایگانی پرونده" };
+const documentTypeLabels: Record<string,string> = { identity:"مدرک هویتی", address:"مدرک نشانی", income:"مدرک درآمد", bank_statement:"گردش حساب", contract:"قرارداد", other:"سایر مدارک" };
+const documentStatusLabels: Record<string,string> = { pending_review:"در انتظار بررسی", accepted:"پذیرفته‌شده", rejected:"نیازمند اصلاح" };
 const productLabels: Record<string, string> = {
  working_capital: "تسهیلات سرمایه در گردش",
  personal: "تسهیلات شخصی",
@@ -158,6 +161,12 @@ async function getApplicationEvents(applicationId: string): Promise<ApplicationE
  const rows = Array.isArray(payload) ? payload : payload.results;
  if (!Array.isArray(rows)) throw new Error("ساختار پاسخ تاریخچه پرونده معتبر نیست.");
  return rows as ApplicationEventRow[];
+}
+async function getApplicationDocuments(applicationId: string): Promise<ApplicationDocumentRow[]> {
+ const payload = await apiRequest("/api/v1/documents/?application=" + encodeURIComponent(applicationId));
+ const rows = Array.isArray(payload) ? payload : payload.results;
+ if (!Array.isArray(rows)) throw new Error("ساختار پاسخ اسناد پرونده معتبر نیست.");
+ return rows as ApplicationDocumentRow[];
 }
 function displayDateTime(value: unknown): string {
  if (!value) return "—";
@@ -456,6 +465,7 @@ function App(){
     </form>}
     {!["system_admin","intake","case_worker"].includes(authUser?.role||"")&&<p className="note">دسترسی این نقش فقط برای مشاهده تاریخچه پرونده مجاز است.</p>}
    </section>}
+   {selected&&<ApplicationDocuments selected={selected} authUser={authUser}/>}
    {page==="customers"&&!selected&&showCustomerForm&&<section className="card" style={{marginBottom:18,padding:22}}>
     <div className="card-head"><div><h2>ثبت مشتری جدید</h2><p>اطلاعات در بک‌اند ذخیره و شماره مشتری به‌صورت خودکار تولید می‌شود.</p></div><button type="button" className="btn secondary" onClick={()=>setShowCustomerForm(false)}>بستن</button></div>
     {customerFormError&&<p role="alert" className="notice">{customerFormError}</p>}
@@ -548,6 +558,181 @@ function App(){
    </div></main>
  </div>
 }
+function ApplicationDocuments({selected,authUser}:{selected:Application;authUser:ApiUser|null}){
+ const [documents,setDocuments]=useState<ApplicationDocumentRow[]>([]);
+ const [loading,setLoading]=useState(true);
+ const [error,setError]=useState("");
+ const [uploadFile,setUploadFile]=useState<File|null>(null);
+ const [uploadType,setUploadType]=useState("identity");
+ const [uploadInputKey,setUploadInputKey]=useState(0);
+ const [uploading,setUploading]=useState(false);
+ const [uploadError,setUploadError]=useState("");
+ const [uploadSuccess,setUploadSuccess]=useState("");
+ const [reviewNotes,setReviewNotes]=useState<Record<string,string>>({});
+ const [reviewErrors,setReviewErrors]=useState<Record<string,string>>({});
+ const [reviewMessages,setReviewMessages]=useState<Record<string,string>>({});
+ const [reviewingId,setReviewingId]=useState<string|null>(null);
+ const [replacementTargetId,setReplacementTargetId]=useState<string|null>(null);
+ const [replacementFiles,setReplacementFiles]=useState<Record<string,File|null>>({});
+ const [replacementErrors,setReplacementErrors]=useState<Record<string,string>>({});
+ const [replacementMessages,setReplacementMessages]=useState<Record<string,string>>({});
+ const [replacingId,setReplacingId]=useState<string|null>(null);
+ const [downloadingId,setDownloadingId]=useState<string|null>(null);
+ const canUpload=["system_admin","intake","case_worker"].includes(authUser?.role||"");
+ const canReview=["system_admin","case_worker"].includes(authUser?.role||"");
+
+ useEffect(()=>{
+  let active=true;
+  setLoading(true);
+  setError("");
+  setDocuments([]);
+  setUploadError("");
+  setUploadSuccess("");
+  void getApplicationDocuments(selected.uuid).then(rows=>{
+   if(active)setDocuments(rows);
+  }).catch(fetchError=>{
+   if(active)setError((fetchError as Error).message||"دریافت اسناد پرونده ناموفق بود.");
+  }).finally(()=>{if(active)setLoading(false);});
+  return ()=>{active=false;};
+ },[selected.uuid]);
+
+ function formatFileSize(bytes:number):string {
+  if(!Number.isFinite(bytes)||bytes<0)return "—";
+  if(bytes<1024)return bytes.toLocaleString("fa-IR")+" بایت";
+  if(bytes<1024*1024)return (bytes/1024).toLocaleString("fa-IR",{maximumFractionDigits:1})+" کیلوبایت";
+  return (bytes/(1024*1024)).toLocaleString("fa-IR",{maximumFractionDigits:1})+" مگابایت";
+ }
+
+ async function uploadDocument(){
+  if(!uploadFile){setUploadError("ابتدا فایل سند را انتخاب کنید.");return;}
+  if(uploadFile.size>10*1024*1024){setUploadError("حداکثر حجم هر سند ۱۰ مگابایت است.");return;}
+  setUploading(true);setUploadError("");setUploadSuccess("");
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const body=new FormData();
+   body.set("application",selected.uuid);
+   body.set("document_type",uploadType);
+   body.set("file",uploadFile);
+   const created=await apiRequest("/api/v1/documents/",{method:"POST",headers:{"X-CSRFToken":String(csrf.csrfToken||"")},body}) as ApplicationDocumentRow;
+   setDocuments(current=>[created,...current]);
+   setUploadFile(null);setUploadType("identity");setUploadInputKey(current=>current+1);
+   setUploadSuccess("سند با موفقیت بارگذاری شد و برای بررسی ارسال شد.");
+  }catch(uploadFailure){
+   setUploadError((uploadFailure as Error).message||"بارگذاری سند ناموفق بود.");
+  }finally{setUploading(false);}
+ }
+
+ async function reviewDocument(documentRow:ApplicationDocumentRow,nextStatus:"accepted"|"rejected"){
+  const note=(reviewNotes[documentRow.id]||"").trim();
+  if(nextStatus==="rejected"&&!note){
+   setReviewErrors(current=>({...current,[documentRow.id]:"برای اعلام نیاز به اصلاح، توضیح الزامی است."}));
+   return;
+  }
+  if(!window.confirm(nextStatus==="accepted"?"آیا پذیرش این سند را تأیید می‌کنید؟":"آیا سند را برای اصلاح برمی‌گردانید؟"))return;
+  setReviewingId(documentRow.id);
+  setReviewErrors(current=>({...current,[documentRow.id]:""}));
+  setReviewMessages(current=>({...current,[documentRow.id]:""}));
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const updated=await apiRequest("/api/v1/documents/"+documentRow.id+"/review/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({status:nextStatus,note})}) as ApplicationDocumentRow;
+   setDocuments(current=>current.map(item=>item.id===updated.id?updated:item));
+   setReviewNotes(current=>({...current,[documentRow.id]:""}));
+   setReviewMessages(current=>({...current,[documentRow.id]:"وضعیت بررسی سند ثبت شد."}));
+  }catch(reviewFailure){
+   setReviewErrors(current=>({...current,[documentRow.id]:(reviewFailure as Error).message||"ثبت نتیجه بررسی سند ناموفق بود."}));
+  }finally{setReviewingId(null);}
+ }
+
+ async function replaceDocument(documentRow:ApplicationDocumentRow){
+  const file=replacementFiles[documentRow.id];
+  if(!file){setReplacementErrors(current=>({...current,[documentRow.id]:"فایل جایگزین را انتخاب کنید."}));return;}
+  if(file.size>10*1024*1024){setReplacementErrors(current=>({...current,[documentRow.id]:"حداکثر حجم هر سند ۱۰ مگابایت است."}));return;}
+  setReplacingId(documentRow.id);
+  setReplacementErrors(current=>({...current,[documentRow.id]:""}));
+  setReplacementMessages(current=>({...current,[documentRow.id]:""}));
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const body=new FormData();
+   body.set("file",file);
+   const created=await apiRequest("/api/v1/documents/"+documentRow.id+"/replace/",{method:"POST",headers:{"X-CSRFToken":String(csrf.csrfToken||"")},body}) as ApplicationDocumentRow;
+   setDocuments(current=>[created,...current]);
+   setReplacementFiles(current=>({...current,[documentRow.id]:null}));
+   setReplacementTargetId(null);
+   setReplacementMessages(current=>({...current,[documentRow.id]:"نسخه جدید ثبت شد؛ نسخه قبلی در تاریخچه باقی ماند."}));
+  }catch(replacementFailure){
+   setReplacementErrors(current=>({...current,[documentRow.id]:(replacementFailure as Error).message||"جایگزینی سند ناموفق بود."}));
+  }finally{setReplacingId(null);}
+ }
+
+ async function downloadDocument(documentRow:ApplicationDocumentRow){
+  if(documentRow.status==="rejected")return;
+  setDownloadingId(documentRow.id);
+  try{
+   const response=await fetch(apiBase+"/api/v1/documents/"+documentRow.id+"/download/",{credentials:"same-origin",headers:{Accept:"application/octet-stream, application/json"}});
+   if(!response.ok){
+    let payload:any={};
+    try{payload=await response.json();}catch{/* Some error responses have no JSON body. */}
+    throw new Error(getApiErrorMessage(payload)||"دریافت فایل سند ناموفق بود.");
+   }
+   const blob=await response.blob();
+   const url=URL.createObjectURL(blob);
+   const anchor=document.createElement("a");
+   anchor.href=url;
+   anchor.download=documentRow.original_filename||documentRow.document_number;
+   document.body.appendChild(anchor);
+   anchor.click();
+   anchor.remove();
+   window.setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }catch(downloadFailure){
+   setError((downloadFailure as Error).message||"دریافت فایل سند ناموفق بود.");
+  }finally{setDownloadingId(null);}
+ }
+
+ return <section className="card" style={{marginTop:16,padding:22}}>
+  <div className="card-head"><div><h2>اسناد و مدارک پرونده</h2><p>فایل‌ها به‌صورت خصوصی در بک‌اند نگهداری و نتیجه بررسی ثبت می‌شود.</p></div><span style={{fontSize:10,color:"#8492a5"}}>{documents.length.toLocaleString("fa-IR")} سند</span></div>
+  {canUpload&&<form onSubmit={event=>{event.preventDefault();void uploadDocument();}} style={{padding:16,border:"1px solid #edf1f6",borderRadius:9,background:"#fcfdff",marginBottom:18}}>
+   <h3 style={{margin:"0 0 12px",fontSize:12,color:"#35465b"}}>بارگذاری سند جدید</h3>
+   <div className="form-grid">
+    <div className="form-row"><label htmlFor="application-document-type">نوع سند *</label><select id="application-document-type" className="field" required value={uploadType} onChange={event=>setUploadType(event.target.value)}><option value="identity">مدرک هویتی</option><option value="address">مدرک نشانی</option><option value="income">مدرک درآمد</option><option value="bank_statement">گردش حساب</option><option value="contract">قرارداد</option><option value="other">سایر مدارک</option></select></div>
+    <div className="form-row"><label htmlFor="application-document-file">فایل سند (PDF، JPEG یا PNG؛ حداکثر ۱۰ مگابایت) *</label><input key={uploadInputKey} id="application-document-file" className="field" type="file" required accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={event=>setUploadFile(event.target.files?.[0]||null)}/>{uploadFile&&<small style={{color:"#8492a5"}}>{uploadFile.name} · {formatFileSize(uploadFile.size)}</small>}</div>
+   </div>
+   {uploadError&&<p role="alert" className="notice">{uploadError}</p>}
+   {uploadSuccess&&<p role="status" className="note">{uploadSuccess}</p>}
+   <div style={{display:"flex",justifyContent:"flex-start",marginTop:12}}><button className="btn primary" type="submit" disabled={uploading||!uploadFile}>{uploading?"در حال بارگذاری…":"بارگذاری سند"}</button></div>
+  </form>}
+  {loading?<p className="empty">در حال دریافت اسناد پرونده…</p>:error?<p role="alert" className="empty">{error}</p>:documents.length===0?<p className="empty">هنوز سندی برای این پرونده ثبت نشده است.</p>:<div style={{display:"grid",gap:12}}>
+   {documents.map(documentRow=>{
+    const superseded=documents.some(item=>item.replaces_document===documentRow.id);
+    const stateColor=documentRow.status==="accepted"?"#24704f":documentRow.status==="rejected"?"#b42318":"#a66b1f";
+    const stateBackground=documentRow.status==="accepted"?"#e8f7ef":documentRow.status==="rejected"?"#fff1f0":"#fff4e5";
+    return <article key={documentRow.id} style={{border:"1px solid #e8edf3",borderRadius:9,padding:15}}>
+     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+      <div style={{minWidth:0,flex:1}}><b style={{fontSize:11,color:"#35465b",overflowWrap:"anywhere"}}>{documentRow.original_filename}</b><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginTop:7}}><span style={{fontSize:9,color:"#8492a5"}}>{documentRow.document_number}</span><span style={{fontSize:9,color:"#8492a5"}}>{documentTypeLabels[documentRow.document_type]||documentRow.document_type}</span><span style={{fontSize:9,color:"#8492a5"}}>{formatFileSize(documentRow.size_bytes)}</span><span style={{fontSize:9,color:"#8492a5"}}>{displayDateTime(documentRow.created_at)}</span><span style={{fontSize:9,fontWeight:700,color:stateColor,background:stateBackground,padding:"4px 7px",borderRadius:5}}>{documentStatusLabels[documentRow.status]||documentRow.status}</span></div></div>
+      <button type="button" className="btn secondary" disabled={downloadingId===documentRow.id||documentRow.status==="rejected"} onClick={()=>void downloadDocument(documentRow)}>{downloadingId===documentRow.id?"در حال دریافت…":documentRow.status==="rejected"?"نیازمند نسخه اصلاحی":"دریافت فایل"}</button>
+     </div>
+     {documentRow.replaces_document_number&&<p style={{fontSize:10,color:"#66758a",margin:"9px 0 0"}}>جایگزین نسخه قبلی: {documentRow.replaces_document_number}</p>}
+     {documentRow.review_note&&<p style={{fontSize:10,lineHeight:1.9,color:documentRow.status==="rejected"?"#b42318":"#66758a",background:documentRow.status==="rejected"?"#fff8f7":"#f7f9fc",padding:9,borderRadius:6,margin:"10px 0 0"}}>یادداشت بررسی: {documentRow.review_note}{documentRow.reviewed_by_username?" · بررسی توسط "+documentRow.reviewed_by_username:""}{documentRow.reviewed_at?" · "+displayDateTime(documentRow.reviewed_at):""}</p>}
+     {documentRow.status==="rejected"&&canUpload&&!superseded&&<div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #edf1f6"}}>
+      {replacementTargetId===documentRow.id?<form onSubmit={event=>{event.preventDefault();void replaceDocument(documentRow);}}>
+       <div className="form-row"><label htmlFor={"replacement-file-"+documentRow.id}>فایل جایگزین (همان نوع سند؛ حداکثر ۱۰ مگابایت)</label><input id={"replacement-file-"+documentRow.id} className="field" type="file" required accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={event=>setReplacementFiles(current=>({...current,[documentRow.id]:event.target.files?.[0]||null}))}/></div>
+       {replacementErrors[documentRow.id]&&<p role="alert" className="notice">{replacementErrors[documentRow.id]}</p>}
+       <div style={{display:"flex",gap:8,marginTop:10}}><button className="btn primary" type="submit" disabled={replacingId===documentRow.id||!replacementFiles[documentRow.id]}>{replacingId===documentRow.id?"در حال ثبت…":"ثبت نسخه جایگزین"}</button><button type="button" className="btn secondary" disabled={replacingId===documentRow.id} onClick={()=>setReplacementTargetId(null)}>انصراف</button></div>
+      </form>:<button type="button" className="btn secondary" onClick={()=>{setReplacementTargetId(documentRow.id);setReplacementErrors(current=>({...current,[documentRow.id]:""}));}}>بارگذاری نسخه اصلاح‌شده</button>}
+     </div>}
+     {documentRow.status==="rejected"&&superseded&&<p style={{fontSize:9,color:"#8492a5",margin:"9px 0 0"}}>برای این نسخه، سند جایگزین ثبت شده است.</p>}
+     {canReview&&documentRow.status==="pending_review"&&<div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #edf1f6"}}>
+      <div className="form-row"><label htmlFor={"document-review-note-"+documentRow.id}>توضیح بررسی (برای بازگرداندن جهت اصلاح الزامی است)</label><textarea id={"document-review-note-"+documentRow.id} className="field" rows={2} maxLength={1000} value={reviewNotes[documentRow.id]||""} onChange={event=>setReviewNotes(current=>({...current,[documentRow.id]:event.target.value}))} style={{minHeight:65,resize:"vertical"}}/></div>
+      {reviewErrors[documentRow.id]&&<p role="alert" className="notice">{reviewErrors[documentRow.id]}</p>}
+      {reviewMessages[documentRow.id]&&<p role="status" className="note">{reviewMessages[documentRow.id]}</p>}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}><button type="button" className="btn primary" disabled={reviewingId===documentRow.id} onClick={()=>void reviewDocument(documentRow,"accepted")}>{reviewingId===documentRow.id?"در حال ثبت…":"پذیرش سند"}</button><button type="button" className="btn secondary" disabled={reviewingId===documentRow.id||!(reviewNotes[documentRow.id]||"").trim()} onClick={()=>void reviewDocument(documentRow,"rejected")}>{reviewingId===documentRow.id?"در حال ثبت…":"اعلام نیاز به اصلاح"}</button></div>
+     </div>}
+    </article>;
+   })}
+  </div>}
+  {!canUpload&&<p className="note">دسترسی این نقش برای مشاهده و دریافت اسناد است.</p>}
+ </section>;
+}
+
 function PasswordChangeForm({required,onSuccess}:{required:boolean;onSuccess:()=>void}){
  const [currentPassword,setCurrentPassword]=useState("");
  const [newPassword,setNewPassword]=useState("");
