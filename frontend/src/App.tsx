@@ -119,13 +119,13 @@ function buildStatusGradient(metrics: {count:number;color:string}[], total:numbe
 }
 const apiFieldLabels: Record<string, string> = {
  customer_type: "نوع مشتری", first_name: "نام", last_name: "نام خانوادگی",
- organization_name: "نام سازمان", phone_number: "شماره تلفن", email: "ایمیل", name: "نام خدمت", active: "وضعیت فعالیت", description: "توضیحات خدمت",
+ organization_name: "نام سازمان", phone_number: "شماره تلفن", email: "ایمیل", name: "نام خدمت", active: "وضعیت فعالیت",
  national_id: "کد ملی / شناسه ملی", birth_date: "تاریخ تولد",
  father_name: "نام پدر", occupation: "شغل", postal_code: "کدپستی",
  sana_verified: "وضعیت احراز ثنا", status: "وضعیت پرونده", notes: "یادداشت",
  customer: "مشتری", product_type: "نوع تسهیلات", requested_amount: "مبلغ درخواستی", service: "خدمت", discount: "تخفیف", paid: "مبلغ دریافتی", payment_method: "روش پرداخت", price: "تعرفه خدمت", online_cost: "هزینه آنلاین",
  term_months: "مدت بازپرداخت", title: "عنوان", application: "پرونده",
- priority: "اولویت", due_at: "موعد انجام", description: "شرح وظیفه",
+ priority: "اولویت", due_at: "موعد انجام", description: "توضیحات",
  current_password: "گذرواژه فعلی", new_password: "گذرواژه جدید",
  status_note: "دلیل تصمیم", requester_customer: "درخواست‌دهنده ضمانت", document_type: "نوع سند", file: "فایل سند", note: "شرح / توضیح", reason: "دلیل تصمیم",
 };
