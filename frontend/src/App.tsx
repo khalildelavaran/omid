@@ -46,7 +46,7 @@ function getApplicationStatusActions(application: Application, role: string | nu
 }
 type ApiUser = { id: number; username: string; first_name: string; last_name: string; role: string | null; role_label: string | null; must_change_password: boolean };
 type ApiError = Error & { status?: number };
-type CustomerRow = { id:string; customer_number:string; customer_type:string; first_name:string; last_name:string; organization_name:string; phone_number:string; email:string; status:string; created_at:string };
+type CustomerRow = { id:string; customer_number:string; customer_type:string; first_name:string; last_name:string; organization_name:string; phone_number:string; email:string; national_id?:string; birth_date?:string|null; father_name?:string; occupation?:string; postal_code?:string; sana_verified?:boolean; notes?:string; status:string; created_at:string };
 type TaskRow = { id:string; task_number:string; application:string; application_number:string; title:string; description:string; status:string; priority:string; assigned_to:string|number; assigned_to_username:string; created_by_username:string; due_at:string|null; completed_at:string|null; created_at:string; is_overdue:boolean };
 type TaskEventRow = { id:string; task:string; event_type:string; previous_status:string|null; new_status:string|null; previous_assignee_username:string|null; new_assignee_username:string|null; previous_due_at:string|null; new_due_at:string|null; note:string; actor_username:string|null; created_at:string };
 type FollowUpSuggestion = { key:string; title:string; description:string; priority:string };
@@ -302,6 +302,7 @@ function App(){
  const [applicationNoteError,setApplicationNoteError]=useState("");
  const [applicationNoteSuccess,setApplicationNoteSuccess]=useState("");
  const [showCustomerForm,setShowCustomerForm]=useState(false);
+ const [editingCustomerId,setEditingCustomerId]=useState<string|null>(null);
  const [customerSaving,setCustomerSaving]=useState(false);
  const [customerFormError,setCustomerFormError]=useState("");
  const [customerType,setCustomerType]=useState<"individual"|"organization">("individual");
@@ -318,6 +319,28 @@ function App(){
  const [customerSanaVerified,setCustomerSanaVerified]=useState(false);
  const [customerStatus,setCustomerStatus]=useState("active");
  const [customerNotes,setCustomerNotes]=useState("");
+ function beginCustomerEdit(customer:CustomerRow){
+  setEditingCustomerId(customer.id);
+  setCustomerFormError("");
+  setCustomerType(customer.customer_type==="organization"?"organization":"individual");
+  setCustomerFirstName(customer.first_name||"");
+  setCustomerLastName(customer.last_name||"");
+  setCustomerOrganizationName(customer.organization_name||"");
+  setCustomerPhone(customer.phone_number||"");
+  setCustomerEmail(customer.email||"");
+  setCustomerNationalId(customer.national_id||"");
+  setCustomerBirthDate(customer.birth_date||"");
+  setCustomerFatherName(customer.father_name||"");
+  setCustomerOccupation(customer.occupation||"");
+  setCustomerPostalCode(customer.postal_code||"");
+  setCustomerSanaVerified(Boolean(customer.sana_verified));
+  setCustomerStatus(customer.status||"active");
+  setCustomerNotes(customer.notes||"");
+  setShowCustomerForm(true);
+ }
+ function resetCustomerForm(){
+  setEditingCustomerId(null);setCustomerType("individual");setCustomerFirstName("");setCustomerLastName("");setCustomerOrganizationName("");setCustomerPhone("");setCustomerEmail("");setCustomerNationalId("");setCustomerBirthDate("");setCustomerFatherName("");setCustomerOccupation("");setCustomerPostalCode("");setCustomerSanaVerified(false);setCustomerStatus("active");setCustomerNotes("");setCustomerFormError("");setShowCustomerForm(false);
+ }
  const [showTaskForm,setShowTaskForm]=useState(false);
  const [taskSaving,setTaskSaving]=useState(false);
  const [taskFormError,setTaskFormError]=useState("");
@@ -550,7 +573,7 @@ function App(){
    {selected&&<ApplicationFollowUps selected={selected} authUser={authUser}/>}
    {selected&&<ApplicationStageWorkflow selected={selected} authUser={authUser}/>}  
    {page==="customers"&&!selected&&showCustomerForm&&<section className="card" style={{marginBottom:18,padding:22}}>
-    <div className="card-head"><div><h2>ثبت مشتری جدید</h2><p>اطلاعات در بک‌اند ذخیره و شماره مشتری به‌صورت خودکار تولید می‌شود.</p></div><button type="button" className="btn secondary" onClick={()=>setShowCustomerForm(false)}>بستن</button></div>
+    <div className="card-head"><div><h2>{editingCustomerId?"ویرایش پروفایل مشتری":"ثبت مشتری جدید"}</h2><p>{editingCustomerId?"تغییرات در پرونده مشتری ذخیره و در سوابق سامانه ثبت می‌شود.":"اطلاعات در بک‌اند ذخیره و شماره مشتری به‌صورت خودکار تولید می‌شود."}</p></div><button type="button" className="btn secondary" onClick={resetCustomerForm}>بستن</button></div>
     {customerFormError&&<p role="alert" className="notice">{customerFormError}</p>}
     <form onSubmit={async event=>{
      event.preventDefault();setCustomerSaving(true);setCustomerFormError("");
@@ -574,9 +597,10 @@ function App(){
        notes:customerNotes.trim(),
        ...(phones.length?{phones}:{})
       };
-      const createdCustomer=await apiRequest("/api/v1/customers/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify(payload)});
-      setCustomers(current=>[createdCustomer as CustomerRow,...current.filter(customer=>customer.id!==String(createdCustomer.id))]);
-      setShowCustomerForm(false);setCustomerType("individual");setCustomerFirstName("");setCustomerLastName("");setCustomerOrganizationName("");setCustomerPhone("");setCustomerEmail("");setCustomerNationalId("");setCustomerBirthDate("");setCustomerFatherName("");setCustomerOccupation("");setCustomerPostalCode("");setCustomerSanaVerified(false);setCustomerStatus("active");setCustomerNotes("");setApiState("connected");setApiError("");setSectionError("");
+      const customerPath=editingCustomerId?"/api/v1/customers/"+editingCustomerId+"/":"/api/v1/customers/";
+      const savedCustomer=await apiRequest(customerPath,{method:editingCustomerId?"PATCH":"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify(payload)}) as CustomerRow;
+      setCustomers(current=>editingCustomerId?current.map(customer=>customer.id===savedCustomer.id?savedCustomer:customer):[savedCustomer,...current.filter(customer=>customer.id!==savedCustomer.id)]);
+      resetCustomerForm();setApiState("connected");setApiError("");setSectionError("");
      }catch(error){setCustomerFormError((error as Error).message||"ثبت مشتری ناموفق بود.");}
      finally{setCustomerSaving(false);}
     }}>
@@ -599,10 +623,10 @@ function App(){
       <div className="form-row"><label>یادداشت</label><input className="field" maxLength={2000} value={customerNotes} onChange={event=>setCustomerNotes(event.target.value)}/></div>
       <label className="form-row" style={{display:"flex",alignItems:"center",gap:8}}><input type="checkbox" checked={customerSanaVerified} onChange={event=>setCustomerSanaVerified(event.target.checked)}/> احراز ثنا انجام شده است</label>
      </div>
-     <div style={{display:"flex",justifyContent:"flex-start",gap:8,marginTop:18}}><button className="btn primary" type="submit" disabled={customerSaving}>{customerSaving?"در حال ثبت…":"ثبت مشتری"}</button><button className="btn secondary" type="button" disabled={customerSaving} onClick={()=>setShowCustomerForm(false)}>انصراف</button></div>
+     <div style={{display:"flex",justifyContent:"flex-start",gap:8,marginTop:18}}><button className="btn primary" type="submit" disabled={customerSaving}>{customerSaving?"در حال ذخیره…":editingCustomerId?"ذخیره تغییرات":"ثبت مشتری"}</button><button className="btn secondary" type="button" disabled={customerSaving} onClick={resetCustomerForm}>انصراف</button></div>
     </form>
    </section>}
-   {page==="customers"&&!selected&&<section className="card list-card"><div className="card-head"><div><h2>فهرست مشتریان</h2><p>{filteredCustomers.length.toLocaleString("fa-IR")} از {customers.length.toLocaleString("fa-IR")} مشتری</p></div><button className="btn secondary" onClick={()=>setPage("applications")}>پرونده‌های تسهیلاتی</button></div>{sectionLoading?<p className="empty">در حال دریافت اطلاعات مشتریان…</p>:sectionError?<p className="empty" role="alert">{sectionError}</p>:<div className="table-wrap"><table><thead><tr><th>شماره مشتری</th><th>نام / شرکت</th><th>نوع</th><th>تلفن</th><th>وضعیت</th><th>تاریخ ثبت</th></tr></thead><tbody>{filteredCustomers.map(customer=><tr key={customer.id}><td><b className="case-id">{customer.customer_number}</b></td><td><b>{customer.customer_type==="organization"?customer.organization_name:[customer.first_name,customer.last_name].filter(Boolean).join(" ")||"—"}</b></td><td>{customer.customer_type==="organization"?"حقوقی":"حقیقی"}</td><td>{customer.phone_number||"—"}</td><td><Status value={customer.status==="active"?"فعال":customer.status==="needs_review"?"نیازمند بررسی":customer.status==="archived"?"بایگانی‌شده":"غیرفعال"}/></td><td>{displayDate(customer.created_at)}</td></tr>)}{!filteredCustomers.length&&<tr><td colSpan={6} className="empty">{normalizedQuery?"مشتری مطابق عبارت جستجو پیدا نشد.":"مشتری‌ای برای نمایش وجود ندارد."}</td></tr>}</tbody></table></div>}</section>}
+   {page==="customers"&&!selected&&<section className="card list-card"><div className="card-head"><div><h2>فهرست مشتریان</h2><p>{filteredCustomers.length.toLocaleString("fa-IR")} از {customers.length.toLocaleString("fa-IR")} مشتری</p></div><button className="btn secondary" onClick={()=>setPage("applications")}>پرونده‌های تسهیلاتی</button></div>{sectionLoading?<p className="empty">در حال دریافت اطلاعات مشتریان…</p>:sectionError?<p className="empty" role="alert">{sectionError}</p>:<div className="table-wrap"><table><thead><tr><th>شماره مشتری</th><th>نام / شرکت</th><th>نوع</th><th>تلفن</th><th>وضعیت</th><th>تاریخ ثبت</th><th>اقدام</th></tr></thead><tbody>{filteredCustomers.map(customer=><tr key={customer.id}><td><b className="case-id">{customer.customer_number}</b></td><td><b>{customer.customer_type==="organization"?customer.organization_name:[customer.first_name,customer.last_name].filter(Boolean).join(" ")||"—"}</b></td><td>{customer.customer_type==="organization"?"حقوقی":"حقیقی"}</td><td>{customer.phone_number||"—"}</td><td><Status value={customer.status==="active"?"فعال":customer.status==="needs_review"?"نیازمند بررسی":customer.status==="archived"?"بایگانی‌شده":"غیرفعال"}/></td><td>{displayDate(customer.created_at)}</td><td><button type="button" className="btn secondary" onClick={()=>beginCustomerEdit(customer)}>ویرایش</button></td></tr>)}{!filteredCustomers.length&&<tr><td colSpan={7} className="empty">{normalizedQuery?"مشتری مطابق عبارت جستجو پیدا نشد.":"مشتری‌ای برای نمایش وجود ندارد."}</td></tr>}</tbody></table></div>}</section>}
    {page==="tasks"&&!selected&&showTaskForm&&<section className="card" style={{marginBottom:18,padding:22}}>
     <div className="card-head"><div><h2>ثبت وظیفهٔ گردش کار</h2><p>وظیفه به پروندهٔ انتخاب‌شده وصل می‌شود و رویداد ایجاد آن در تاریخچهٔ بک‌اند ثبت خواهد شد.</p></div><button type="button" className="btn secondary" onClick={()=>setShowTaskForm(false)}>بستن</button></div>
     {taskFormError&&<p role="alert" className="notice">{taskFormError}</p>}
