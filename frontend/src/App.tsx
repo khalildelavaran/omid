@@ -2,7 +2,41 @@ import { useEffect, useMemo, useState } from "react";
 import "./style.css";
 
 type NavKey = "dashboard" | "applications" | "customers" | "tasks" | "reports" | "settings";
-type Application = { uuid: string; id: string; customer: string; type: string; amount: string; stage: string; status: string; date: string };
+type Application = { uuid: string; id: string; customer: string; type: string; amount: string; stage: string; status: string; statusKey: string; date: string };
+type ApplicationStatusAction = { status: string; label: string; variant: "primary" | "secondary"; requiresReason?: boolean };
+const workflowStages = [
+ {key:"under_review",label:"بررسی اولیه"},
+ {key:"awaiting_documents",label:"تکمیل مدارک"},
+ {key:"awaiting_approval",label:"تصمیم اعتباری"},
+];
+const staffWorkflowActions: Record<string, ApplicationStatusAction[]> = {
+ under_review: [
+  {status:"awaiting_documents",label:"درخواست تکمیل مدارک",variant:"secondary"},
+  {status:"awaiting_approval",label:"ارسال برای تأیید اعتباری",variant:"primary"},
+  {status:"cancelled",label:"لغو پرونده",variant:"secondary"},
+ ],
+ awaiting_documents: [
+  {status:"under_review",label:"بازگشت به بررسی",variant:"secondary"},
+  {status:"awaiting_approval",label:"ارسال برای تأیید اعتباری",variant:"primary"},
+  {status:"cancelled",label:"لغو پرونده",variant:"secondary"},
+ ],
+ awaiting_approval: [
+  {status:"under_review",label:"بازگشت به بررسی",variant:"secondary"},
+  {status:"cancelled",label:"لغو پرونده",variant:"secondary"},
+ ],
+};
+function getApplicationStatusActions(application: Application, role: string | null): ApplicationStatusAction[] {
+ if(role==="credit_approver" && application.statusKey==="awaiting_approval") {
+  return [
+   {status:"approved",label:"تأیید اعتباری",variant:"primary"},
+   {status:"rejected",label:"رد درخواست",variant:"secondary",requiresReason:true},
+  ];
+ }
+ if(role==="system_admin"||role==="intake"||role==="case_worker") {
+  return staffWorkflowActions[application.statusKey] || [];
+ }
+ return [];
+}
 type ApiUser = { id: number; username: string; first_name: string; last_name: string; role: string | null; role_label: string | null; must_change_password: boolean };
 type ApiError = Error & { status?: number };
 type CustomerRow = { id:string; customer_number:string; customer_type:string; first_name:string; last_name:string; organization_name:string; phone_number:string; email:string; status:string; created_at:string };
@@ -16,7 +50,7 @@ const nav: {key:NavKey;label:string;icon:string;group:string}[] = [
  {key:"reports",label:"گزارش‌ها",icon:"▥",group:"عملیات"},
  {key:"settings",label:"تنظیمات",icon:"⚙",group:"مدیریت"},
 ];
-const stages = ["ثبت درخواست","تکمیل پرونده","بررسی مدارک","بررسی اعتباری","تصمیم اعتباری","قرارداد","پرداخت تسهیلات"];
+
 const apiBase = ""; // Same-origin only: Vite proxies /api locally and Cloudflare Worker proxies it in production.
 const statusLabels: Record<string, string> = {
  under_review: "در حال بررسی",
@@ -56,11 +90,12 @@ const apiFieldLabels: Record<string, string> = {
  organization_name: "نام سازمان", phone_number: "شماره تلفن", email: "ایمیل",
  national_id: "کد ملی / شناسه ملی", birth_date: "تاریخ تولد",
  father_name: "نام پدر", occupation: "شغل", postal_code: "کدپستی",
- sana_verified: "وضعیت احراز ثنا", status: "وضعیت", notes: "یادداشت",
+ sana_verified: "وضعیت احراز ثنا", status: "وضعیت پرونده", notes: "یادداشت",
  customer: "مشتری", product_type: "نوع تسهیلات", requested_amount: "مبلغ درخواستی",
  term_months: "مدت بازپرداخت", title: "عنوان", application: "پرونده",
  priority: "اولویت", due_at: "موعد انجام", description: "شرح وظیفه",
  current_password: "گذرواژه فعلی", new_password: "گذرواژه جدید",
+ status_note: "دلیل تصمیم",
 };
 function getApiErrorMessage(payload: any): string {
  if (typeof payload?.detail === "string") return payload.detail;
@@ -106,6 +141,7 @@ function mapApplication(x: any): Application {
   amount: formatMoney(x.requested_amount),
   stage: statusLabels[String(x.status)] || "ثبت درخواست",
   status: statusLabels[String(x.status)] || String(x.status || "نامشخص"),
+  statusKey: String(x.status || ""),
   date: displayDate(x.created_at),
  };
 }
@@ -163,6 +199,10 @@ function App(){
  const [applicationNotes,setApplicationNotes]=useState("");
  const [applicationSaving,setApplicationSaving]=useState(false);
  const [applicationFormError,setApplicationFormError]=useState("");
+ const [applicationStatusSaving,setApplicationStatusSaving]=useState(false);
+ const [applicationStatusError,setApplicationStatusError]=useState("");
+ const [applicationStatusSuccess,setApplicationStatusSuccess]=useState("");
+ const [applicationDecisionNote,setApplicationDecisionNote]=useState("");
  const [showCustomerForm,setShowCustomerForm]=useState(false);
  const [customerSaving,setCustomerSaving]=useState(false);
  const [customerFormError,setCustomerFormError]=useState("");
@@ -202,6 +242,11 @@ function App(){
   return ()=>{active=false;};
  },[]);
  useEffect(()=>{
+  setApplicationDecisionNote("");
+  setApplicationStatusError("");
+  setApplicationStatusSuccess("");
+ },[selected?.uuid]);
+ useEffect(()=>{
   if(!authUser || !["dashboard","customers","tasks","reports"].includes(page)) return;
   let active=true;
   setSectionLoading(true);setSectionError("");
@@ -228,6 +273,30 @@ function App(){
   void load();
   return ()=>{active=false;};
  },[authUser,page]);
+ async function changeApplicationStatus(nextStatus:string){
+  if(!selected)return;
+  const action=getApplicationStatusActions(selected,authUser?.role||null).find(item=>item.status===nextStatus);
+  if(!action)return;
+  if(action.requiresReason&&!applicationDecisionNote.trim()){
+   setApplicationStatusError("برای رد درخواست، ثبت دلیل تصمیم الزامی است.");
+   return;
+  }
+  if(nextStatus==="cancelled"&&!window.confirm("آیا از لغو این پرونده مطمئن هستید؟ پس از لغو، تغییر وضعیت عادی ممکن نخواهد بود."))return;
+  if(nextStatus==="rejected"&&!window.confirm("آیا از ثبت تصمیم نهایی رد درخواست مطمئن هستید؟"))return;
+  setApplicationStatusSaving(true);setApplicationStatusError("");setApplicationStatusSuccess("");
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const updated=await apiRequest("/api/v1/applications/"+selected.uuid+"/",{method:"PATCH",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({status:nextStatus,...(action.requiresReason?{status_note:applicationDecisionNote.trim()}:{})})});
+   const mapped=mapApplication(updated);
+   setSelected(mapped);
+   setApps(current=>current.map(item=>item.uuid===mapped.uuid?mapped:item));
+   setApplicationDecisionNote("");
+   setApplicationStatusSuccess("وضعیت پرونده با موفقیت به «"+mapped.status+"» تغییر کرد.");
+   setApiState("connected");setApiError("");
+  }catch(error){
+   setApplicationStatusError((error as Error).message||"تغییر وضعیت پرونده ناموفق بود.");
+  }finally{setApplicationStatusSaving(false);}
+ }
  async function changeTaskStatus(task:TaskRow,nextStatus:string){
   try{const csrf=await apiRequest("/api/v1/auth/csrf/");await apiRequest("/api/v1/tasks/"+task.id+"/",{method:"PATCH",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({status:nextStatus})});setTasks(await getTasks());setSectionError("");}catch(error){setSectionError((error as Error).message||"به‌روزرسانی وضعیت وظیفه ناموفق بود.");}
  }
@@ -302,7 +371,13 @@ function App(){
      {!sectionLoading&&!sectionError&&followUpTasks.length===0&&<p className="empty">وظیفهٔ بازی برای پیگیری وجود ندارد.</p>}
     </section></div></>}
    {page==="applications"&&!selected&&<section className="card list-card"><div className="card-head list-head"><div><h2>همه پرونده‌ها</h2><p>{filtered.length.toLocaleString("fa-IR")} پرونده مطابق فیلتر</p></div><button className="btn secondary" onClick={()=>{setQuery("");setStatus("همه وضعیت‌ها")}}>پاک‌کردن فیلترها</button></div><div className="filters"><label className="search-field">⌕ <input placeholder="جستجو بر اساس شماره پرونده، مشتری..." value={query} onChange={e=>setQuery(e.target.value)}/></label><select value={status} onChange={e=>setStatus(e.target.value)}><option>همه وضعیت‌ها</option>{["در حال بررسی","نیازمند اقدام","در انتظار","تکمیل شده"].map(s=><option key={s}>{s}</option>)}</select><button className="btn secondary" onClick={()=>window.print()}>⇩ خروجی / چاپ</button></div><ApplicationsTable rows={filtered} onSelect={setSelected}/></section>}
-   {selected&&<section className="detail-layout"><section className="card detail-main"><div className="detail-id"><div><span className="eyebrow">شماره پرونده</span><h2>{selected.id}</h2></div><Status value={selected.status}/></div><div className="detail-fields">{[["نام مشتری",selected.customer],["نوع تسهیلات",selected.type],["مبلغ درخواستی",selected.amount+" تومان"],["مرحله جاری",selected.stage],["تاریخ ثبت",selected.date],["شناسه پرونده",selected.id]].map(x=><div key={x[0]}><small>{x[0]}</small><b>{x[1]}</b></div>)}</div><div className="card-head"><div><h2>مراحل پرونده</h2><p>گردش کار پرونده از ثبت تا پرداخت</p></div></div><div className="workflow">{stages.map((s,i)=><div className={"workflow-step "+(s===selected.stage?"current":stages.indexOf(selected.stage)>i?"done":"")} key={s}><span>{stages.indexOf(selected.stage)>i?"✓":i+1}</span><div><b>{s}</b><small>{s===selected.stage?"مرحله جاری":stages.indexOf(selected.stage)>i?"تکمیل‌شده":"در انتظار انجام"}</small></div></div>)}</div><button className="btn secondary" onClick={()=>setSelected(null)}>← بازگشت به فهرست پرونده‌ها</button></section><aside className="card detail-aside"><h3>اقدامات پرونده</h3><p>دسترسی سریع به عملیات مرتبط با این پرونده</p><button className="btn primary full" onClick={()=>alert("عملیات مرحله بعد باید از طریق API گردش کار انجام شود.")}>ادامه فرایند ←</button><button className="btn secondary full" onClick={()=>window.print()}>چاپ خلاصه پرونده</button><div className="note"><b>نکته</b><p>تغییر مرحله پرونده باید با مجوز کاربر و از طریق API بک‌اند ثبت شود.</p></div></aside></section>}
+   {selected&&<section className="detail-layout"><section className="card detail-main"><div className="detail-id"><div><span className="eyebrow">شماره پرونده</span><h2>{selected.id}</h2></div><Status value={selected.status}/></div><div className="detail-fields">{[["نام مشتری",selected.customer],["نوع تسهیلات",selected.type],["مبلغ درخواستی",selected.amount+" تومان"],["مرحله جاری",selected.stage],["تاریخ ثبت",selected.date],["شناسه پرونده",selected.id]].map(x=><div key={x[0]}><small>{x[0]}</small><b>{x[1]}</b></div>)}</div><div className="card-head"><div><h2>مراحل پرونده</h2><p>گردش کار پرونده از ثبت تا پرداخت</p></div></div><div className="workflow">{["approved","rejected","cancelled"].includes(selected.statusKey)?<div className={"workflow-step "+(selected.statusKey==="approved"?"done":"current")}><span>{selected.statusKey==="approved"?"✓":"!"}</span><div><b>{selected.status}</b><small>پرونده به وضعیت نهایی رسیده است.</small></div></div>:workflowStages.map((stageItem,i)=>{const currentStage=workflowStages.findIndex(item=>item.key===selected.statusKey);return <div className={"workflow-step "+(stageItem.key===selected.statusKey?"current":currentStage>i?"done":"")} key={stageItem.key}><span>{currentStage>i?"✓":i+1}</span><div><b>{stageItem.label}</b><small>{stageItem.key===selected.statusKey?"مرحله جاری":currentStage>i?"تکمیل‌شده":"در انتظار انجام"}</small></div></div>;})}</div><button className="btn secondary" onClick={()=>setSelected(null)}>← بازگشت به فهرست پرونده‌ها</button></section><aside className="card detail-aside"><h3>اقدامات پرونده</h3><p>اقدام‌های مجاز بر اساس نقش کاربر و وضعیت فعلی</p>
+   {applicationStatusError&&<p role="alert" className="notice">{applicationStatusError}</p>}
+   {applicationStatusSuccess&&<p role="status" className="note">{applicationStatusSuccess}</p>}
+   {getApplicationStatusActions(selected,authUser?.role||null).some(action=>action.requiresReason)&&<div className="form-row" style={{marginTop:12}}><label htmlFor="application-decision-note">دلیل رد درخواست *</label><textarea id="application-decision-note" className="field" rows={3} maxLength={1000} value={applicationDecisionNote} onChange={event=>setApplicationDecisionNote(event.target.value)} placeholder="دلیل تصمیم اعتباری را ثبت کنید." style={{minHeight:84,resize:"vertical"}}/></div>}
+   {getApplicationStatusActions(selected,authUser?.role||null).map(action=><button key={action.status} className={"btn "+action.variant+" full"} disabled={applicationStatusSaving||(action.requiresReason&&!applicationDecisionNote.trim())} onClick={()=>void changeApplicationStatus(action.status)}>{applicationStatusSaving?"در حال ثبت…":action.label}</button>)}
+   {getApplicationStatusActions(selected,authUser?.role||null).length===0&&<p className="note">برای نقش فعلی یا وضعیت این پرونده، تغییر وضعیت مجازی وجود ندارد.</p>}
+   <button className="btn secondary full" onClick={()=>window.print()}>چاپ خلاصه پرونده</button></aside></section>}
    {page==="customers"&&!selected&&showCustomerForm&&<section className="card" style={{marginBottom:18,padding:22}}>
     <div className="card-head"><div><h2>ثبت مشتری جدید</h2><p>اطلاعات در بک‌اند ذخیره و شماره مشتری به‌صورت خودکار تولید می‌شود.</p></div><button type="button" className="btn secondary" onClick={()=>setShowCustomerForm(false)}>بستن</button></div>
     {customerFormError&&<p role="alert" className="notice">{customerFormError}</p>}
