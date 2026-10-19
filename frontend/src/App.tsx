@@ -48,6 +48,8 @@ type ApiUser = { id: number; username: string; first_name: string; last_name: st
 type ApiError = Error & { status?: number };
 type CustomerRow = { id:string; customer_number:string; customer_type:string; first_name:string; last_name:string; organization_name:string; phone_number:string; email:string; status:string; created_at:string };
 type TaskRow = { id:string; task_number:string; application_number:string; title:string; status:string; priority:string; assigned_to_username:string; due_at:string|null; is_overdue:boolean };
+type ApplicationTaskRow = { id:string; task_number:string; application:string; application_number:string; title:string; description:string; status:string; priority:string; assigned_to:number|string; assigned_to_username:string; created_by:number|string; created_by_username:string; due_at:string|null; completed_at:string|null; created_at:string; updated_at:string; is_overdue:boolean };
+type ApplicationTaskEventRow = { id:string; task:string; event_type:string; previous_status:string; new_status:string; previous_assignee_username:string|null; new_assignee_username:string|null; previous_due_at:string|null; new_due_at:string|null; note:string; actor_username:string|null; created_at:string };
 type OperationsReport = { generated_at:string; scope:string; customers:{total:number;active:number;inactive:number;archived:number}; applications:{total:number;by_status:Record<string,number>}; tasks:{total:number;open:number;in_progress:number;completed:number;cancelled:number;overdue:number;due_today:number}; guarantees:{total:number;by_status:Record<string,number>}; service_receipts:{count:number;gross_total:string;paid_total:string;outstanding_total:string} };
 const nav: {key:NavKey;label:string;icon:string;group:string}[] = [
  {key:"dashboard",label:"داشبورد",icon:"▦",group:"فضای کاری"},
@@ -74,6 +76,15 @@ const documentStatusLabels: Record<string,string> = { pending_review:"در ان�
 const guaranteeStatusLabels: Record<string,string> = { registered:"ثبت‌شده", under_review:"در حال بررسی", approved:"تأیید شده", rejected:"رد شده", fulfilled:"انجام‌شده", cancelled:"لغو شده" };
 const guaranteeEventLabels: Record<string,string> = { created:"ثبت درخواست ضمانت", status_changed:"تغییر وضعیت", note_added:"یادداشت پیگیری" };
 const paymentMethodLabels: Record<string,string> = { pos:"کارت‌خوان", cash:"نقدی", bank_transfer:"واریز بانکی", other:"سایر" };
+const taskStatusLabels:Record<string,string>={open:"باز",in_progress:"در حال انجام",completed:"انجام‌شده",cancelled:"لغوشده"};
+const taskPriorityLabels:Record<string,string>={low:"کم",normal:"عادی",high:"زیاد",urgent:"فوری"};
+const taskEventLabels:Record<string,string>={created:"ایجاد وظیفه",updated:"ویرایش وظیفه",status_changed:"تغییر وضعیت",assigned:"واگذاری وظیفه",due_date_changed:"تغییر موعد",note_added:"یادداشت پیگیری"};
+function getApplicationTaskActions(task:ApplicationTaskRow,canMutate:boolean):{status:string;label:string;variant:"primary"|"secondary"}[]{
+ if(!canMutate)return [];
+ if(task.status==="open")return [{status:"in_progress",label:"شروع انجام",variant:"primary"},{status:"completed",label:"تکمیل وظیفه",variant:"secondary"},{status:"cancelled",label:"لغو وظیفه",variant:"secondary"}];
+ if(task.status==="in_progress")return [{status:"open",label:"بازگشت به باز",variant:"secondary"},{status:"completed",label:"تکمیل وظیفه",variant:"primary"},{status:"cancelled",label:"لغو وظیفه",variant:"secondary"}];
+ return [];
+}
 function parseIntegerMoney(value:string):bigint|null {
  const normalized=String(value||"").trim();
  if(!/^\d+$/.test(normalized))return null;
@@ -506,6 +517,7 @@ function App(){
    </section>}
    {selected&&<ApplicationDocuments selected={selected} authUser={authUser}/>}
    {selected&&<ApplicationGuarantees selected={selected} authUser={authUser}/>}
+   {selected&&<ApplicationFollowUps selected={selected} authUser={authUser}/>}
    {page==="customers"&&!selected&&showCustomerForm&&<section className="card" style={{marginBottom:18,padding:22}}>
     <div className="card-head"><div><h2>ثبت مشتری جدید</h2><p>اطلاعات در بک‌اند ذخیره و شماره مشتری به‌صورت خودکار تولید می‌شود.</p></div><button type="button" className="btn secondary" onClick={()=>setShowCustomerForm(false)}>بستن</button></div>
     {customerFormError&&<p role="alert" className="notice">{customerFormError}</p>}
@@ -599,6 +611,159 @@ function App(){
    </div></main>
  </div>
 }
+function ApplicationFollowUps({selected,authUser}:{selected:Application;authUser:ApiUser|null}){
+ const [tasks,setTasks]=useState<ApplicationTaskRow[]>([]);
+ const [loading,setLoading]=useState(true);
+ const [error,setError]=useState("");
+ const [formOpen,setFormOpen]=useState(false);
+ const [title,setTitle]=useState("");
+ const [description,setDescription]=useState("");
+ const [priority,setPriority]=useState("normal");
+ const [dueAt,setDueAt]=useState("");
+ const [saving,setSaving]=useState(false);
+ const [createError,setCreateError]=useState("");
+ const [createSuccess,setCreateSuccess]=useState("");
+ const [updatingId,setUpdatingId]=useState<string|null>(null);
+ const [statusErrors,setStatusErrors]=useState<Record<string,string>>({});
+ const [statusMessages,setStatusMessages]=useState<Record<string,string>>({});
+ const [eventsByTask,setEventsByTask]=useState<Record<string,ApplicationTaskEventRow[]>>({});
+ const [eventsLoadingId,setEventsLoadingId]=useState<string|null>(null);
+ const [eventsErrors,setEventsErrors]=useState<Record<string,string>>({});
+ const [openHistoryId,setOpenHistoryId]=useState<string|null>(null);
+ const [notesByTask,setNotesByTask]=useState<Record<string,string>>({});
+ const [notesSavingId,setNotesSavingId]=useState<string|null>(null);
+ const [notesErrors,setNotesErrors]=useState<Record<string,string>>({});
+ const [notesMessages,setNotesMessages]=useState<Record<string,string>>({});
+ const role=authUser?.role||"";
+ const canCreate=["system_admin","intake","case_worker"].includes(role);
+
+ useEffect(()=>{
+  let active=true;
+  setLoading(true);setError("");
+  setTasks([]);setEventsByTask({});setOpenHistoryId(null);
+  void apiRequest("/api/v1/tasks/?application="+encodeURIComponent(selected.uuid)).then(payload=>{
+   const rows=Array.isArray(payload)?payload:payload.results;
+   if(!Array.isArray(rows))throw new Error("ساختار پاسخ وظایف پرونده معتبر نیست.");
+   if(active)setTasks(rows as ApplicationTaskRow[]);
+  }).catch(failure=>{
+   if(active)setError((failure as Error).message||"دریافت وظایف پرونده ناموفق بود.");
+  }).finally(()=>{if(active)setLoading(false);});
+  return ()=>{active=false;};
+ },[selected.uuid]);
+
+ async function createTask(){
+  if(!title.trim()){setCreateError("عنوان وظیفه الزامی است.");return;}
+  setSaving(true);setCreateError("");setCreateSuccess("");
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   let normalizedDueAt:string|null=null;
+   if(dueAt){
+    const parsed=new Date(dueAt);
+    if(Number.isNaN(parsed.getTime()))throw new Error("موعد واردشده معتبر نیست.");
+    normalizedDueAt=parsed.toISOString();
+   }
+   const created=await apiRequest("/api/v1/tasks/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({
+    application:selected.uuid,
+    title:title.trim(),
+    description:description.trim(),
+    priority,
+    due_at:normalizedDueAt
+   })}) as ApplicationTaskRow;
+   setTasks(current=>[created,...current.filter(task=>task.id!==created.id)]);
+   setTitle("");setDescription("");setPriority("normal");setDueAt("");setFormOpen(false);
+   setCreateSuccess("وظیفه «"+created.task_number+"» ثبت شد و به حساب شما تخصیص یافت.");
+  }catch(failure){
+   setCreateError((failure as Error).message||"ثبت وظیفه ناموفق بود.");
+  }finally{setSaving(false);}
+ }
+
+ async function changeTaskStatus(task:ApplicationTaskRow,nextStatus:string){
+  if(task.status===nextStatus)return;
+  if(nextStatus==="cancelled"&&!window.confirm("آیا از لغو این وظیفه مطمئن هستید؟"))return;
+  setUpdatingId(task.id);setStatusErrors(current=>({...current,[task.id]:""}));setStatusMessages(current=>({...current,[task.id]:""}));
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const updated=await apiRequest("/api/v1/tasks/"+task.id+"/",{method:"PATCH",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({status:nextStatus})}) as ApplicationTaskRow;
+   setTasks(current=>current.map(item=>item.id===updated.id?updated:item));
+   setStatusMessages(current=>({...current,[task.id]:"وضعیت وظیفه تغییر کرد."}));
+   setEventsByTask(current=>{const next={...current};delete next[task.id];return next;});
+  }catch(failure){
+   setStatusErrors(current=>({...current,[task.id]:(failure as Error).message||"تغییر وضعیت وظیفه ناموفق بود."}));
+  }finally{setUpdatingId(null);}
+ }
+
+ async function toggleTaskHistory(task:ApplicationTaskRow){
+  if(openHistoryId===task.id){setOpenHistoryId(null);return;}
+  setOpenHistoryId(task.id);
+  if(eventsByTask[task.id])return;
+  setEventsLoadingId(task.id);setEventsErrors(current=>({...current,[task.id]:""}));
+  try{
+   const payload=await apiRequest("/api/v1/tasks/"+task.id+"/events/");
+   const rows=Array.isArray(payload)?payload:payload.results;
+   if(!Array.isArray(rows))throw new Error("ساختار پاسخ تاریخچه وظیفه معتبر نیست.");
+   setEventsByTask(current=>({...current,[task.id]:rows as ApplicationTaskEventRow[]}));
+  }catch(failure){
+   setEventsErrors(current=>({...current,[task.id]:(failure as Error).message||"دریافت تاریخچه وظیفه ناموفق بود."}));
+  }finally{setEventsLoadingId(null);}
+ }
+
+ async function addTaskNote(task:ApplicationTaskRow){
+  const note=(notesByTask[task.id]||"").trim();
+  if(!note){setNotesErrors(current=>({...current,[task.id]:"متن یادداشت را وارد کنید."}));return;}
+  setNotesSavingId(task.id);setNotesErrors(current=>({...current,[task.id]:""}));setNotesMessages(current=>({...current,[task.id]:""}));
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const created=await apiRequest("/api/v1/tasks/"+task.id+"/notes/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({note})}) as ApplicationTaskEventRow;
+   setNotesByTask(current=>({...current,[task.id]:""}));
+   setNotesMessages(current=>({...current,[task.id]:"یادداشت پیگیری ثبت شد."}));
+   setEventsByTask(current=>({...current,[task.id]:[...(current[task.id]||[]),created]}));
+   setOpenHistoryId(task.id);
+  }catch(failure){
+   setNotesErrors(current=>({...current,[task.id]:(failure as Error).message||"ثبت یادداشت وظیفه ناموفق بود."}));
+  }finally{setNotesSavingId(null);}
+ }
+
+ const overdueCount=tasks.filter(task=>task.is_overdue).length;
+ return <section className="card" style={{marginTop:16,padding:22}}>
+  <div className="card-head"><div><h2>وظایف و پیگیری پرونده</h2><p>وظایف مستقیماً به همین پرونده متصل‌اند؛ تغییر وضعیت و یادداشت‌ها در سابقه ثبت می‌شوند.</p></div><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><span style={{fontSize:10,color:"#8492a5"}}>{tasks.length.toLocaleString("fa-IR")} وظیفه</span>{overdueCount>0&&<span style={{fontSize:9,color:"#b42318",background:"#fff1f0",padding:"5px 8px",borderRadius:5}}>{overdueCount.toLocaleString("fa-IR")} عقب‌افتاده</span>}</div></div>
+  {canCreate&&<div style={{marginBottom:16}}><button type="button" className="btn primary" onClick={()=>{setFormOpen(current=>!current);setCreateError("");setCreateSuccess("");}}>＋ ثبت وظیفه برای این پرونده</button>
+   {formOpen&&<form onSubmit={event=>{event.preventDefault();void createTask();}} style={{marginTop:14,padding:16,border:"1px solid #edf1f6",borderRadius:9,background:"#fcfdff"}}>
+    <div className="form-grid">
+     <div className="form-row"><label htmlFor="application-task-title">عنوان وظیفه *</label><input id="application-task-title" className="field" required maxLength={200} value={title} onChange={event=>setTitle(event.target.value)} placeholder="مثلاً پیگیری تکمیل مدارک ضامن"/></div>
+     <div className="form-row"><label htmlFor="application-task-priority">اولویت</label><select id="application-task-priority" className="field" value={priority} onChange={event=>setPriority(event.target.value)}><option value="low">کم</option><option value="normal">عادی</option><option value="high">زیاد</option><option value="urgent">فوری</option></select></div>
+     <div className="form-row"><label htmlFor="application-task-due">مهلت انجام (اختیاری)</label><input id="application-task-due" className="field" type="datetime-local" value={dueAt} onChange={event=>setDueAt(event.target.value)}/></div>
+     <div className="form-row"><label htmlFor="application-task-description">شرح و اقدام بعدی</label><textarea id="application-task-description" className="field" rows={3} maxLength={5000} value={description} onChange={event=>setDescription(event.target.value)} placeholder="اقدام مورد انتظار و مدارک یا تماس لازم…" style={{minHeight:80,resize:"vertical"}}/></div>
+    </div>
+    {createError&&<p role="alert" className="notice">{createError}</p>}
+    <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}><button className="btn primary" type="submit" disabled={saving||!title.trim()}>{saving?"در حال ثبت…":"ثبت وظیفه"}</button><button type="button" className="btn secondary" disabled={saving} onClick={()=>setFormOpen(false)}>انصراف</button><small style={{alignSelf:"center",fontSize:9,color:"#8492a5"}}>وظیفه به کاربر واردشده تخصیص داده می‌شود؛ مدیر سامانه می‌تواند از بخش وظایف آن را واگذار کند.</small></div>
+   </form>}
+   {createSuccess&&<p role="status" className="note">{createSuccess}</p>}
+  </div>}
+  {loading?<p className="empty">در حال دریافت وظایف پرونده…</p>:error?<p role="alert" className="empty">{error}</p>:tasks.length===0?<p className="empty">برای این پرونده هنوز وظیفه‌ای ثبت نشده است.</p>:<div style={{display:"grid",gap:12}}>
+   {tasks.map(task=>{
+    const canMutate=role==="system_admin"||String(task.assigned_to)===String(authUser?.id);
+    const actions=getApplicationTaskActions(task,canMutate);
+    return <article key={task.id} style={{border:"1px solid #e8edf3",borderRadius:9,padding:15}}>
+     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+      <div style={{minWidth:0,flex:1}}><b style={{fontSize:11,color:"#35465b"}}>{task.title}</b><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginTop:7}}><span style={{fontSize:9,color:"#8492a5"}}>{task.task_number}</span><span style={{fontSize:9,color:"#526176",background:"#f2f5f9",padding:"4px 7px",borderRadius:5}}>{taskStatusLabels[task.status]||task.status}</span><span style={{fontSize:9,color:task.priority==="urgent"||task.priority==="high"?"#a66b1f":"#8492a5"}}>اولویت: {taskPriorityLabels[task.priority]||task.priority}</span><span style={{fontSize:9,color:"#8492a5"}}>مسئول: {task.assigned_to_username||"—"}</span></div></div>
+      <button type="button" className="btn secondary" onClick={()=>void toggleTaskHistory(task)}>{openHistoryId===task.id?"بستن تاریخچه":"تاریخچه و یادداشت‌ها"}</button>
+     </div>
+     {task.description&&<p style={{fontSize:10,lineHeight:1.9,color:"#66758a",whiteSpace:"pre-wrap",overflowWrap:"anywhere",margin:"10px 0 0"}}>{task.description}</p>}
+     <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:9,color:task.is_overdue?"#b42318":"#8492a5",marginTop:10}}><span>مهلت: {displayDateTime(task.due_at)}</span>{task.is_overdue&&<b>از موعد گذشته</b>}{task.completed_at&&<span>تکمیل: {displayDateTime(task.completed_at)}</span>}</div>
+     {openHistoryId===task.id&&<div style={{marginTop:13,paddingTop:13,borderTop:"1px solid #edf1f6"}}>
+      {eventsLoadingId===task.id&&<p className="empty">در حال دریافت تاریخچه وظیفه…</p>}
+      {eventsErrors[task.id]&&<p role="alert" className="notice">{eventsErrors[task.id]}</p>}
+      {(eventsByTask[task.id]||[]).length>0&&<div style={{display:"grid",gap:8,marginBottom:12}}>{[...(eventsByTask[task.id]||[])].reverse().map(item=><div key={item.id} style={{padding:10,borderRadius:7,background:"#f8fafd"}}><div style={{display:"flex",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}><b style={{fontSize:10,color:"#35465b"}}>{taskEventLabels[item.event_type]||item.event_type}</b><small style={{fontSize:9,color:"#91a0b2"}}>{displayDateTime(item.created_at)}</small></div>{item.previous_status&&item.new_status&&<p style={{fontSize:9,color:"#66758a",margin:"6px 0"}}>{taskStatusLabels[item.previous_status]||item.previous_status} ← {taskStatusLabels[item.new_status]||item.new_status}</p>}{item.previous_assignee_username!==item.new_assignee_username&&(item.previous_assignee_username||item.new_assignee_username)&&<p style={{fontSize:9,color:"#66758a",margin:"6px 0"}}>مسئول: {item.previous_assignee_username||"—"} ← {item.new_assignee_username||"—"}</p>}{item.previous_due_at!==item.new_due_at&&(item.previous_due_at||item.new_due_at)&&<p style={{fontSize:9,color:"#66758a",margin:"6px 0"}}>مهلت: {displayDateTime(item.previous_due_at)} ← {displayDateTime(item.new_due_at)}</p>}{item.note&&<p style={{fontSize:10,lineHeight:1.8,color:"#526176",whiteSpace:"pre-wrap",margin:"6px 0"}}>{item.note}</p>}<small style={{fontSize:9,color:"#91a0b2"}}>ثبت توسط: {item.actor_username||"کاربر سامانه"}</small></div>)}</div>}
+      {canMutate&&<form onSubmit={event=>{event.preventDefault();void addTaskNote(task);}}><div className="form-row"><label htmlFor={"application-task-note-"+task.id}>یادداشت پیگیری</label><textarea id={"application-task-note-"+task.id} className="field" rows={2} maxLength={5000} value={notesByTask[task.id]||""} onChange={event=>setNotesByTask(current=>({...current,[task.id]:event.target.value}))} placeholder="نتیجه تماس یا اقدام انجام‌شده…" style={{minHeight:65,resize:"vertical"}}/></div>{notesErrors[task.id]&&<p role="alert" className="notice">{notesErrors[task.id]}</p>}{notesMessages[task.id]&&<p role="status" className="note">{notesMessages[task.id]}</p>}<div style={{display:"flex",justifyContent:"flex-start",marginTop:9}}><button type="submit" className="btn secondary" disabled={notesSavingId===task.id||!(notesByTask[task.id]||"").trim()}>{notesSavingId===task.id?"در حال ثبت…":"ثبت یادداشت"}</button></div></form>}
+     </div>}
+     {actions.length>0&&<div style={{marginTop:13,paddingTop:12,borderTop:"1px solid #edf1f6"}}>{statusErrors[task.id]&&<p role="alert" className="notice">{statusErrors[task.id]}</p>}{statusMessages[task.id]&&<p role="status" className="note">{statusMessages[task.id]}</p>}<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{actions.map(action=><button key={action.status} type="button" className={"btn "+action.variant} disabled={updatingId===task.id} onClick={()=>void changeTaskStatus(task,action.status)}>{updatingId===task.id?"در حال ثبت…":action.label}</button>)}</div></div>}
+    </article>;
+   })}
+  </div>}
+  {!canCreate&&<p className="note">این نقش می‌تواند فقط وظایف در محدوده مجاز خود را مشاهده کند.</p>}
+ </section>;
+}
+
 function ApplicationDocuments({selected,authUser}:{selected:Application;authUser:ApiUser|null}){
  const [documents,setDocuments]=useState<ApplicationDocumentRow[]>([]);
  const [loading,setLoading]=useState(true);
