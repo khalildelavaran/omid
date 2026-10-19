@@ -595,7 +595,7 @@ function App(){
        sana_verified:customerSanaVerified,
        status:customerStatus,
        notes:customerNotes.trim(),
-       ...(phones.length?{phones}:{})
+       ...(!editingCustomerId&&phones.length?{phones}:{})
       };
       const customerPath=editingCustomerId?"/api/v1/customers/"+editingCustomerId+"/":"/api/v1/customers/";
       const savedCustomer=await apiRequest(customerPath,{method:editingCustomerId?"PATCH":"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify(payload)}) as CustomerRow;
