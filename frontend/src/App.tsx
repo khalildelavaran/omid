@@ -60,6 +60,7 @@ const apiFieldLabels: Record<string, string> = {
  customer: "مشتری", product_type: "نوع تسهیلات", requested_amount: "مبلغ درخواستی",
  term_months: "مدت بازپرداخت", title: "عنوان", application: "پرونده",
  priority: "اولویت", due_at: "موعد انجام", description: "شرح وظیفه",
+ current_password: "گذرواژه فعلی", new_password: "گذرواژه جدید",
 };
 function getApiErrorMessage(payload: any): string {
  if (typeof payload?.detail === "string") return payload.detail;
@@ -96,11 +97,8 @@ function displayDate(value: unknown): string {
  const date = new Date(String(value));
  return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat("fa-IR", {year:"numeric", month:"2-digit", day:"2-digit"}).format(date);
 }
-async function getApplications(): Promise<Application[]> {
- const payload = await apiRequest("/api/v1/applications/");
- const rows = Array.isArray(payload) ? payload : payload.results;
- if (!Array.isArray(rows)) throw new Error("ساختار پاسخ فهرست پرونده‌ها معتبر نیست.");
- return rows.map((x: any) => ({
+function mapApplication(x: any): Application {
+ return {
   uuid: String(x.id ?? ""),
   id: String(x.application_number ?? x.id ?? "—"),
   customer: String(x.customer_display_name ?? x.customer_number ?? "مشتری"),
@@ -109,7 +107,13 @@ async function getApplications(): Promise<Application[]> {
   stage: statusLabels[String(x.status)] || "ثبت درخواست",
   status: statusLabels[String(x.status)] || String(x.status || "نامشخص"),
   date: displayDate(x.created_at),
- }));
+ };
+}
+async function getApplications(): Promise<Application[]> {
+ const payload = await apiRequest("/api/v1/applications/");
+ const rows = Array.isArray(payload) ? payload : payload.results;
+ if (!Array.isArray(rows)) throw new Error("ساختار پاسخ فهرست پرونده‌ها معتبر نیست.");
+ return rows.map(mapApplication);
 }
 async function getCustomers(): Promise<CustomerRow[]> {
  const payload = await apiRequest("/api/v1/customers/");
@@ -270,6 +274,7 @@ function App(){
    <p style={{fontSize:11,lineHeight:1.9,color:"#8492a5",margin:"18px 0 0"}}>ورود فقط برای حساب‌های داخلی فعال‌شده در بک‌اند مجاز است.</p>
   </form>
  </div>;
+ if(authUser.must_change_password) return <PasswordChangeForm required onSuccess={()=>setAuthUser(current=>current?{...current,must_change_password:false}:current)}/>;
  return <div className="app" dir="rtl">
   <aside className={"sidebar "+(mobileOpen?"open":"")}><div className="brand"><div className="brand-mark">ا</div><div><b>سامانه امید</b><small>مدیریت مالی و تسهیلات</small></div><button className="mobile-close" onClick={()=>setMobileOpen(false)}>×</button></div>
    <div className="workspace"><span className="workspace-dot"></span><div><b>شرکت خدمات مالی امید</b><small>فضای کاری سازمانی</small></div><span className="down">⌄</span></div>
@@ -280,7 +285,7 @@ function App(){
   {mobileOpen&&<button aria-label="بستن منو" className="scrim" onClick={()=>setMobileOpen(false)}/>}
   <main className="main"><header className="topbar"><button className="hamburger" onClick={()=>setMobileOpen(true)}>☰</button><div className="crumb">سامانه امید <span>/</span> {current.label}</div><div className="top-actions"><label className="global-search">⌕ <input placeholder="جستجو در سامانه..." value={query} onChange={e=>setQuery(e.target.value)}/><kbd>⌘ K</kbd></label><button className="icon-action" aria-label="اعلان‌ها">♧<i></i></button><div className="top-avatar">خد</div></div></header>
    <div className="content"><div className="page-heading"><div><div className="eyebrow">مدیریت و عملیات</div><h1>{selected?"جزئیات پرونده":title[page]}</h1><p>{selected?"نمای کلی اطلاعات و مرحله جاری پرونده":description[page]}</p></div><div className="heading-actions">{page==="applications"&&<button className="btn primary" onClick={async()=>{setApplicationFormError("");if(!customers.length){try{setCustomers(await getCustomers());}catch(error){setApplicationFormError((error as Error).message);}}setShowApplicationForm(value=>!value);}}>＋ ایجاد پرونده جدید</button>}{page==="customers"&&<button className="btn primary" onClick={()=>{setCustomerFormError("");setShowCustomerForm(value=>!value);}}>＋ ایجاد مشتری جدید</button>}{page==="tasks"&&<button className="btn primary" onClick={async()=>{setTaskFormError("");if(!apps.length){try{setApps(await getApplications());}catch(error){setTaskFormError((error as Error).message||"دریافت پرونده‌ها ناموفق بود.");}}setShowTaskForm(value=>!value);}}>＋ ثبت وظیفه</button>}{page==="dashboard"&&<button className="btn primary" onClick={()=>setPage("applications")}>مشاهده پرونده‌ها <span>←</span></button>}</div></div>
-   {page==="applications"&&!selected&&showApplicationForm&&<section className="card" style={{marginBottom:18,padding:22}}><div className="card-head"><div><h2>ثبت پرونده تسهیلاتی</h2><p>پرونده در سرور ثبت می‌شود و شماره آن توسط بک‌اند تولید خواهد شد.</p></div><button className="btn secondary" onClick={()=>setShowApplicationForm(false)}>بستن</button></div>{applicationFormError&&<p role="alert" className="notice">{applicationFormError}</p>}<form onSubmit={async event=>{event.preventDefault();setApplicationSaving(true);setApplicationFormError("");try{const csrf=await apiRequest("/api/v1/auth/csrf/");await apiRequest("/api/v1/applications/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({customer:applicationCustomer,product_type:applicationProduct,requested_amount:applicationAmount,term_months:applicationTerm?Number(applicationTerm):null,purpose:applicationPurpose,notes:applicationNotes})});setShowApplicationForm(false);setApplicationAmount("");setApplicationPurpose("");setApplicationNotes("");const refreshed=await getApplications();setApps(refreshed);setApiState("connected");}catch(error){setApplicationFormError((error as Error).message||"ثبت پرونده انجام نشد.");}finally{setApplicationSaving(false);}}}><div className="form-grid"><div className="form-row"><label>مشتری *</label><select className="field" required value={applicationCustomer} onChange={e=>setApplicationCustomer(e.target.value)}><option value="">انتخاب مشتری</option>{customers.filter(x=>x.status==="active").map(x=><option key={x.id} value={x.id}>{x.customer_number} — {x.customer_type==="organization"?x.organization_name:[x.first_name,x.last_name].filter(Boolean).join(" ")}</option>)}</select></div><div className="form-row"><label>نوع تسهیلات *</label><select className="field" value={applicationProduct} onChange={e=>setApplicationProduct(e.target.value)}><option value="working_capital">سرمایه در گردش</option><option value="personal">تسهیلات شخصی</option><option value="corporate_credit">اعتباری شرکتی</option><option value="equipment">خرید تجهیزات</option></select></div><div className="form-row"><label>مبلغ درخواستی (تومان) *</label><input className="field" required min="1" type="number" step="1" value={applicationAmount} onChange={e=>setApplicationAmount(e.target.value)}/></div><div className="form-row"><label>مدت بازپرداخت (ماه)</label><input className="field" min="1" max="240" type="number" value={applicationTerm} onChange={e=>setApplicationTerm(e.target.value)}/></div><div className="form-row"><label>هدف درخواست</label><input className="field" maxLength={250} value={applicationPurpose} onChange={e=>setApplicationPurpose(e.target.value)}/></div><div className="form-row"><label>یادداشت</label><input className="field" value={applicationNotes} onChange={e=>setApplicationNotes(e.target.value)}/></div></div><div className="actions" style={{marginTop:16}}><button className="btn primary" disabled={applicationSaving||!customers.length}>{applicationSaving?"در حال ثبت…":"ثبت پرونده در سامانه"}</button><button type="button" className="btn secondary" onClick={()=>setShowApplicationForm(false)}>انصراف</button></div>{customers.length===0&&<p className="muted">برای ثبت پرونده ابتدا باید دست‌کم یک مشتری فعال در محدوده دسترسی شما وجود داشته باشد.</p>}</form></section>}
+   {page==="applications"&&!selected&&showApplicationForm&&<section className="card" style={{marginBottom:18,padding:22}}><div className="card-head"><div><h2>ثبت پرونده تسهیلاتی</h2><p>پرونده در سرور ثبت می‌شود و شماره آن توسط بک‌اند تولید خواهد شد.</p></div><button className="btn secondary" onClick={()=>setShowApplicationForm(false)}>بستن</button></div>{applicationFormError&&<p role="alert" className="notice">{applicationFormError}</p>}<form onSubmit={async event=>{event.preventDefault();setApplicationSaving(true);setApplicationFormError("");try{const csrf=await apiRequest("/api/v1/auth/csrf/");const created=await apiRequest("/api/v1/applications/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({customer:applicationCustomer,product_type:applicationProduct,requested_amount:applicationAmount,term_months:applicationTerm?Number(applicationTerm):null,purpose:applicationPurpose,notes:applicationNotes})});setApps(current=>[mapApplication(created),...current.filter(item=>item.uuid!==String(created.id))]);setShowApplicationForm(false);setApplicationCustomer("");setApplicationAmount("");setApplicationPurpose("");setApplicationNotes("");setApiState("connected");setApiError("");setApplicationFormError("");}catch(error){setApplicationFormError((error as Error).message||"ثبت پرونده انجام نشد.");}finally{setApplicationSaving(false);}}}><div className="form-grid"><div className="form-row"><label>مشتری *</label><select className="field" required value={applicationCustomer} onChange={e=>setApplicationCustomer(e.target.value)}><option value="">انتخاب مشتری</option>{customers.filter(x=>x.status==="active").map(x=><option key={x.id} value={x.id}>{x.customer_number} — {x.customer_type==="organization"?x.organization_name:[x.first_name,x.last_name].filter(Boolean).join(" ")}</option>)}</select></div><div className="form-row"><label>نوع تسهیلات *</label><select className="field" value={applicationProduct} onChange={e=>setApplicationProduct(e.target.value)}><option value="working_capital">سرمایه در گردش</option><option value="personal">تسهیلات شخصی</option><option value="corporate_credit">اعتباری شرکتی</option><option value="equipment">خرید تجهیزات</option></select></div><div className="form-row"><label>مبلغ درخواستی (تومان) *</label><input className="field" required min="1" type="number" step="1" value={applicationAmount} onChange={e=>setApplicationAmount(e.target.value)}/></div><div className="form-row"><label>مدت بازپرداخت (ماه)</label><input className="field" min="1" max="240" type="number" value={applicationTerm} onChange={e=>setApplicationTerm(e.target.value)}/></div><div className="form-row"><label>هدف درخواست</label><input className="field" maxLength={250} value={applicationPurpose} onChange={e=>setApplicationPurpose(e.target.value)}/></div><div className="form-row"><label>یادداشت</label><input className="field" value={applicationNotes} onChange={e=>setApplicationNotes(e.target.value)}/></div></div><div className="actions" style={{marginTop:16}}><button className="btn primary" disabled={applicationSaving||!customers.length}>{applicationSaving?"در حال ثبت…":"ثبت پرونده در سامانه"}</button><button type="button" className="btn secondary" onClick={()=>setShowApplicationForm(false)}>انصراف</button></div>{customers.length===0&&<p className="muted">برای ثبت پرونده ابتدا باید دست‌کم یک مشتری فعال در محدوده دسترسی شما وجود داشته باشد.</p>}</form></section>}
    {page==="dashboard"&&!selected&&<>
     {sectionError&&<p className="notice" role="alert">{sectionError}</p>}
     {sectionLoading&&!report&&<p className="note">در حال دریافت آمار عملیاتی و وظایف از سرور…</p>}
@@ -385,10 +390,44 @@ function App(){
    </section>}
    {page==="tasks"&&!selected&&<section className="card list-card"><div className="card-head"><div><h2>وظایف و پیگیری</h2><p>{tasks.length.toLocaleString("fa-IR")} وظیفه در محدوده دسترسی شما</p></div><button className="btn secondary" onClick={()=>setPage("applications")}>پرونده‌ها</button></div>{sectionLoading?<p className="empty">در حال دریافت وظایف…</p>:sectionError?<p className="empty" role="alert">{sectionError}</p>:<div className="table-wrap"><table><thead><tr><th>شماره وظیفه</th><th>عنوان</th><th>پرونده</th><th>مسئول</th><th>اولویت</th><th>موعد</th><th>وضعیت</th><th>اقدام</th></tr></thead><tbody>{tasks.map(task=><tr key={task.id}><td><b className="case-id">{task.task_number}</b></td><td>{task.title}</td><td>{task.application_number||"—"}</td><td>{task.assigned_to_username||"—"}</td><td>{task.priority==="urgent"?"فوری":task.priority==="high"?"زیاد":task.priority==="low"?"کم":"عادی"}</td><td>{displayDate(task.due_at)}</td><td><Status value={task.is_overdue?"عقب‌افتاده":task.status==="open"?"باز":task.status==="in_progress"?"در حال انجام":task.status==="completed"?"انجام‌شده":"لغوشده"}/></td><td>{task.status==="open"?<button className="btn secondary" onClick={()=>void changeTaskStatus(task,"in_progress")}>شروع</button>:task.status==="in_progress"?<button className="btn secondary" onClick={()=>void changeTaskStatus(task,"completed")}>تکمیل</button>:<span>—</span>}</td></tr>)}{!tasks.length&&<tr><td colSpan={8} className="empty">وظیفه‌ای برای نمایش وجود ندارد.</td></tr>}</tbody></table></div>}</section>}
    {page==="reports"&&!selected&&<section className="card list-card"><div className="card-head"><div><h2>گزارش عملیاتی</h2><p>{report?"آخرین تولید: "+displayDate(report.generated_at):"گزارش زنده از بک‌اند"}</p></div><button className="btn secondary" onClick={()=>setPage("dashboard")}>بازگشت به داشبورد</button></div>{sectionLoading?<p className="empty">در حال دریافت گزارش…</p>:sectionError?<p className="empty" role="alert">{sectionError}</p>:report?<><div className="stat-grid"><Stat icon="♙" label="مشتریان" value={report.customers.total.toLocaleString("fa-IR")} delta={"فعال: "+report.customers.active.toLocaleString("fa-IR")} tone="blue"/><Stat icon="▤" label="پرونده‌های تسهیلاتی" value={report.applications.total.toLocaleString("fa-IR")} delta="طبق محدوده دسترسی کاربر" tone="violet"/><Stat icon="◷" label="وظایف عقب‌افتاده" value={report.tasks.overdue.toLocaleString("fa-IR")} delta={"امروز: "+report.tasks.due_today.toLocaleString("fa-IR")} tone="amber"/><Stat icon="✓" label="رسیدهای خدمات" value={report.service_receipts.count.toLocaleString("fa-IR")} delta={"مانده: "+formatMoney(report.service_receipts.outstanding_total)+" تومان"} tone="green"/></div><p className="note">این گزارش فقط داده‌هایی را نمایش می‌دهد که بک‌اند برای نقش و محدوده دسترسی شما مجاز دانسته است.</p></>:<p className="empty">گزارشی در دسترس نیست.</p>}</section>}
-   {page==="settings"&&!selected&&<section className="card placeholder"><div className="placeholder-icon">{current.icon}</div><h2>{title[page]}</h2><p>تنظیمات مدیریتی و تغییر گذرواژه باید پس از تعیین قرارداد API و مجوزهای موردنیاز پیاده‌سازی شوند.</p><button className="btn primary" onClick={()=>setPage("applications")}>رفتن به پرونده‌های تسهیلاتی ←</button></section>}
+   {page==="settings"&&!selected&&<PasswordChangeForm required={false} onSuccess={()=>setAuthUser(current=>current?{...current,must_change_password:false}:current)}/>}
    <footer><span>© ۱۴۰۵ سامانه امید</span><span className="connection"><i className={apiState==="connected"?"connected":""}></i>{apiState==="connected"?"متصل به API":apiState==="error"?"خطا در اتصال API":"در حال اتصال به API"}</span><span>نسخه رابط کاربری ۱.۰</span></footer>
    </div></main>
  </div>
+}
+function PasswordChangeForm({required,onSuccess}:{required:boolean;onSuccess:()=>void}){
+ const [currentPassword,setCurrentPassword]=useState("");
+ const [newPassword,setNewPassword]=useState("");
+ const [confirmPassword,setConfirmPassword]=useState("");
+ const [saving,setSaving]=useState(false);
+ const [error,setError]=useState("");
+ const [success,setSuccess]=useState("");
+ const form=<form onSubmit={async event=>{
+  event.preventDefault();setError("");setSuccess("");
+  if(newPassword!==confirmPassword){setError("گذرواژه جدید و تکرار آن یکسان نیستند.");return;}
+  if(currentPassword===newPassword){setError("گذرواژه جدید باید با گذرواژه فعلی متفاوت باشد.");return;}
+  setSaving(true);
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const result=await apiRequest("/api/v1/auth/change-password/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({current_password:currentPassword,new_password:newPassword})});
+   setCurrentPassword("");setNewPassword("");setConfirmPassword("");
+   setSuccess(String(result.detail||"گذرواژه با موفقیت تغییر کرد."));
+   onSuccess();
+  }catch(requestError){setError((requestError as Error).message||"تغییر گذرواژه ناموفق بود.");}
+  finally{setSaving(false);}
+ }}>
+  {error&&<p role="alert" className="notice">{error}</p>}
+  {success&&<p role="status" className="note">{success}</p>}
+  <div className="form-grid">
+   <div className="form-row"><label htmlFor={required?"required-current-password":"settings-current-password"}>گذرواژه فعلی *</label><input id={required?"required-current-password":"settings-current-password"} className="field" type="password" autoComplete="current-password" required value={currentPassword} onChange={event=>setCurrentPassword(event.target.value)} /></div>
+   <div className="form-row"><label htmlFor={required?"required-new-password":"settings-new-password"}>گذرواژه جدید *</label><input id={required?"required-new-password":"settings-new-password"} className="field" type="password" autoComplete="new-password" required minLength={8} value={newPassword} onChange={event=>setNewPassword(event.target.value)} /></div>
+   <div className="form-row"><label htmlFor={required?"required-confirm-password":"settings-confirm-password"}>تکرار گذرواژه جدید *</label><input id={required?"required-confirm-password":"settings-confirm-password"} className="field" type="password" autoComplete="new-password" required minLength={8} value={confirmPassword} onChange={event=>setConfirmPassword(event.target.value)} /></div>
+  </div>
+  <p className="note">قدرت و قواعد نهایی گذرواژه در سمت سرور بررسی می‌شود؛ پس از تغییر، نشست فعلی حفظ خواهد شد.</p>
+  <div style={{display:"flex",justifyContent:"flex-start",gap:8,marginTop:16}}><button className="btn primary" type="submit" disabled={saving}>{saving?"در حال تغییر…":"تغییر گذرواژه"}</button></div>
+ </form>;
+ if(required)return <div dir="rtl" style={{minHeight:"100vh",display:"grid",placeItems:"center",padding:20,background:"#f5f7fb",fontFamily:"Vazirmatn,Tahoma,sans-serif"}}><section className="card" style={{width:"100%",maxWidth:600,padding:28}}><div className="brand" style={{marginBottom:20,paddingBottom:18}}><div className="brand-mark">ا</div><div><b>سامانه امید</b><small>تکمیل امن ورود</small></div></div><h1 style={{fontSize:21,margin:"0 0 8px",color:"#1b2b43"}}>تغییر گذرواژه الزامی است</h1><p style={{fontSize:12,color:"#8492a5",lineHeight:1.9,margin:"0 0 20px"}}>برای ادامهٔ کار، ابتدا گذرواژه فعلی را تأیید و گذرواژه جدیدی تعیین کنید.</p>{form}</section></div>;
+ return <section className="card list-card" style={{padding:22,maxWidth:720}}><div className="card-head"><div><h2>تغییر گذرواژه</h2><p>برای حفظ امنیت حساب، گذرواژه فعلی لازم است.</p></div></div>{form}</section>;
 }
 function Stat({icon,label,value,delta,tone}:{icon:string;label:string;value:string;delta:string;tone:string}){return <section className="card stat"><div className={"stat-icon "+tone}>{icon}</div><div className="stat-info"><span>{label}</span><b>{value}</b><small>{delta}</small></div><span className="stat-menu">•••</span></section>}
 function Status({value}:{value:string}){let cls=value==="تکمیل شده"?"green":value==="نیازمند اقدام"?"amber":value==="در انتظار"?"gray":"blue";return <span className={"status "+cls}><i></i>{value}</span>}
