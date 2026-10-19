@@ -47,7 +47,9 @@ function getApplicationStatusActions(application: Application, role: string | nu
 type ApiUser = { id: number; username: string; first_name: string; last_name: string; role: string | null; role_label: string | null; must_change_password: boolean };
 type ApiError = Error & { status?: number };
 type CustomerRow = { id:string; customer_number:string; customer_type:string; first_name:string; last_name:string; organization_name:string; phone_number:string; email:string; status:string; created_at:string };
-type TaskRow = { id:string; task_number:string; application_number:string; title:string; status:string; priority:string; assigned_to_username:string; due_at:string|null; is_overdue:boolean };
+type TaskRow = { id:string; task_number:string; application:string; application_number:string; title:string; description:string; status:string; priority:string; assigned_to:string|number; assigned_to_username:string; created_by_username:string; due_at:string|null; completed_at:string|null; created_at:string; is_overdue:boolean };
+type TaskEventRow = { id:string; task:string; event_type:string; previous_status:string|null; new_status:string|null; previous_assignee_username:string|null; new_assignee_username:string|null; previous_due_at:string|null; new_due_at:string|null; note:string; actor_username:string|null; created_at:string };
+type FollowUpSuggestion = { key:string; title:string; description:string; priority:string };
 type OperationsReport = { generated_at:string; scope:string; customers:{total:number;active:number;inactive:number;archived:number}; applications:{total:number;by_status:Record<string,number>}; tasks:{total:number;open:number;in_progress:number;completed:number;cancelled:number;overdue:number;due_today:number}; guarantees:{total:number;by_status:Record<string,number>}; service_receipts:{count:number;gross_total:string;paid_total:string;outstanding_total:string} };
 const nav: {key:NavKey;label:string;icon:string;group:string}[] = [
  {key:"dashboard",label:"داشبورد",icon:"▦",group:"فضای کاری"},
@@ -74,6 +76,9 @@ const documentStatusLabels: Record<string,string> = { pending_review:"در ان�
 const guaranteeStatusLabels: Record<string,string> = { registered:"ثبت‌شده", under_review:"در حال بررسی", approved:"تأیید شده", rejected:"رد شده", fulfilled:"انجام‌شده", cancelled:"لغو شده" };
 const guaranteeEventLabels: Record<string,string> = { created:"ثبت درخواست ضمانت", status_changed:"تغییر وضعیت", note_added:"یادداشت پیگیری" };
 const paymentMethodLabels: Record<string,string> = { pos:"کارت‌خوان", cash:"نقدی", bank_transfer:"واریز بانکی", other:"سایر" };
+const taskStatusLabels: Record<string,string> = { open:"باز", in_progress:"در حال انجام", completed:"انجام‌شده", cancelled:"لغوشده" };
+const taskPriorityLabels: Record<string,string> = { low:"کم", normal:"عادی", high:"زیاد", urgent:"فوری" };
+const taskEventLabels: Record<string,string> = { created:"ایجاد وظیفه", status_changed:"تغییر وضعیت", due_date_changed:"تغییر موعد", assigned:"تغییر مسئول", updated:"به‌روزرسانی", note_added:"یادداشت پیگیری" };
 function parseIntegerMoney(value:string):bigint|null {
  const normalized=String(value||"").trim();
  if(!/^\d+$/.test(normalized))return null;
@@ -223,6 +228,18 @@ async function getTasks(): Promise<TaskRow[]> {
  const rows = Array.isArray(payload) ? payload : payload.results;
  if (!Array.isArray(rows)) throw new Error("ساختار پاسخ فهرست وظایف معتبر نیست.");
  return rows as TaskRow[];
+}
+async function getApplicationTasks(applicationId:string):Promise<TaskRow[]> {
+ const payload=await apiRequest("/api/v1/tasks/?application="+encodeURIComponent(applicationId));
+ const rows=Array.isArray(payload)?payload:payload.results;
+ if(!Array.isArray(rows))throw new Error("ساختار وظایف پرونده معتبر نیست.");
+ return rows as TaskRow[];
+}
+async function getApplicationGuarantees(applicationId:string):Promise<GuaranteeRequestRow[]> {
+ const payload=await apiRequest("/api/v1/guarantees/?application="+encodeURIComponent(applicationId));
+ const rows=Array.isArray(payload)?payload:payload.results;
+ if(!Array.isArray(rows))throw new Error("ساختار درخواست‌های ضمانت پرونده معتبر نیست.");
+ return rows as GuaranteeRequestRow[];
 }
 async function getOperationsReport(): Promise<OperationsReport> {
  const payload = await apiRequest("/api/v1/reports/operations/");
@@ -506,6 +523,7 @@ function App(){
    </section>}
    {selected&&<ApplicationDocuments selected={selected} authUser={authUser}/>}
    {selected&&<ApplicationGuarantees selected={selected} authUser={authUser}/>}
+   {selected&&<ApplicationFollowUps selected={selected} authUser={authUser}/>} 
    {page==="customers"&&!selected&&showCustomerForm&&<section className="card" style={{marginBottom:18,padding:22}}>
     <div className="card-head"><div><h2>ثبت مشتری جدید</h2><p>اطلاعات در بک‌اند ذخیره و شماره مشتری به‌صورت خودکار تولید می‌شود.</p></div><button type="button" className="btn secondary" onClick={()=>setShowCustomerForm(false)}>بستن</button></div>
     {customerFormError&&<p role="alert" className="notice">{customerFormError}</p>}
@@ -908,6 +926,222 @@ function ApplicationGuarantees({selected,authUser}:{selected:Application;authUse
    })}
   </div>}
   {!canCreate&&<p className="note">دسترسی این نقش فقط مطابق مجوزهای بک‌اند برای مشاهده و انتقال وضعیت‌های مجاز است.</p>}
+ </section>;
+}
+
+function ApplicationFollowUps({selected,authUser}:{selected:Application;authUser:ApiUser|null}){
+ const [tasks,setTasks]=useState<TaskRow[]>([]);
+ const [documents,setDocuments]=useState<ApplicationDocumentRow[]>([]);
+ const [guarantees,setGuarantees]=useState<GuaranteeRequestRow[]>([]);
+ const [loading,setLoading]=useState(true);
+ const [loadError,setLoadError]=useState("");
+ const [contextWarning,setContextWarning]=useState("");
+ const [formOpen,setFormOpen]=useState(false);
+ const [title,setTitle]=useState("");
+ const [description,setDescription]=useState("");
+ const [priority,setPriority]=useState("normal");
+ const [dueAt,setDueAt]=useState("");
+ const [saving,setSaving]=useState(false);
+ const [formError,setFormError]=useState("");
+ const [formSuccess,setFormSuccess]=useState("");
+ const [updatingId,setUpdatingId]=useState<string|null>(null);
+ const [openHistoryId,setOpenHistoryId]=useState<string|null>(null);
+ const [eventsByTask,setEventsByTask]=useState<Record<string,TaskEventRow[]>>({});
+ const [eventErrors,setEventErrors]=useState<Record<string,string>>({});
+ const [eventsLoadingId,setEventsLoadingId]=useState<string|null>(null);
+ const [noteDrafts,setNoteDrafts]=useState<Record<string,string>>({});
+ const [noteErrors,setNoteErrors]=useState<Record<string,string>>({});
+ const [noteSuccess,setNoteSuccess]=useState<Record<string,string>>({});
+ const [noteSavingId,setNoteSavingId]=useState<string|null>(null);
+ const canWrite=["system_admin","intake","case_worker"].includes(authUser?.role||"");
+
+ useEffect(()=>{
+  let active=true;
+  setLoading(true);setLoadError("");setContextWarning("");
+  setTasks([]);setDocuments([]);setGuarantees([]);
+  setOpenHistoryId(null);setEventsByTask({});setEventErrors({});
+  void Promise.allSettled([
+   getApplicationTasks(selected.uuid),
+   getApplicationDocuments(selected.uuid),
+   getApplicationGuarantees(selected.uuid),
+  ]).then(results=>{
+   if(!active)return;
+   const [taskResult,documentResult,guaranteeResult]=results;
+   if(taskResult.status==="fulfilled")setTasks(taskResult.value);
+   else setLoadError((taskResult.reason as Error)?.message||"دریافت وظایف پرونده ناموفق بود.");
+   const warnings:string[]=[];
+   if(documentResult.status==="fulfilled")setDocuments(documentResult.value);
+   else warnings.push("وضعیت اسناد دریافت نشد");
+   if(guaranteeResult.status==="fulfilled")setGuarantees(guaranteeResult.value);
+   else warnings.push("وضعیت ضمانت‌ها دریافت نشد");
+   setContextWarning(warnings.length?warnings.join("؛ ")+". پیشنهادهای پیگیری ممکن است کامل نباشند.":"");
+  }).finally(()=>{if(active)setLoading(false);});
+  return ()=>{active=false;};
+ },[selected.uuid]);
+
+ const suggestions=useMemo(()=>{
+  if(!canWrite)return [];
+  const candidates:FollowUpSuggestion[]=[];
+  if(selected.statusKey==="awaiting_documents"){
+   candidates.push({key:"application-documents",title:"پیگیری تکمیل مدارک پرونده "+selected.id,description:"وضعیت پرونده در انتظار تکمیل مدارک است. با مشتری تماس بگیرید و مدارک باقیمانده را پیگیری کنید.",priority:"high"});
+  }
+  const supersededIds=new Set(documents.map(item=>item.replaces_document).filter((value):value is string=>Boolean(value)));
+  for(const item of documents){
+   if(item.status==="rejected"&&!supersededIds.has(item.id)){
+    candidates.push({key:"document-replacement-"+item.id,title:"پیگیری دریافت نسخه اصلاحی "+item.document_number,description:"مدرک "+(documentTypeLabels[item.document_type]||item.document_type)+" نیازمند اصلاح اعلام شده است."+ (item.review_note?" دلیل اعلام‌شده: "+item.review_note:"")+" پس از دریافت نسخه جدید، سند را دوباره بررسی کنید.",priority:"high"});
+   }else if(item.status==="pending_review"){
+    candidates.push({key:"document-review-"+item.id,title:"پیگیری بررسی سند "+item.document_number,description:"سند "+(documentTypeLabels[item.document_type]||item.document_type)+" در انتظار بررسی است؛ نتیجه بررسی و اقدام بعدی را پیگیری کنید.",priority:"normal"});
+   }
+  }
+  for(const item of guarantees){
+   if(item.status==="registered"){
+    candidates.push({key:"guarantee-review-"+item.id,title:"پیگیری شروع بررسی ضمانت "+item.request_number,description:"درخواست ضمانت ثبت شده و هنوز وارد مرحله بررسی نشده است.",priority:"normal"});
+   }else if(item.status==="under_review"){
+    candidates.push({key:"guarantee-decision-"+item.id,title:"پیگیری تصمیم اعتباری ضمانت "+item.request_number,description:"درخواست ضمانت در حال بررسی است؛ نتیجه تصمیم اعتباری را پیگیری کنید.",priority:"high"});
+   }else if(item.status==="approved"){
+    candidates.push({key:"guarantee-fulfilment-"+item.id,title:"پیگیری تکمیل ضمانت "+item.request_number,description:"درخواست ضمانت تأیید شده است؛ اجرای ضمانت و تکمیل مراحل پرونده را پیگیری کنید.",priority:"normal"});
+   }
+  }
+  const existingTitles=new Set(tasks.map(item=>item.title.trim().toLocaleLowerCase()));
+  return candidates.filter(item=>!existingTitles.has(item.title.trim().toLocaleLowerCase()));
+ },[canWrite,selected.statusKey,selected.id,documents,guarantees,tasks]);
+
+ function startTaskForm(suggestion?:FollowUpSuggestion){
+  setTitle(suggestion?.title||"");
+  setDescription(suggestion?.description||"");
+  setPriority(suggestion?.priority||"normal");
+  setDueAt("");
+  setFormError("");setFormSuccess("");setFormOpen(true);
+ }
+ function taskActions(task:TaskRow):{status:string;label:string;variant:"primary"|"secondary"}[]{
+  if(!canWrite)return [];
+  if(task.status==="open")return [
+   {status:"in_progress",label:"شروع",variant:"primary"},
+   {status:"completed",label:"انجام شد",variant:"secondary"},
+   {status:"cancelled",label:"لغو وظیفه",variant:"secondary"},
+  ];
+  if(task.status==="in_progress")return [
+   {status:"open",label:"بازگردانی به باز",variant:"secondary"},
+   {status:"completed",label:"انجام شد",variant:"primary"},
+   {status:"cancelled",label:"لغو وظیفه",variant:"secondary"},
+  ];
+  return [];
+ }
+
+ async function submitTask(){
+  const taskTitle=title.trim();
+  if(!taskTitle){setFormError("عنوان وظیفه الزامی است.");return;}
+  setSaving(true);setFormError("");setFormSuccess("");
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const created=await apiRequest("/api/v1/tasks/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({
+    application:selected.uuid,
+    title:taskTitle,
+    description:description.trim(),
+    priority,
+    due_at:dueAt||null
+   })}) as TaskRow;
+   setTasks(current=>[created,...current.filter(item=>item.id!==created.id)]);
+   setFormOpen(false);setTitle("");setDescription("");setPriority("normal");setDueAt("");
+   setFormSuccess("وظیفه «"+created.task_number+"» برای این پرونده ثبت شد.");
+  }catch(failure){
+   setFormError((failure as Error).message||"ثبت وظیفه ناموفق بود.");
+  }finally{setSaving(false);}
+ }
+
+ async function changeStatus(task:TaskRow,nextStatus:string){
+  if(nextStatus==="cancelled"&&!window.confirm("آیا از لغو وظیفه «"+task.title+"» مطمئن هستید؟"))return;
+  setUpdatingId(task.id);setLoadError("");
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const updated=await apiRequest("/api/v1/tasks/"+task.id+"/",{method:"PATCH",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({status:nextStatus})}) as TaskRow;
+   setTasks(current=>current.map(item=>item.id===updated.id?updated:item));
+   setEventsByTask(current=>{const next={...current};delete next[task.id];return next;});
+  }catch(failure){
+   setLoadError((failure as Error).message||"تغییر وضعیت وظیفه ناموفق بود.");
+  }finally{setUpdatingId(null);}
+ }
+
+ async function toggleTaskHistory(task:TaskRow){
+  if(openHistoryId===task.id){setOpenHistoryId(null);return;}
+  setOpenHistoryId(task.id);
+  if(eventsByTask[task.id])return;
+  setEventsLoadingId(task.id);setEventErrors(current=>({...current,[task.id]:""}));
+  try{
+   const payload=await apiRequest("/api/v1/tasks/"+task.id+"/events/");
+   const rows=Array.isArray(payload)?payload:payload.results;
+   if(!Array.isArray(rows))throw new Error("ساختار پاسخ تاریخچه وظیفه معتبر نیست.");
+   setEventsByTask(current=>({...current,[task.id]:rows as TaskEventRow[]}));
+  }catch(failure){
+   setEventErrors(current=>({...current,[task.id]:(failure as Error).message||"دریافت تاریخچه وظیفه ناموفق بود."}));
+  }finally{setEventsLoadingId(null);}
+ }
+
+ async function addTaskNote(task:TaskRow){
+  const note=(noteDrafts[task.id]||"").trim();
+  if(!note){setNoteErrors(current=>({...current,[task.id]:"متن یادداشت را وارد کنید."}));return;}
+  setNoteSavingId(task.id);setNoteErrors(current=>({...current,[task.id]:""}));setNoteSuccess(current=>({...current,[task.id]:""}));
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const created=await apiRequest("/api/v1/tasks/"+task.id+"/notes/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({note})}) as TaskEventRow;
+   setEventsByTask(current=>({...current,[task.id]:[...(current[task.id]||[]),created]}));
+   setNoteDrafts(current=>({...current,[task.id]:""}));
+   setNoteSuccess(current=>({...current,[task.id]:"یادداشت وظیفه ثبت شد."}));
+  }catch(failure){
+   setNoteErrors(current=>({...current,[task.id]:(failure as Error).message||"ثبت یادداشت وظیفه ناموفق بود."}));
+  }finally{setNoteSavingId(null);}
+ }
+
+ return <section className="card" style={{marginTop:16,padding:22}}>
+  <div className="card-head"><div><h2>وظایف و پیگیری‌های پرونده</h2><p>وظایف موجود، پیگیری پیشنهادی مدارک و ضمانت‌ها و سابقه اقدام‌ها در همین پرونده.</p></div><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><span style={{fontSize:10,color:"#8492a5"}}>{tasks.length.toLocaleString("fa-IR")} وظیفه</span>{canWrite&&<button type="button" className="btn primary" onClick={()=>startTaskForm()}>＋ ثبت وظیفه</button>}</div></div>
+  {canWrite&&suggestions.length>0&&<div style={{marginBottom:18,padding:14,border:"1px solid #e7edf5",borderRadius:9,background:"#fbfcfe"}}>
+   <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:10}}><b style={{fontSize:11,color:"#35465b"}}>پیشنهادهای پیگیری</b><small style={{fontSize:9,color:"#8492a5"}}>با انتخاب هر مورد، فرم از پیش پر می‌شود؛ وظیفه فقط با تأیید شما ثبت خواهد شد.</small></div>
+   <div style={{display:"grid",gap:8}}>{suggestions.map(suggestion=><div key={suggestion.key} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",padding:"10px 0",borderTop:"1px solid #edf1f6"}}>
+    <div style={{minWidth:0,flex:1}}><b style={{display:"block",fontSize:10,color:"#35465b"}}>{suggestion.title}</b><small style={{display:"block",fontSize:9,color:"#8492a5",lineHeight:1.8,marginTop:4}}>{suggestion.description}</small></div><button type="button" className="btn secondary" onClick={()=>startTaskForm(suggestion)}>ساخت وظیفه</button>
+   </div>)}</div>
+  </div>}
+  {formOpen&&canWrite&&<form onSubmit={event=>{event.preventDefault();void submitTask();}} style={{marginBottom:18,padding:16,border:"1px solid #edf1f6",borderRadius:9,background:"#fcfdff"}}>
+   <div className="card-head"><div><h3 style={{fontSize:12,margin:0,color:"#35465b"}}>ثبت وظیفه برای پرونده {selected.id}</h3><p>وظیفه به کاربر جاری واگذار می‌شود؛ رویداد ایجاد در بک‌اند ثبت خواهد شد.</p></div><button type="button" className="btn secondary" disabled={saving} onClick={()=>setFormOpen(false)}>بستن</button></div>
+   <div className="form-grid">
+    <div className="form-row"><label htmlFor="case-task-title">عنوان وظیفه *</label><input id="case-task-title" className="field" required maxLength={200} value={title} onChange={event=>setTitle(event.target.value)}/></div>
+    <div className="form-row"><label htmlFor="case-task-priority">اولویت</label><select id="case-task-priority" className="field" value={priority} onChange={event=>setPriority(event.target.value)}><option value="low">کم</option><option value="normal">عادی</option><option value="high">زیاد</option><option value="urgent">فوری</option></select></div>
+    <div className="form-row"><label htmlFor="case-task-due">موعد انجام</label><input id="case-task-due" className="field" type="datetime-local" value={dueAt} onChange={event=>setDueAt(event.target.value)}/></div>
+    <div className="form-row"><label htmlFor="case-task-description">شرح پیگیری</label><textarea id="case-task-description" className="field" rows={3} maxLength={5000} value={description} onChange={event=>setDescription(event.target.value)} style={{minHeight:80,resize:"vertical"}}/></div>
+   </div>
+   {formError&&<p role="alert" className="notice">{formError}</p>}
+   <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}><button type="submit" className="btn primary" disabled={saving||!title.trim()}>{saving?"در حال ثبت…":"ثبت وظیفه"}</button><button type="button" className="btn secondary" disabled={saving} onClick={()=>setFormOpen(false)}>انصراف</button></div>
+  </form>}
+  {formSuccess&&<p role="status" className="note">{formSuccess}</p>}
+  {contextWarning&&<p className="note">{contextWarning}</p>}
+  {loading?<p className="empty">در حال دریافت وظایف مرتبط، اسناد و ضمانت‌ها…</p>:loadError?<p role="alert" className="empty">{loadError}</p>:tasks.length===0?<p className="empty">هنوز وظیفه‌ای برای این پرونده ثبت نشده است.</p>:<div style={{display:"grid",gap:12}}>
+   {tasks.map(task=>{
+    const actions=taskActions(task);
+    const dueColor=task.is_overdue?"#b42318":task.due_at?"#66758a":"#91a0b2";
+    const dueLabel=task.is_overdue?"عقب‌افتاده":task.due_at?"موعد: "+displayDateTime(task.due_at):"بدون موعد";
+    return <article key={task.id} style={{border:"1px solid #e8edf3",borderRadius:9,padding:15}}>
+     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+      <div style={{minWidth:0,flex:1}}><b style={{fontSize:11,color:"#35465b"}}>{task.title}</b><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginTop:7}}><span style={{fontSize:9,color:"#8492a5"}}>{task.task_number}</span><span style={{fontSize:9,color:task.status==="completed"?"#24704f":task.status==="cancelled"?"#7c8999":"#315d95",background:task.status==="completed"?"#e8f7ef":task.status==="cancelled"?"#f0f2f5":"#eef4fc",padding:"4px 7px",borderRadius:5}}>{taskStatusLabels[task.status]||task.status}</span><span style={{fontSize:9,color:"#8492a5"}}>اولویت: {taskPriorityLabels[task.priority]||task.priority}</span><span style={{fontSize:9,color:dueColor}}>{dueLabel}</span></div></div>
+      <button type="button" className="btn secondary" onClick={()=>void toggleTaskHistory(task)}>{openHistoryId===task.id?"بستن سابقه":"سابقه و یادداشت‌ها"}</button>
+     </div>
+     {task.description&&<p style={{fontSize:10,lineHeight:1.9,color:"#66758a",whiteSpace:"pre-wrap",margin:"10px 0 0"}}>{task.description}</p>}
+     <small style={{display:"block",fontSize:9,color:"#91a0b2",marginTop:8}}>مسئول: {task.assigned_to_username||"—"} · ثبت‌کننده: {task.created_by_username||"—"}</small>
+     {actions.length>0&&<div style={{display:"flex",gap:7,flexWrap:"wrap",marginTop:12,paddingTop:12,borderTop:"1px solid #edf1f6"}}>{actions.map(action=><button key={action.status} type="button" className={"btn "+action.variant} disabled={updatingId===task.id} onClick={()=>void changeStatus(task,action.status)}>{updatingId===task.id?"در حال ثبت…":action.label}</button>)}</div>}
+     {openHistoryId===task.id&&<div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #edf1f6"}}>
+      {eventsLoadingId===task.id&&<p className="empty">در حال دریافت سابقه…</p>}
+      {eventErrors[task.id]&&<p role="alert" className="notice">{eventErrors[task.id]}</p>}
+      {(eventsByTask[task.id]||[]).length>0&&<div style={{display:"grid",gap:8,marginBottom:12}}>{[...(eventsByTask[task.id]||[])].reverse().map(item=><div key={item.id} style={{padding:10,borderRadius:7,background:"#f8fafd"}}><div style={{display:"flex",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}><b style={{fontSize:10,color:"#35465b"}}>{taskEventLabels[item.event_type]||item.event_type}</b><small style={{fontSize:9,color:"#91a0b2"}}>{displayDateTime(item.created_at)}</small></div>{item.previous_status&&item.new_status&&<p style={{fontSize:9,color:"#66758a",margin:"6px 0"}}>{taskStatusLabels[item.previous_status]||item.previous_status} ← {taskStatusLabels[item.new_status]||item.new_status}</p>}{item.note&&<p style={{fontSize:10,lineHeight:1.8,color:"#526176",whiteSpace:"pre-wrap",margin:"6px 0"}}>{item.note}</p>}<small style={{fontSize:9,color:"#91a0b2"}}>ثبت توسط: {item.actor_username||"کاربر سامانه"}</small></div>)}</div>}
+      {(eventsByTask[task.id]||[]).length===0&&!eventsLoadingId&&!eventErrors[task.id]&&<p style={{fontSize:10,color:"#8492a5"}}>هنوز رویدادی برای نمایش بارگذاری نشده یا سابقه‌ای وجود ندارد.</p>}
+      {canWrite&&<form onSubmit={event=>{event.preventDefault();void addTaskNote(task);}} style={{padding:12,background:"#fcfdff",border:"1px solid #edf1f6",borderRadius:8}}>
+       <label htmlFor={"task-note-"+task.id} style={{display:"block",fontSize:10,color:"#526176",marginBottom:6}}>یادداشت پیگیری</label><textarea id={"task-note-"+task.id} className="field" rows={2} maxLength={5000} value={noteDrafts[task.id]||""} onChange={event=>setNoteDrafts(current=>({...current,[task.id]:event.target.value}))} style={{minHeight:65,resize:"vertical"}}/>
+       {noteErrors[task.id]&&<p role="alert" className="notice">{noteErrors[task.id]}</p>}
+       {noteSuccess[task.id]&&<p role="status" className="note">{noteSuccess[task.id]}</p>}
+       <button type="submit" className="btn secondary" disabled={noteSavingId===task.id||!(noteDrafts[task.id]||"").trim()} style={{marginTop:8}}>{noteSavingId===task.id?"در حال ثبت…":"ثبت یادداشت"}</button>
+      </form>}
+     </div>}
+    </article>;
+   })}
+  </div>}
+  {!canWrite&&<p className="note">این نقش امکان مشاهده وظایف پرونده را دارد؛ ایجاد یا تغییر وظیفه مطابق مجوزهای بک‌اند محدود شده است.</p>}
  </section>;
 }
 
