@@ -5,6 +5,9 @@ type NavKey = "dashboard" | "applications" | "customers" | "tasks" | "reports" |
 type Application = { id: string; customer: string; type: string; amount: string; stage: string; status: string; date: string };
 type ApiUser = { id: number; username: string; first_name: string; last_name: string; role: string | null; role_label: string | null; must_change_password: boolean };
 type ApiError = Error & { status?: number };
+type CustomerRow = { id:string; customer_number:string; customer_type:string; first_name:string; last_name:string; organization_name:string; phone_number:string; email:string; status:string; created_at:string };
+type TaskRow = { id:string; task_number:string; application_number:string; title:string; status:string; priority:string; assigned_to_username:string; due_at:string|null; is_overdue:boolean };
+type OperationsReport = { generated_at:string; scope:string; customers:{total:number;active:number;inactive:number;archived:number}; applications:{total:number;by_status:Record<string,number>}; tasks:{total:number;open:number;in_progress:number;completed:number;cancelled:number;overdue:number;due_today:number}; guarantees:{total:number;by_status:Record<string,number>}; service_receipts:{count:number;gross_total:string;paid_total:string;outstanding_total:string} };
 const nav: {key:NavKey;label:string;icon:string;group:string}[] = [
  {key:"dashboard",label:"داشبورد",icon:"▦",group:"فضای کاری"},
  {key:"applications",label:"پرونده‌های تسهیلاتی",icon:"▤",group:"فضای کاری"},
@@ -71,6 +74,11 @@ async function getApplications(): Promise<Application[]> {
 }
 function App(){
  const [page,setPage]=useState<NavKey>("dashboard");
+ const [customers,setCustomers]=useState<CustomerRow[]>([]);
+ const [tasks,setTasks]=useState<TaskRow[]>([]);
+ const [report,setReport]=useState<OperationsReport|null>(null);
+ const [sectionLoading,setSectionLoading]=useState(false);
+ const [sectionError,setSectionError]=useState("");
  const [apps,setApps]=useState<Application[]>([]);
  const [query,setQuery]=useState("");
  const [status,setStatus]=useState("همه وضعیت‌ها");
@@ -97,6 +105,34 @@ function App(){
   }).finally(()=>{if(active)setAuthChecking(false);});
   return ()=>{active=false;};
  },[]);
+ useEffect(()=>{
+  if(!authUser || !["customers","tasks","reports"].includes(page)) return;
+  let active=true;
+  setSectionLoading(true);setSectionError("");
+  const load=async()=>{
+   try {
+    if(page==="customers"){
+     const payload=await apiRequest("/api/v1/customers/");
+     const rows=Array.isArray(payload)?payload:payload.results;
+     if(!Array.isArray(rows)) throw new Error("ساختار پاسخ فهرست مشتریان معتبر نیست.");
+     if(active)setCustomers(rows);
+    } else if(page==="tasks"){
+     const payload=await apiRequest("/api/v1/tasks/");
+     const rows=Array.isArray(payload)?payload:payload.results;
+     if(!Array.isArray(rows)) throw new Error("ساختار پاسخ فهرست وظایف معتبر نیست.");
+     if(active)setTasks(rows);
+    } else {
+     const payload=await apiRequest("/api/v1/reports/operations/");
+     if(active)setReport(payload);
+    }
+    if(active){setApiState("connected");setApiError("");}
+   } catch(error) {
+    if(active){const message=(error as Error).message||"دریافت اطلاعات ناموفق بود.";setSectionError(message);setApiError(message);if((error as ApiError).status===502||(error as ApiError).status===503)setApiState("error");}
+   } finally {if(active)setSectionLoading(false);}
+  };
+  void load();
+  return ()=>{active=false;};
+ },[authUser,page]);
  const filtered=useMemo(()=>apps.filter(a=>(a.id+" "+a.customer+" "+a.type).toLowerCase().includes(query.toLowerCase())&&(status==="همه وضعیت‌ها"||a.status===status)),[apps,query,status]);
  const current=nav.find(n=>n.key===page)!;
  const counts=[apps.length,apps.filter(a=>a.status==="در حال بررسی").length,apps.filter(a=>a.status==="نیازمند اقدام").length,apps.filter(a=>a.status==="تکمیل شده").length];
@@ -143,7 +179,10 @@ function App(){
     <div className="bottom-grid"><section className="card"><div className="card-head"><div><h2>پرونده‌های اخیر</h2><p>آخرین پرونده‌های ثبت یا به‌روزرسانی‌شده</p></div><button className="subtle-btn" onClick={()=>setPage("applications")}>مشاهده همه ←</button></div><ApplicationsTable rows={apps.slice(0,4)} onSelect={setSelected}/></section><section className="card tasks-card"><div className="card-head"><div><h2>نیازمند پیگیری</h2><p>اقدام‌های پیشنهادی برای امروز</p></div><span className="count-pill">۳ مورد</span></div>{apps.filter(a=>a.status==="نیازمند اقدام"||a.status==="در حال بررسی").slice(0,3).map((a,i)=><button className="task-row" key={a.id} onClick={()=>setSelected(a)}><span className={"task-symbol t"+i}>{i===0?"◷":i===1?"▤":"↗"}</span><span className="task-text"><b>{a.customer}</b><small>{a.id} · {a.stage}</small></span><span className="task-arrow">←</span></button>)}</section></div></>}
    {page==="applications"&&!selected&&<section className="card list-card"><div className="card-head list-head"><div><h2>همه پرونده‌ها</h2><p>{filtered.length.toLocaleString("fa-IR")} پرونده مطابق فیلتر</p></div><button className="btn secondary" onClick={()=>{setQuery("");setStatus("همه وضعیت‌ها")}}>پاک‌کردن فیلترها</button></div><div className="filters"><label className="search-field">⌕ <input placeholder="جستجو بر اساس شماره پرونده، مشتری..." value={query} onChange={e=>setQuery(e.target.value)}/></label><select value={status} onChange={e=>setStatus(e.target.value)}><option>همه وضعیت‌ها</option>{["در حال بررسی","نیازمند اقدام","در انتظار","تکمیل شده"].map(s=><option key={s}>{s}</option>)}</select><button className="btn secondary" onClick={()=>window.print()}>⇩ خروجی / چاپ</button></div><ApplicationsTable rows={filtered} onSelect={setSelected}/></section>}
    {selected&&<section className="detail-layout"><section className="card detail-main"><div className="detail-id"><div><span className="eyebrow">شماره پرونده</span><h2>{selected.id}</h2></div><Status value={selected.status}/></div><div className="detail-fields">{[["نام مشتری",selected.customer],["نوع تسهیلات",selected.type],["مبلغ درخواستی",selected.amount+" تومان"],["مرحله جاری",selected.stage],["تاریخ ثبت",selected.date],["شناسه پرونده",selected.id]].map(x=><div key={x[0]}><small>{x[0]}</small><b>{x[1]}</b></div>)}</div><div className="card-head"><div><h2>مراحل پرونده</h2><p>گردش کار پرونده از ثبت تا پرداخت</p></div></div><div className="workflow">{stages.map((s,i)=><div className={"workflow-step "+(s===selected.stage?"current":stages.indexOf(selected.stage)>i?"done":"")} key={s}><span>{stages.indexOf(selected.stage)>i?"✓":i+1}</span><div><b>{s}</b><small>{s===selected.stage?"مرحله جاری":stages.indexOf(selected.stage)>i?"تکمیل‌شده":"در انتظار انجام"}</small></div></div>)}</div><button className="btn secondary" onClick={()=>setSelected(null)}>← بازگشت به فهرست پرونده‌ها</button></section><aside className="card detail-aside"><h3>اقدامات پرونده</h3><p>دسترسی سریع به عملیات مرتبط با این پرونده</p><button className="btn primary full" onClick={()=>alert("عملیات مرحله بعد باید از طریق API گردش کار انجام شود.")}>ادامه فرایند ←</button><button className="btn secondary full" onClick={()=>window.print()}>چاپ خلاصه پرونده</button><div className="note"><b>نکته</b><p>تغییر مرحله پرونده باید با مجوز کاربر و از طریق API بک‌اند ثبت شود.</p></div></aside></section>}
-   {["customers","tasks","reports","settings"].includes(page)&&!selected&&<section className="card placeholder"><div className="placeholder-icon">{current.icon}</div><h2>{title[page]}</h2><p>ساختار رابط کاربری آماده است. اتصال این بخش به API اختصاصی در گام بعدی انجام می‌شود تا اطلاعات واقعی نمایش داده شود.</p><button className="btn primary" onClick={()=>setPage("applications")}>رفتن به پرونده‌های تسهیلاتی ←</button></section>}
+   {page==="customers"&&!selected&&<section className="card list-card"><div className="card-head"><div><h2>فهرست مشتریان</h2><p>{customers.length.toLocaleString("fa-IR")} مشتری دریافت‌شده از بک‌اند</p></div><button className="btn secondary" onClick={()=>setPage("applications")}>پرونده‌های تسهیلاتی</button></div>{sectionLoading?<p className="empty">در حال دریافت اطلاعات مشتریان…</p>:sectionError?<p className="empty" role="alert">{sectionError}</p>:<div className="table-wrap"><table><thead><tr><th>شماره مشتری</th><th>نام / شرکت</th><th>نوع</th><th>تلفن</th><th>وضعیت</th><th>تاریخ ثبت</th></tr></thead><tbody>{customers.map(customer=><tr key={customer.id}><td><b className="case-id">{customer.customer_number}</b></td><td><b>{customer.customer_type==="organization"?customer.organization_name:[customer.first_name,customer.last_name].filter(Boolean).join(" ")||"—"}</b></td><td>{customer.customer_type==="organization"?"حقوقی":"حقیقی"}</td><td>{customer.phone_number||"—"}</td><td><Status value={customer.status==="active"?"فعال":customer.status==="needs_review"?"نیازمند بررسی":customer.status==="archived"?"بایگانی‌شده":"غیرفعال"}/></td><td>{displayDate(customer.created_at)}</td></tr>)}{!customers.length&&<tr><td colSpan={6} className="empty">مشتری‌ای برای نمایش وجود ندارد.</td></tr>}</tbody></table></div>}</section>}
+   {page==="tasks"&&!selected&&<section className="card list-card"><div className="card-head"><div><h2>وظایف و پیگیری</h2><p>{tasks.length.toLocaleString("fa-IR")} وظیفه در محدوده دسترسی شما</p></div><button className="btn secondary" onClick={()=>setPage("applications")}>پرونده‌ها</button></div>{sectionLoading?<p className="empty">در حال دریافت وظایف…</p>:sectionError?<p className="empty" role="alert">{sectionError}</p>:<div className="table-wrap"><table><thead><tr><th>شماره وظیفه</th><th>عنوان</th><th>پرونده</th><th>مسئول</th><th>اولویت</th><th>موعد</th><th>وضعیت</th></tr></thead><tbody>{tasks.map(task=><tr key={task.id}><td><b className="case-id">{task.task_number}</b></td><td>{task.title}</td><td>{task.application_number||"—"}</td><td>{task.assigned_to_username||"—"}</td><td>{task.priority==="urgent"?"فوری":task.priority==="high"?"زیاد":task.priority==="low"?"کم":"عادی"}</td><td>{displayDate(task.due_at)}</td><td><Status value={task.is_overdue?"عقب‌افتاده":task.status==="open"?"باز":task.status==="in_progress"?"در حال انجام":task.status==="completed"?"انجام‌شده":"لغوشده"}/></td></tr>)}{!tasks.length&&<tr><td colSpan={7} className="empty">وظیفه‌ای برای نمایش وجود ندارد.</td></tr>}</tbody></table></div>}</section>}
+   {page==="reports"&&!selected&&<section className="card list-card"><div className="card-head"><div><h2>گزارش عملیاتی</h2><p>{report?"آخرین تولید: "+displayDate(report.generated_at):"گزارش زنده از بک‌اند"}</p></div><button className="btn secondary" onClick={()=>setPage("dashboard")}>بازگشت به داشبورد</button></div>{sectionLoading?<p className="empty">در حال دریافت گزارش…</p>:sectionError?<p className="empty" role="alert">{sectionError}</p>:report?<><div className="stat-grid"><Stat icon="♙" label="مشتریان" value={report.customers.total.toLocaleString("fa-IR")} delta={"فعال: "+report.customers.active.toLocaleString("fa-IR")} tone="blue"/><Stat icon="▤" label="پرونده‌های تسهیلاتی" value={report.applications.total.toLocaleString("fa-IR")} delta="طبق محدوده دسترسی کاربر" tone="violet"/><Stat icon="◷" label="وظایف عقب‌افتاده" value={report.tasks.overdue.toLocaleString("fa-IR")} delta={"امروز: "+report.tasks.due_today.toLocaleString("fa-IR")} tone="amber"/><Stat icon="✓" label="رسیدهای خدمات" value={report.service_receipts.count.toLocaleString("fa-IR")} delta={"مانده: "+formatMoney(report.service_receipts.outstanding_total)+" تومان"} tone="green"/></div><p className="note">این گزارش فقط داده‌هایی را نمایش می‌دهد که بک‌اند برای نقش و محدوده دسترسی شما مجاز دانسته است.</p></>:<p className="empty">گزارشی در دسترس نیست.</p>}</section>}
+   {page==="settings"&&!selected&&<section className="card placeholder"><div className="placeholder-icon">{current.icon}</div><h2>{title[page]}</h2><p>تنظیمات مدیریتی و تغییر گذرواژه باید پس از تعیین قرارداد API و مجوزهای موردنیاز پیاده‌سازی شوند.</p><button className="btn primary" onClick={()=>setPage("applications")}>رفتن به پرونده‌های تسهیلاتی ←</button></section>}
    <footer><span>© ۱۴۰۵ سامانه امید</span><span className="connection"><i className={apiState==="connected"?"connected":""}></i>{apiState==="connected"?"متصل به API":apiState==="error"?"خطا در اتصال API":"در حال اتصال به API"}</span><span>نسخه رابط کاربری ۱.۰</span></footer>
    </div></main>
  </div>
