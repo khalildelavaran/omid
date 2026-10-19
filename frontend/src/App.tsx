@@ -119,7 +119,7 @@ function buildStatusGradient(metrics: {count:number;color:string}[], total:numbe
 }
 const apiFieldLabels: Record<string, string> = {
  customer_type: "نوع مشتری", first_name: "نام", last_name: "نام خانوادگی",
- organization_name: "نام سازمان", phone_number: "شماره تلفن", email: "ایمیل",
+ organization_name: "نام سازمان", phone_number: "شماره تلفن", email: "ایمیل", name: "نام خدمت", active: "وضعیت فعالیت", description: "توضیحات خدمت",
  national_id: "کد ملی / شناسه ملی", birth_date: "تاریخ تولد",
  father_name: "نام پدر", occupation: "شغل", postal_code: "کدپستی",
  sana_verified: "وضعیت احراز ثنا", status: "وضعیت پرونده", notes: "یادداشت",
@@ -195,8 +195,8 @@ async function getApplicationDocuments(applicationId: string): Promise<Applicati
  if (!Array.isArray(rows)) throw new Error("ساختار پاسخ اسناد پرونده معتبر نیست.");
  return rows as ApplicationDocumentRow[];
 }
-async function getServiceCatalog():Promise<ServiceCatalogRow[]> {
- const payload=await apiRequest("/api/v1/services/catalog/?active=true");
+async function getServiceCatalog(activeOnly=true):Promise<ServiceCatalogRow[]> {
+ const payload=await apiRequest("/api/v1/services/catalog/"+(activeOnly?"?active=true":""));
  const rows=Array.isArray(payload)?payload:payload.results;
  if(!Array.isArray(rows))throw new Error("ساختار فهرست خدمات معتبر نیست.");
  return rows as ServiceCatalogRow[];
@@ -931,7 +931,23 @@ function ServiceReceiptsPage({authUser}:{authUser:ApiUser|null}){
  const [createError,setCreateError]=useState("");
  const [createSuccess,setCreateSuccess]=useState("");
  const [receiptAttempt,setReceiptAttempt]=useState<{fingerprint:string;key:string}|null>(null);
+ const [adminCatalog,setAdminCatalog]=useState<ServiceCatalogRow[]>([]);
+ const [adminCatalogLoading,setAdminCatalogLoading]=useState(false);
+ const [adminCatalogError,setAdminCatalogError]=useState("");
+ const [catalogQuery,setCatalogQuery]=useState("");
+ const [catalogFormOpen,setCatalogFormOpen]=useState(false);
+ const [catalogEditId,setCatalogEditId]=useState<string|null>(null);
+ const [catalogName,setCatalogName]=useState("");
+ const [catalogDescription,setCatalogDescription]=useState("");
+ const [catalogPrice,setCatalogPrice]=useState("");
+ const [catalogOnlineCost,setCatalogOnlineCost]=useState("0");
+ const [catalogSaving,setCatalogSaving]=useState(false);
+ const [catalogSaveError,setCatalogSaveError]=useState("");
+ const [catalogSaveSuccess,setCatalogSaveSuccess]=useState("");
+ const [catalogTogglingId,setCatalogTogglingId]=useState<string|null>(null);
  const canCreate=["system_admin","intake","case_worker","finance"].includes(authUser?.role||"");
+ const isAdmin=authUser?.role==="system_admin";
+ const isAdminCatalogBusy=catalogSaving||Boolean(catalogTogglingId);
 
  useEffect(()=>{
   let active=true;
@@ -941,6 +957,12 @@ function ServiceReceiptsPage({authUser}:{authUser:ApiUser|null}){
   }).catch(failure=>{
    if(active)setLoadError((failure as Error).message||"دریافت فهرست خدمات و رسیدها ناموفق بود.");
   }).finally(()=>{if(active)setLoading(false);});
+  if(isAdmin){
+   setAdminCatalogLoading(true);setAdminCatalogError("");
+   void getServiceCatalog(false).then(items=>{if(active)setAdminCatalog(items);}).catch(failure=>{
+    if(active)setAdminCatalogError((failure as Error).message||"دریافت کاتالوگ خدمات ناموفق بود.");
+   }).finally(()=>{if(active)setAdminCatalogLoading(false);});
+  }else{setAdminCatalog([]);setAdminCatalogLoading(false);setAdminCatalogError("");}
   if(canCreate){
    setCustomerError("");
    void getCustomers().then(rows=>{if(active)setCustomers(rows);}).catch(failure=>{
@@ -948,7 +970,7 @@ function ServiceReceiptsPage({authUser}:{authUser:ApiUser|null}){
    });
   }else{setCustomers([]);setCustomerError("");}
   return ()=>{active=false;};
- },[canCreate]);
+ },[canCreate,isAdmin]);
 
  const selectedService=catalogue.find(item=>item.id===serviceId)||null;
  const priceValue=selectedService?parseIntegerMoney(selectedService.price):null;
@@ -969,6 +991,51 @@ function ServiceReceiptsPage({authUser}:{authUser:ApiUser|null}){
   return haystack.includes(query.trim().toLocaleLowerCase())&&(paymentFilter==="all"||row.payment_method===paymentFilter);
  });
 
+ function resetCatalogForm(){
+  setCatalogEditId(null);setCatalogName("");setCatalogDescription("");setCatalogPrice("");setCatalogOnlineCost("0");setCatalogFormOpen(false);setCatalogSaveError("");
+ }
+ function beginCatalogEdit(item:ServiceCatalogRow){
+  setCatalogEditId(item.id);setCatalogName(item.name);setCatalogDescription(item.description||"");setCatalogPrice(String(item.price));setCatalogOnlineCost(String(item.online_cost));setCatalogSaveError("");setCatalogSaveSuccess("");setCatalogFormOpen(true);
+ }
+ async function saveCatalogItem(){
+  const name=catalogName.trim();
+  const price=parseIntegerMoney(catalogPrice);
+  const onlineCost=parseIntegerMoney(catalogOnlineCost||"0");
+  if(!name){setCatalogSaveError("نام خدمت الزامی است.");return;}
+  if(name.length>200){setCatalogSaveError("نام خدمت نباید بیشتر از ۲۰۰ نویسه باشد.");return;}
+  if(catalogDescription.trim().length>1000){setCatalogSaveError("توضیحات خدمت نباید بیشتر از ۱۰۰۰ نویسه باشد.");return;}
+  if(price===null||onlineCost===null){setCatalogSaveError("تعرفه و هزینه آنلاین باید عدد صحیح نامنفی باشند.");return;}
+  if(onlineCost>price){setCatalogSaveError("هزینه آنلاین نمی‌تواند از تعرفه خدمت بیشتر باشد.");return;}
+  setCatalogSaving(true);setCatalogSaveError("");setCatalogSaveSuccess("");
+  const editingId=catalogEditId;
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const payload={name,description:catalogDescription.trim(),price:price.toString(),online_cost:onlineCost.toString()};
+   const path=editingId?"/api/v1/services/catalog/"+editingId+"/":"/api/v1/services/catalog/";
+   const saved=await apiRequest(path,{method:editingId?"PATCH":"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify(payload)}) as ServiceCatalogRow;
+   setAdminCatalog(current=>editingId?current.map(item=>item.id===saved.id?saved:item):[saved,...current]);
+   setCatalogue(current=>saved.active?[saved,...current.filter(item=>item.id!==saved.id)]:current.filter(item=>item.id!==saved.id));
+   setCatalogSaveSuccess((editingId?"اطلاعات خدمت «":"خدمت «")+saved.name+(editingId?"» به‌روزرسانی شد.":"» ثبت شد و در فهرست خدمات فعال قرار گرفت."));
+   resetCatalogForm();
+  }catch(failure){
+   setCatalogSaveError((failure as Error).message||"ذخیره کاتالوگ خدمت ناموفق بود.");
+  }finally{setCatalogSaving(false);}
+ }
+ async function toggleCatalogActive(item:ServiceCatalogRow){
+  if(item.active&&!window.confirm("آیا از غیرفعال کردن خدمت «"+item.name+"» مطمئن هستید؟ رسیدهای قبلی حفظ می‌شوند."))return;
+  setCatalogTogglingId(item.id);setAdminCatalogError("");setCatalogSaveSuccess("");
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const updated=await apiRequest("/api/v1/services/catalog/"+item.id+"/",{method:"PATCH",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({active:!item.active})}) as ServiceCatalogRow;
+   setAdminCatalog(current=>current.map(row=>row.id===updated.id?updated:row));
+   setCatalogue(current=>updated.active?[updated,...current.filter(row=>row.id!==updated.id)]:current.filter(row=>row.id!==updated.id));
+   if(!updated.active&&serviceId===updated.id)setServiceId("");
+   setCatalogSaveSuccess(updated.active?"خدمت دوباره فعال شد.":"خدمت غیرفعال شد؛ رسیدهای قبلی دست‌نخورده باقی ماندند.");
+  }catch(failure){
+   setAdminCatalogError((failure as Error).message||"تغییر وضعیت خدمت ناموفق بود.");
+  }finally{setCatalogTogglingId(null);}
+ }
+ const filteredAdminCatalog=adminCatalog.filter(item=>[item.name,item.code,item.description].join(" ").toLocaleLowerCase().includes(catalogQuery.trim().toLocaleLowerCase()));
  async function createReceipt(){
   if(!authUser)return;
   if(!customerId||!serviceId){setCreateError("مشتری و خدمت را انتخاب کنید.");return;}
@@ -1002,6 +1069,31 @@ function ServiceReceiptsPage({authUser}:{authUser:ApiUser|null}){
 
  return <section className="card list-card">
   <div className="card-head list-head"><div><h2>رسیدهای خدمات</h2><p>اطلاعات از سرویس واقعی دریافت می‌شود؛ رسید صادرشده immutable است و حذف یا ویرایش نمی‌شود.</p></div><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><span style={{fontSize:10,color:"#8492a5"}}>{receipts.length.toLocaleString("fa-IR")} رسید در محدوده دسترسی</span>{canCreate&&<button type="button" className="btn primary" onClick={()=>{setCreateOpen(current=>!current);setCreateError("");setCreateSuccess("");}}>＋ ثبت رسید</button>}</div></div>
+  {isAdmin&&<section style={{margin:"0 20px 18px",padding:18,border:"1px solid #e8edf3",borderRadius:9,background:"#fff"}}>
+   <div className="card-head"><div><h2>مدیریت کاتالوگ خدمات</h2><p>تعرفه و هزینه آنلاین را تعریف یا اصلاح کنید؛ خدمات غیرفعال حذف نمی‌شوند و رسیدهای پیشین محفوظ می‌مانند.</p></div><button type="button" className="btn primary" onClick={()=>{if(catalogFormOpen&&!catalogEditId){resetCatalogForm();return;}resetCatalogForm();setCatalogFormOpen(true);setCatalogSaveSuccess("");}}>＋ افزودن خدمت</button></div>
+   {catalogFormOpen&&<form onSubmit={event=>{event.preventDefault();void saveCatalogItem();}} style={{padding:16,border:"1px solid #edf1f6",borderRadius:9,background:"#fcfdff",marginBottom:16}}>
+    <div className="card-head"><div><h3 style={{fontSize:12,margin:0,color:"#35465b"}}>{catalogEditId?"ویرایش مشخصات خدمت":"تعریف خدمت جدید"}</h3><p>کد خدمت را سامانه به‌صورت خودکار تولید می‌کند.</p></div><button type="button" className="btn secondary" disabled={catalogSaving} onClick={resetCatalogForm}>انصراف</button></div>
+    <div className="form-grid">
+     <div className="form-row"><label htmlFor="catalog-service-name">نام خدمت *</label><input id="catalog-service-name" className="field" required maxLength={200} value={catalogName} onChange={event=>setCatalogName(event.target.value)}/></div>
+     <div className="form-row"><label htmlFor="catalog-service-price">تعرفه مشتری (تومان) *</label><input id="catalog-service-price" className="field" type="number" min="0" step="1" required value={catalogPrice} onChange={event=>setCatalogPrice(event.target.value)}/></div>
+     <div className="form-row"><label htmlFor="catalog-online-cost">هزینه آنلاین (تومان) *</label><input id="catalog-online-cost" className="field" type="number" min="0" step="1" required value={catalogOnlineCost} onChange={event=>setCatalogOnlineCost(event.target.value)}/></div>
+     <div className="form-row"><label htmlFor="catalog-service-description">توضیحات</label><textarea id="catalog-service-description" className="field" rows={3} maxLength={1000} value={catalogDescription} onChange={event=>setCatalogDescription(event.target.value)} style={{minHeight:80,resize:"vertical"}}/></div>
+    </div>
+    {catalogSaveError&&<p role="alert" className="notice">{catalogSaveError}</p>}
+    <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}><button className="btn primary" type="submit" disabled={catalogSaving}>{catalogSaving?"در حال ذخیره…":catalogEditId?"ذخیره تغییرات":"ثبت خدمت"}</button><small style={{alignSelf:"center",fontSize:9,color:"#8492a5"}}>هزینه آنلاین بخشی از مبلغ نهایی است؛ اعتبارسنجی نهایی سمت سرور انجام می‌شود.</small></div>
+   </form>}
+   {adminCatalogError&&<p role="alert" className="notice">{adminCatalogError}</p>}
+   {catalogSaveSuccess&&<p role="status" className="note">{catalogSaveSuccess}</p>}
+   <div className="filters" style={{padding:"10px 0",borderTop:0,background:"transparent"}}><label className="search-field">⌕ <input placeholder="جستجو در نام یا کد خدمت..." value={catalogQuery} onChange={event=>setCatalogQuery(event.target.value)}/></label><span style={{fontSize:9,color:"#8492a5"}}>{filteredAdminCatalog.length.toLocaleString("fa-IR")} خدمت</span></div>
+   {adminCatalogLoading?<p className="empty">در حال دریافت کاتالوگ خدمات…</p>:filteredAdminCatalog.length===0?<p className="empty">{adminCatalog.length?"خدمتی مطابق جستجو پیدا نشد.":"هنوز خدمتی ثبت نشده است؛ از «افزودن خدمت» استفاده کنید."}</p>:<div style={{display:"grid",gap:10}}>{filteredAdminCatalog.map(item=>{
+    const price=parseIntegerMoney(item.price);const onlineCost=parseIntegerMoney(item.online_cost);const companyCommission=price!==null&&onlineCost!==null&&price>=onlineCost?price-onlineCost:null;
+    return <article key={item.id} style={{padding:14,border:"1px solid #edf1f6",borderRadius:8,display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+    <div style={{minWidth:0,flex:1}}><div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><b style={{fontSize:11,color:"#35465b"}}>{item.name}</b><span style={{fontSize:9,color:item.active?"#24704f":"#7c8999",background:item.active?"#e8f7ef":"#f0f2f5",padding:"4px 7px",borderRadius:5}}>{item.active?"فعال":"غیرفعال"}</span><small style={{fontSize:9,color:"#91a0b2"}}>{item.code}</small></div>
+     <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:7,fontSize:10,color:"#66758a"}}><span>تعرفه: {formatMoney(item.price)} تومان</span><span>هزینه آنلاین: {formatMoney(item.online_cost)} تومان</span><span>سهم شرکت: {companyCommission!==null?formatMoney(companyCommission.toString()):"—"} تومان</span></div>
+     {item.description&&<p style={{fontSize:10,lineHeight:1.8,color:"#7c8999",margin:"7px 0 0",whiteSpace:"pre-wrap"}}>{item.description}</p>}
+    </div><div style={{display:"flex",gap:7,flexWrap:"wrap"}}><button type="button" className="btn secondary" disabled={isAdminCatalogBusy||catalogTogglingId===item.id} onClick={()=>beginCatalogEdit(item)}>ویرایش</button><button type="button" className="btn secondary" disabled={isAdminCatalogBusy||catalogTogglingId===item.id} onClick={()=>void toggleCatalogActive(item)}>{catalogTogglingId===item.id?"در حال تغییر…":item.active?"غیرفعال‌سازی":"فعال‌سازی"}</button></div>
+   </article>})}</div>}
+  </section>}
   {createOpen&&canCreate&&<section style={{margin:"0 20px 18px",padding:18,border:"1px solid #edf1f6",borderRadius:9,background:"#fcfdff"}}>
    <div className="card-head"><div><h2>ثبت رسید خدمات</h2><p>مبالغ قطعی و سهم شرکت در سرور محاسبه می‌شود.</p></div><button type="button" className="btn secondary" disabled={saving} onClick={()=>setCreateOpen(false)}>بستن</button></div>
    <form onSubmit={event=>{event.preventDefault();void createReceipt();}}>
