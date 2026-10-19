@@ -30,10 +30,12 @@ const productLabels: Record<string, string> = {
  equipment: "خرید تجهیزات",
 };
 async function apiRequest(path: string, init: RequestInit = {}): Promise<any> {
+ const headers = new Headers(init.headers);
+ headers.set("Accept", "application/json");
  const response = await fetch(apiBase + path, {
   ...init,
   credentials: "same-origin",
-  headers: { Accept: "application/json", ...((init.headers || {}) as Record<string, string>) },
+  headers,
  });
  let payload: any = {};
  try { payload = await response.json(); } catch { /* Some error responses have no JSON body. */ }
