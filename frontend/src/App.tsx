@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import "./style.css";
 
 type NavKey = "dashboard" | "applications" | "customers" | "tasks" | "services" | "reports" | "settings";
-type Application = { uuid: string; id: string; customer: string; type: string; amount: string; stage: string; status: string; statusKey: string; date: string };
+type Application = { uuid: string; id: string; customerId: string; customer: string; type: string; amount: string; stage: string; status: string; statusKey: string; date: string };
 type ApplicationStatusAction = { status: string; label: string; variant: "primary" | "secondary"; requiresReason?: boolean };
 type ApplicationEventRow = { id: string | number; event_type: string; previous_status: string | null; new_status: string | null; note: string; actor_username: string | null; created_at: string };
 type ApplicationDocumentRow = { id:string; document_number:string; application:string; application_number:string; document_type:string; replaces_document:string|null; replaces_document_number:string|null; original_filename:string; content_type:string; size_bytes:number; sha256:string; status:string; review_note:string; uploaded_by:string; uploaded_by_username:string; reviewed_by:string|null; reviewed_by_username:string|null; reviewed_at:string|null; created_at:string; updated_at:string };
@@ -50,6 +50,8 @@ type CustomerRow = { id:string; customer_number:string; customer_type:string; fi
 type TaskRow = { id:string; task_number:string; application:string; application_number:string; title:string; description:string; status:string; priority:string; assigned_to:string|number; assigned_to_username:string; created_by_username:string; due_at:string|null; completed_at:string|null; created_at:string; is_overdue:boolean };
 type TaskEventRow = { id:string; task:string; event_type:string; previous_status:string|null; new_status:string|null; previous_assignee_username:string|null; new_assignee_username:string|null; previous_due_at:string|null; new_due_at:string|null; note:string; actor_username:string|null; created_at:string };
 type FollowUpSuggestion = { key:string; title:string; description:string; priority:string };
+type CasePartyRow = { id:string; application:string; person:string; person_display:string; role:string; relationship_to_applicant:string; membership_status:string; account_status:string; sort_order:number };
+type StageInstanceRow = { id:string; application:string; application_number:string; party:string|null; party_person:string|null; code:string; status:string; assigned_to:number|string|null; started_at:string|null; due_at:string|null; completed_at:string|null; outcome:string; hold_reason:string; evidence_reference:string; follow_up_count:number };
 type OperationsReport = { generated_at:string; scope:string; customers:{total:number;active:number;inactive:number;archived:number}; applications:{total:number;by_status:Record<string,number>}; tasks:{total:number;open:number;in_progress:number;completed:number;cancelled:number;overdue:number;due_today:number}; guarantees:{total:number;by_status:Record<string,number>}; service_receipts:{count:number;gross_total:string;paid_total:string;outstanding_total:string} };
 const nav: {key:NavKey;label:string;icon:string;group:string}[] = [
  {key:"dashboard",label:"داشبورد",icon:"▦",group:"فضای کاری"},
@@ -76,6 +78,14 @@ const documentStatusLabels: Record<string,string> = { pending_review:"در ان�
 const guaranteeStatusLabels: Record<string,string> = { registered:"ثبت‌شده", under_review:"در حال بررسی", approved:"تأیید شده", rejected:"رد شده", fulfilled:"انجام‌شده", cancelled:"لغو شده" };
 const guaranteeEventLabels: Record<string,string> = { created:"ثبت درخواست ضمانت", status_changed:"تغییر وضعیت", note_added:"یادداشت پیگیری" };
 const paymentMethodLabels: Record<string,string> = { pos:"کارت‌خوان", cash:"نقدی", bank_transfer:"واریز بانکی", other:"سایر" };
+const casePartyRoleLabels:Record<string,string>={applicant:"متقاضی اصلی",guarantor:"ضامن",representative:"نماینده"};
+const accountStatusLabels:Record<string,string>={unknown:"بررسی‌نشده",existing_verified:"حساب موجود تأییدشده",needs_opening:"نیازمند افتتاح"};
+const membershipStatusLabels:Record<string,string>={active:"فعال",replaced:"جایگزین‌شده",removed:"خارج‌شده"};
+const stageCodeLabels:Record<string,string>={documents:"مدارک",account:"وضعیت حساب",merat:"اعتبارسنجی مرآت",e_note:"سفته الکترونیک",loan_submission:"ثبت درخواست وام",bank_review:"بررسی بانک",disbursement:"واریز تسهیلات",settlement:"تسویه",handover:"تحویل نهایی"};
+const stageStatusLabels:Record<string,string>={locked:"قفل‌شده",pending:"در انتظار",in_progress:"در جریان",action_needed:"نیازمند اقدام",completed:"تکمیل‌شده",bypassed:"عبور مجاز",rejected:"ردشده",on_hold:"تعلیق"};
+const personStageDefinitions=[{code:"documents",label:"مدارک"},{code:"account",label:"وضعیت حساب"},{code:"merat",label:"اعتبارسنجی مرآت"},{code:"e_note",label:"سفته الکترونیک"}];
+const caseStageDefinitions=[{code:"loan_submission",label:"ثبت درخواست وام"},{code:"bank_review",label:"بررسی بانک"},{code:"disbursement",label:"واریز تسهیلات"},{code:"settlement",label:"تسویه"},{code:"handover",label:"تحویل نهایی"}];
+const completedStageStatuses=["completed","bypassed"];
 const taskStatusLabels: Record<string,string> = { open:"باز", in_progress:"در حال انجام", completed:"انجام‌شده", cancelled:"لغوشده" };
 const taskPriorityLabels: Record<string,string> = { low:"کم", normal:"عادی", high:"زیاد", urgent:"فوری" };
 const taskEventLabels: Record<string,string> = { created:"ایجاد وظیفه", status_changed:"تغییر وضعیت", due_date_changed:"تغییر موعد", assigned:"تغییر مسئول", updated:"به‌روزرسانی", note_added:"یادداشت پیگیری" };
@@ -173,6 +183,7 @@ function mapApplication(x: any): Application {
  return {
   uuid: String(x.id ?? ""),
   id: String(x.application_number ?? x.id ?? "—"),
+  customerId: String(x.customer ?? ""),
   customer: String(x.customer_display_name ?? x.customer_number ?? "مشتری"),
   type: productLabels[String(x.product_type)] || String(x.product_type || "تسهیلات"),
   amount: formatMoney(x.requested_amount),
@@ -523,7 +534,8 @@ function App(){
    </section>}
    {selected&&<ApplicationDocuments selected={selected} authUser={authUser}/>}
    {selected&&<ApplicationGuarantees selected={selected} authUser={authUser}/>}
-   {selected&&<ApplicationFollowUps selected={selected} authUser={authUser}/>} 
+   {selected&&<ApplicationFollowUps selected={selected} authUser={authUser}/>}
+   {selected&&<ApplicationStageWorkflow selected={selected} authUser={authUser}/>} 
    {page==="customers"&&!selected&&showCustomerForm&&<section className="card" style={{marginBottom:18,padding:22}}>
     <div className="card-head"><div><h2>ثبت مشتری جدید</h2><p>اطلاعات در بک‌اند ذخیره و شماره مشتری به‌صورت خودکار تولید می‌شود.</p></div><button type="button" className="btn secondary" onClick={()=>setShowCustomerForm(false)}>بستن</button></div>
     {customerFormError&&<p role="alert" className="notice">{customerFormError}</p>}
