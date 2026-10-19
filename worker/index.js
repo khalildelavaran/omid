@@ -97,6 +97,10 @@ export default {
       }
     }
 
+    // Serve the React/Vite build configured in wrangler.toml after routing API calls.
+    // The API proxy above must run first so cookies and CSRF stay same-origin.
+    if (env?.ASSETS) return env.ASSETS.fetch(request);
+
     if (url.pathname === "/favicon.ico") return new Response(null, { status: 204 });
 
     const html = `<!doctype html>
