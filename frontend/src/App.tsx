@@ -14,7 +14,7 @@ const nav: {key:NavKey;label:string;icon:string;group:string}[] = [
  {key:"settings",label:"تنظیمات",icon:"⚙",group:"مدیریت"},
 ];
 const stages = ["ثبت درخواست","تکمیل پرونده","بررسی مدارک","بررسی اعتباری","تصمیم اعتباری","قرارداد","پرداخت تسهیلات"];
-const apiBase = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const apiBase = ""; // Same-origin only: Vite proxies /api locally and Cloudflare Worker proxies it in production.
 const statusLabels: Record<string, string> = {
  under_review: "در حال بررسی",
  awaiting_documents: "نیازمند اقدام",
