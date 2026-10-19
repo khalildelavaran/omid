@@ -97,6 +97,12 @@ export default {
       }
     }
 
+    // Serve the built React/Vite application from the Workers Static Assets binding.
+    // Without this, requests fall through to the legacy embedded demo HTML below.
+    if (env?.ASSETS && typeof env.ASSETS.fetch === "function") {
+      return env.ASSETS.fetch(request);
+    }
+
     if (url.pathname === "/favicon.ico") return new Response(null, { status: 204 });
 
     const html = `<!doctype html>
