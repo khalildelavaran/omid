@@ -6,6 +6,9 @@ type Application = { uuid: string; id: string; customer: string; type: string; a
 type ApplicationStatusAction = { status: string; label: string; variant: "primary" | "secondary"; requiresReason?: boolean };
 type ApplicationEventRow = { id: string | number; event_type: string; previous_status: string | null; new_status: string | null; note: string; actor_username: string | null; created_at: string };
 type ApplicationDocumentRow = { id:string; document_number:string; application:string; application_number:string; document_type:string; replaces_document:string|null; replaces_document_number:string|null; original_filename:string; content_type:string; size_bytes:number; sha256:string; status:string; review_note:string; uploaded_by:string; uploaded_by_username:string; reviewed_by:string|null; reviewed_by_username:string|null; reviewed_at:string|null; created_at:string; updated_at:string };
+type GuaranteeRequestRow = { id:string; request_number:string; application:string; application_number:string; loan_customer_name:string; requester_customer:string|null; requester_customer_name:string; status:string; note:string; created_by:string; created_by_username:string; created_at:string; updated_at:string };
+type GuaranteeRequestEventRow = { id:string; guarantee_request:string; event_type:string; previous_status:string; new_status:string; note:string; actor_username:string|null; created_at:string };
+type GuaranteeStatusAction = { status:string; label:string; variant:"primary"|"secondary"; requiresReason?:boolean };
 const workflowStages = [
  {key:"under_review",label:"بررسی اولیه"},
  {key:"awaiting_documents",label:"تکمیل مدارک"},
@@ -65,6 +68,17 @@ const statusLabels: Record<string, string> = {
 const applicationEventLabels: Record<string, string> = { created: "ثبت پرونده", status_changed: "تغییر وضعیت", note_added: "یادداشت پیگیری", archived: "بایگانی پرونده" };
 const documentTypeLabels: Record<string,string> = { identity:"مدرک هویتی", address:"مدرک نشانی", income:"مدرک درآمد", bank_statement:"گردش حساب", contract:"قرارداد", other:"سایر مدارک" };
 const documentStatusLabels: Record<string,string> = { pending_review:"در انتظار بررسی", accepted:"پذیرفته‌شده", rejected:"نیازمند اصلاح" };
+const guaranteeStatusLabels: Record<string,string> = { registered:"ثبت‌شده", under_review:"در حال بررسی", approved:"تأیید شده", rejected:"رد شده", fulfilled:"انجام‌شده", cancelled:"لغو شده" };
+const guaranteeEventLabels: Record<string,string> = { created:"ثبت درخواست ضمانت", status_changed:"تغییر وضعیت", note_added:"یادداشت پیگیری" };
+function getGuaranteeStatusActions(request:GuaranteeRequestRow,role:string|null):GuaranteeStatusAction[]{
+ if(["system_admin","intake","case_worker"].includes(role||"")){
+  if(request.status==="registered")return [{status:"under_review",label:"شروع بررسی",variant:"primary"},{status:"cancelled",label:"لغو درخواست",variant:"secondary",requiresReason:true}];
+  if(request.status==="under_review")return [{status:"cancelled",label:"لغو درخواست",variant:"secondary",requiresReason:true}];
+ }
+ if(role==="credit_approver"&&request.status==="under_review")return [{status:"approved",label:"تأیید ضمانت",variant:"primary"},{status:"rejected",label:"رد ضمانت",variant:"secondary",requiresReason:true}];
+ if(role==="finance"&&request.status==="approved")return [{status:"fulfilled",label:"ثبت انجام ضمانت",variant:"primary"}];
+ return [];
+}
 const productLabels: Record<string, string> = {
  working_capital: "تسهیلات سرمایه در گردش",
  personal: "تسهیلات شخصی",
@@ -100,7 +114,7 @@ const apiFieldLabels: Record<string, string> = {
  term_months: "مدت بازپرداخت", title: "عنوان", application: "پرونده",
  priority: "اولویت", due_at: "موعد انجام", description: "شرح وظیفه",
  current_password: "گذرواژه فعلی", new_password: "گذرواژه جدید",
- status_note: "دلیل تصمیم",
+ status_note: "دلیل تصمیم", requester_customer: "درخواست‌دهنده ضمانت", document_type: "نوع سند", file: "فایل سند", note: "شرح / توضیح", reason: "دلیل تصمیم",
 };
 function getApiErrorMessage(payload: any): string {
  if (typeof payload?.detail === "string") return payload.detail;
@@ -466,6 +480,7 @@ function App(){
     {!["system_admin","intake","case_worker"].includes(authUser?.role||"")&&<p className="note">دسترسی این نقش فقط برای مشاهده تاریخچه پرونده مجاز است.</p>}
    </section>}
    {selected&&<ApplicationDocuments selected={selected} authUser={authUser}/>}
+   {selected&&<ApplicationGuarantees selected={selected} authUser={authUser}/>}
    {page==="customers"&&!selected&&showCustomerForm&&<section className="card" style={{marginBottom:18,padding:22}}>
     <div className="card-head"><div><h2>ثبت مشتری جدید</h2><p>اطلاعات در بک‌اند ذخیره و شماره مشتری به‌صورت خودکار تولید می‌شود.</p></div><button type="button" className="btn secondary" onClick={()=>setShowCustomerForm(false)}>بستن</button></div>
     {customerFormError&&<p role="alert" className="notice">{customerFormError}</p>}
@@ -730,6 +745,143 @@ function ApplicationDocuments({selected,authUser}:{selected:Application;authUser
    })}
   </div>}
   {!canUpload&&<p className="note">دسترسی این نقش برای مشاهده و دریافت اسناد است.</p>}
+ </section>;
+}
+
+function ApplicationGuarantees({selected,authUser}:{selected:Application;authUser:ApiUser|null}){
+ const [requests,setRequests]=useState<GuaranteeRequestRow[]>([]);
+ const [loading,setLoading]=useState(true);
+ const [loadError,setLoadError]=useState("");
+ const [customers,setCustomers]=useState<CustomerRow[]>([]);
+ const [customerError,setCustomerError]=useState("");
+ const [createOpen,setCreateOpen]=useState(false);
+ const [requesterCustomer,setRequesterCustomer]=useState("");
+ const [requestNote,setRequestNote]=useState("");
+ const [saving,setSaving]=useState(false);
+ const [createError,setCreateError]=useState("");
+ const [createSuccess,setCreateSuccess]=useState("");
+ const [transitionReasons,setTransitionReasons]=useState<Record<string,string>>({});
+ const [transitionErrors,setTransitionErrors]=useState<Record<string,string>>({});
+ const [transitionMessages,setTransitionMessages]=useState<Record<string,string>>({});
+ const [transitioningId,setTransitioningId]=useState<string|null>(null);
+ const [openHistoryId,setOpenHistoryId]=useState<string|null>(null);
+ const [eventsById,setEventsById]=useState<Record<string,GuaranteeRequestEventRow[]>>({});
+ const [eventErrors,setEventErrors]=useState<Record<string,string>>({});
+ const [loadingEventsId,setLoadingEventsId]=useState<string|null>(null);
+ const canCreate=["system_admin","intake","case_worker"].includes(authUser?.role||"");
+
+ useEffect(()=>{
+  let active=true;
+  setLoading(true);setLoadError("");setRequests([]);
+  void apiRequest("/api/v1/guarantees/?application="+encodeURIComponent(selected.uuid)).then(payload=>{
+   const rows=Array.isArray(payload)?payload:payload.results;
+   if(!Array.isArray(rows))throw new Error("ساختار پاسخ درخواست‌های ضمانت معتبر نیست.");
+   if(active)setRequests(rows as GuaranteeRequestRow[]);
+  }).catch(failure=>{
+   if(active)setLoadError((failure as Error).message||"دریافت درخواست‌های ضمانت ناموفق بود.");
+  }).finally(()=>{if(active)setLoading(false);});
+  if(canCreate){
+   setCustomerError("");
+   void getCustomers().then(rows=>{if(active)setCustomers(rows);}).catch(failure=>{
+    if(active)setCustomerError((failure as Error).message||"دریافت فهرست مشتریان برای انتخاب درخواست‌دهنده ناموفق بود.");
+   });
+  }else{setCustomers([]);setCustomerError("");}
+  return ()=>{active=false;};
+ },[selected.uuid,canCreate]);
+
+ async function createRequest(){
+  setSaving(true);setCreateError("");setCreateSuccess("");
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const created=await apiRequest("/api/v1/guarantees/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({
+    application:selected.uuid,
+    requester_customer:requesterCustomer||null,
+    note:requestNote.trim()
+   })}) as GuaranteeRequestRow;
+   setRequests(current=>[created,...current]);
+   setRequesterCustomer("");setRequestNote("");setCreateOpen(false);
+   setCreateSuccess("درخواست ضمانت با شماره «"+created.request_number+"» ثبت شد.");
+  }catch(failure){
+   setCreateError((failure as Error).message||"ثبت درخواست ضمانت ناموفق بود.");
+  }finally{setSaving(false);}
+ }
+
+ async function transitionRequest(request:GuaranteeRequestRow,action:GuaranteeStatusAction){
+  const reason=(transitionReasons[request.id]||"").trim();
+  if(action.requiresReason&&!reason){
+   setTransitionErrors(current=>({...current,[request.id]:"برای رد یا لغو درخواست، ثبت دلیل الزامی است."}));
+   return;
+  }
+  if(["rejected","cancelled"].includes(action.status)&&!window.confirm("آیا از ثبت این تصمیم برای درخواست ضمانت مطمئن هستید؟"))return;
+  setTransitioningId(request.id);
+  setTransitionErrors(current=>({...current,[request.id]:""}));
+  setTransitionMessages(current=>({...current,[request.id]:""}));
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const updated=await apiRequest("/api/v1/guarantees/"+request.id+"/transition/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||"")},body:JSON.stringify({status:action.status,reason})}) as GuaranteeRequestRow;
+   setRequests(current=>current.map(item=>item.id===updated.id?updated:item));
+   setTransitionReasons(current=>({...current,[request.id]:""}));
+   setTransitionMessages(current=>({...current,[request.id]:"وضعیت درخواست ضمانت تغییر کرد."}));
+   setEventsById(current=>{const next={...current};delete next[request.id];return next;});
+  }catch(failure){
+   setTransitionErrors(current=>({...current,[request.id]:(failure as Error).message||"تغییر وضعیت درخواست ضمانت ناموفق بود."}));
+  }finally{setTransitioningId(null);}
+ }
+
+ async function toggleHistory(request:GuaranteeRequestRow){
+  if(openHistoryId===request.id){setOpenHistoryId(null);return;}
+  setOpenHistoryId(request.id);
+  if(eventsById[request.id])return;
+  setLoadingEventsId(request.id);
+  setEventErrors(current=>({...current,[request.id]:""}));
+  try{
+   const payload=await apiRequest("/api/v1/guarantees/"+request.id+"/events/");
+   const rows=Array.isArray(payload)?payload:payload.results;
+   if(!Array.isArray(rows))throw new Error("ساختار پاسخ تاریخچه درخواست ضمانت معتبر نیست.");
+   setEventsById(current=>({...current,[request.id]:rows as GuaranteeRequestEventRow[]}));
+  }catch(failure){
+   setEventErrors(current=>({...current,[request.id]:(failure as Error).message||"دریافت تاریخچه درخواست ضمانت ناموفق بود."}));
+  }finally{setLoadingEventsId(null);}
+ }
+
+ return <section className="card" style={{marginTop:16,padding:22}}>
+  <div className="card-head"><div><h2>درخواست‌های ضمانت پرونده</h2><p>ثبت درخواست، بررسی اعتباری، پیگیری وضعیت و تاریخچه از طریق بک‌اند.</p></div><span style={{fontSize:10,color:"#8492a5"}}>{requests.length.toLocaleString("fa-IR")} درخواست</span></div>
+  {canCreate&&<div style={{marginBottom:18}}>
+   <button type="button" className="btn primary" onClick={()=>{setCreateOpen(current=>!current);setCreateError("");setCreateSuccess("");}}>{createOpen?"بستن فرم":"＋ ثبت درخواست ضمانت"}</button>
+   {createOpen&&<form onSubmit={event=>{event.preventDefault();void createRequest();}} style={{marginTop:14,padding:16,border:"1px solid #edf1f6",borderRadius:9,background:"#fcfdff"}}>
+    <div className="form-grid">
+     <div className="form-row"><label htmlFor="guarantee-requester">درخواست‌دهنده (اختیاری)</label><select id="guarantee-requester" className="field" value={requesterCustomer} onChange={event=>setRequesterCustomer(event.target.value)}><option value="">بدون درخواست‌دهنده جداگانه</option>{customers.map(customer=><option key={customer.id} value={customer.id}>{customer.customer_number+" — "+(customer.customer_type==="organization"?customer.organization_name:[customer.first_name,customer.last_name].filter(Boolean).join(" ")||"مشتری")}</option>)}</select>{customerError&&<small role="alert" style={{color:"#b42318"}}>{customerError}</small>}</div>
+     <div className="form-row"><label htmlFor="guarantee-request-note">شرح درخواست</label><textarea id="guarantee-request-note" className="field" rows={3} maxLength={1000} value={requestNote} onChange={event=>setRequestNote(event.target.value)} placeholder="مثلاً درخواست صدور ضمانت برای پرونده" style={{minHeight:84,resize:"vertical"}}/></div>
+    </div>
+    {createError&&<p role="alert" className="notice">{createError}</p>}
+    <div style={{display:"flex",gap:8,marginTop:12}}><button className="btn primary" type="submit" disabled={saving}>{saving?"در حال ثبت…":"ثبت درخواست"}</button><button className="btn secondary" type="button" disabled={saving} onClick={()=>setCreateOpen(false)}>انصراف</button></div>
+   </form>}
+   {createSuccess&&<p role="status" className="note">{createSuccess}</p>}
+  </div>}
+  {loading?<p className="empty">در حال دریافت درخواست‌های ضمانت…</p>:loadError?<p role="alert" className="empty">{loadError}</p>:requests.length===0?<p className="empty">برای این پرونده درخواستی ثبت نشده است.</p>:<div style={{display:"grid",gap:12}}>
+   {requests.map(request=>{
+    const actions=getGuaranteeStatusActions(request,authUser?.role||null);
+    return <article key={request.id} style={{border:"1px solid #e8edf3",borderRadius:9,padding:15}}>
+     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+      <div style={{flex:1,minWidth:0}}><b style={{fontSize:11,color:"#35465b"}}>{request.request_number}</b><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginTop:7}}><span style={{fontSize:9,color:"#8492a5"}}>وضعیت: {guaranteeStatusLabels[request.status]||request.status}</span><span style={{fontSize:9,color:"#8492a5"}}>ثبت: {displayDateTime(request.created_at)}</span><span style={{fontSize:9,color:"#8492a5"}}>ثبت‌کننده: {request.created_by_username||"کاربر سامانه"}</span></div></div>
+      <button type="button" className="btn secondary" onClick={()=>void toggleHistory(request)}>{openHistoryId===request.id?"بستن تاریخچه":"مشاهده تاریخچه"}</button>
+     </div>
+     <div style={{display:"grid",gap:5,marginTop:10,fontSize:10,color:"#66758a"}}><span>مشتری وام‌گیرنده: {request.loan_customer_name||selected.customer}</span><span>درخواست‌دهنده ضمانت: {request.requester_customer_name||"مشخص نشده"}</span>{request.note&&<span style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>شرح: {request.note}</span>}</div>
+     {openHistoryId===request.id&&<div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #edf1f6"}}>
+      {loadingEventsId===request.id&&<p className="empty">در حال دریافت تاریخچه…</p>}
+      {eventErrors[request.id]&&<p role="alert" className="notice">{eventErrors[request.id]}</p>}
+      {(eventsById[request.id]||[]).length>0&&<div style={{display:"grid",gap:8}}>{[...(eventsById[request.id]||[])].reverse().map(item=><div key={item.id} style={{padding:10,borderRadius:7,background:"#f8fafd"}}><div style={{display:"flex",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}><b style={{fontSize:10,color:"#35465b"}}>{guaranteeEventLabels[item.event_type]||item.event_type}</b><small style={{fontSize:9,color:"#91a0b2"}}>{displayDateTime(item.created_at)}</small></div>{item.previous_status&&item.new_status&&<p style={{fontSize:9,color:"#66758a",margin:"6px 0"}}>{guaranteeStatusLabels[item.previous_status]||item.previous_status} ← {guaranteeStatusLabels[item.new_status]||item.new_status}</p>}{item.note&&<p style={{fontSize:10,lineHeight:1.8,color:"#526176",whiteSpace:"pre-wrap",margin:"6px 0"}}>{item.note}</p>}<small style={{fontSize:9,color:"#91a0b2"}}>ثبت توسط: {item.actor_username||"کاربر سامانه"}</small></div>)}</div>}
+     </div>}
+     {actions.length>0&&<div style={{marginTop:13,paddingTop:12,borderTop:"1px solid #edf1f6"}}>
+      {actions.some(action=>action.requiresReason)&&<div className="form-row"><label htmlFor={"guarantee-transition-reason-"+request.id}>دلیل تصمیم (برای رد یا لغو الزامی است)</label><textarea id={"guarantee-transition-reason-"+request.id} className="field" rows={2} maxLength={1000} value={transitionReasons[request.id]||""} onChange={event=>setTransitionReasons(current=>({...current,[request.id]:event.target.value}))} style={{minHeight:65,resize:"vertical"}}/></div>}
+      {transitionErrors[request.id]&&<p role="alert" className="notice">{transitionErrors[request.id]}</p>}
+      {transitionMessages[request.id]&&<p role="status" className="note">{transitionMessages[request.id]}</p>}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>{actions.map(action=><button key={action.status} type="button" className={"btn "+action.variant} disabled={transitioningId===request.id||(action.requiresReason&&!(transitionReasons[request.id]||"").trim())} onClick={()=>void transitionRequest(request,action)}>{transitioningId===request.id?"در حال ثبت…":action.label}</button>)}</div>
+     </div>}
+    </article>;
+   })}
+  </div>}
+  {!canCreate&&<p className="note">دسترسی این نقش فقط مطابق مجوزهای بک‌اند برای مشاهده و انتقال وضعیت‌های مجاز است.</p>}
  </section>;
 }
 
