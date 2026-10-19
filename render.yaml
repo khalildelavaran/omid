@@ -1,0 +1,35 @@
+# Render Blueprint for the Omid Django API and managed PostgreSQL.
+# The free plans below are intended for initial validation only:
+# Render's free PostgreSQL instances expire after 30 days, and local files are ephemeral.
+# Before production use, choose paid persistent database/storage appropriate for private documents.
+services:
+  - type: web
+    name: omid-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: sh -c 'python manage.py migrate --noinput && exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers ${GUNICORN_WORKERS:-2} --access-logfile - --error-logfile - --timeout 60'
+    healthCheckPath: /api/v1/health/
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: omid-postgres
+          property: connectionString
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        value: https://omid.khalil-delavaran.workers.dev
+      - key: PRIVATE_DOCUMENT_ROOT
+        value: /var/lib/omid/private-documents
+
+databases:
+  - name: omid-postgres
+    databaseName: omid
+    user: omid
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "16"
