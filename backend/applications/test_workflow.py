@@ -144,6 +144,93 @@ class TwoLevelWorkflowApiTests(TestCase):
         self.assertEqual(stage.code, StageInstance.Code.DOCUMENTS)
         self.assertEqual(stage.party_id, party.pk)
 
+    def test_stage_api_can_create_a_case_level_stage(self):
+        response = self.client.post(
+            "/api/v1/applications/stages/",
+            {"application": str(self.application.pk), "code": StageInstance.Code.LOAN_SUBMISSION},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        stage = StageInstance.objects.get(pk=response.data["id"])
+        self.assertEqual(stage.application, self.application)
+        self.assertIsNone(stage.party_id)
+        self.assertEqual(stage.status, StageInstance.Status.LOCKED)
+
+    def test_locked_loan_submission_can_start_after_all_person_stages_are_complete(self):
+        party = CaseParty.objects.create(
+            application=self.application,
+            person=self.customer,
+            role=CaseParty.Role.APPLICANT,
+            account_status=CaseParty.AccountStatus.EXISTING_VERIFIED,
+        )
+        for code in (
+            StageInstance.Code.DOCUMENTS,
+            StageInstance.Code.ACCOUNT,
+            StageInstance.Code.MERAT,
+            StageInstance.Code.E_NOTE,
+        ):
+            StageInstance.objects.create(
+                application=self.application,
+                party=party,
+                code=code,
+                status=StageInstance.Status.COMPLETED,
+            )
+        submission = StageInstance.objects.create(
+            application=self.application,
+            code=StageInstance.Code.LOAN_SUBMISSION,
+        )
+        self.assertEqual(submission.status, StageInstance.Status.LOCKED)
+        response = self.client.post(
+            f"/api/v1/applications/stages/{submission.pk}/transition/",
+            {"action": "start"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        submission.refresh_from_db()
+        self.assertEqual(submission.status, StageInstance.Status.IN_PROGRESS)
+
+    def test_held_person_stage_can_resume(self):
+        party = CaseParty.objects.create(
+            application=self.application,
+            person=self.customer,
+            role=CaseParty.Role.APPLICANT,
+        )
+        stage = StageInstance.objects.create(
+            application=self.application,
+            party=party,
+            code=StageInstance.Code.DOCUMENTS,
+            status=StageInstance.Status.ON_HOLD,
+            hold_reason="در انتظار پاسخ مشتری",
+        )
+        response = self.client.post(
+            f"/api/v1/applications/stages/{stage.pk}/transition/",
+            {"action": "start"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        stage.refresh_from_db()
+        self.assertEqual(stage.status, StageInstance.Status.IN_PROGRESS)
+
+    def test_admin_cannot_bypass_loan_submission_before_person_stages_are_ready(self):
+        admin = User.objects.create_superuser(
+            username="workflow-admin-bypass-submit",
+            password="test-pass-123",
+        )
+        submission = StageInstance.objects.create(
+            application=self.application,
+            code=StageInstance.Code.LOAN_SUBMISSION,
+        )
+        self.client.force_authenticate(admin)
+        response = self.client.post(
+            f"/api/v1/applications/stages/{submission.pk}/transition/",
+            {"action": "bypass", "reason": "درخواست استثنا"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        submission.refresh_from_db()
+        self.assertEqual(submission.status, StageInstance.Status.LOCKED)
+        self.client.force_authenticate(self.worker)
+
     def test_bank_review_cannot_start_before_loan_submission(self):
         StageInstance.objects.create(
             application=self.application, code=StageInstance.Code.LOAN_SUBMISSION,
