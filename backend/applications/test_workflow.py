@@ -185,6 +185,22 @@ class TwoLevelWorkflowApiTests(TestCase):
         submission.refresh_from_db()
         self.assertEqual(submission.status, StageInstance.Status.IN_PROGRESS)
 
+    def test_admin_cannot_bypass_loan_submission_before_person_stages_are_ready(self):
+        admin = User.objects.create_superuser(username="workflow-admin-bypass-submit", password="test-pass-123")
+        submission = StageInstance.objects.create(
+            application=self.application,
+            code=StageInstance.Code.LOAN_SUBMISSION,
+        )
+        self.client.force_authenticate(admin)
+        response = self.client.post(
+            f"/api/v1/applications/stages/{submission.pk}/transition/",
+            {"action": "bypass", "reason": "درخواست استثنا"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        submission.refresh_from_db()
+        self.assertEqual(submission.status, StageInstance.Status.LOCKED)
+
     def test_held_person_stage_can_resume(self):
         party = CaseParty.objects.create(
             application=self.application, person=self.customer,
