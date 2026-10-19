@@ -178,8 +178,13 @@ class StageInstanceViewSet(viewsets.ModelViewSet):
         role = _role(request.user)
 
         if command == "start":
-            if stage.status not in {StageInstance.Status.PENDING, StageInstance.Status.ACTION_NEEDED}:
-                raise ValidationError({"action": "شروع فقط برای مرحله در انتظار یا نیازمند اقدام مجاز است."})
+            if stage.status not in {
+                StageInstance.Status.LOCKED,
+                StageInstance.Status.PENDING,
+                StageInstance.Status.ACTION_NEEDED,
+                StageInstance.Status.ON_HOLD,
+            }:
+                raise ValidationError({"action": "شروع فقط برای مرحله قفل‌شده، در انتظار، نیازمند اقدام یا تعلیق مجاز است."})
             if stage.code == StageInstance.Code.LOAN_SUBMISSION:
                 _ensure_submission_ready(stage.application)
             _ensure_case_stage_prerequisite(stage)

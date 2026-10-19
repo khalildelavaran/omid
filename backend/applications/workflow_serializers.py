@@ -94,7 +94,7 @@ class StageInstanceSerializer(serializers.ModelSerializer):
             _validate_application_scope(self, application)
         person_codes = {
             StageInstance.Code.DOCUMENTS, StageInstance.Code.ACCOUNT, StageInstance.Code.MERAT,
-            StageInstance.Code.DIGITAL_BANKING, StageInstance.Code.E_NOTE,
+            StageInstance.Code.E_NOTE,
         }
         if party and application and party.application_id != application.pk:
             raise serializers.ValidationError({"party": "شخص باید متعلق به همین پرونده باشد."})
