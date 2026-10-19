@@ -114,7 +114,7 @@ const apiFieldLabels: Record<string, string> = {
  term_months: "مدت بازپرداخت", title: "عنوان", application: "پرونده",
  priority: "اولویت", due_at: "موعد انجام", description: "شرح وظیفه",
  current_password: "گذرواژه فعلی", new_password: "گذرواژه جدید",
- status_note: "دلیل تصمیم",
+ status_note: "دلیل تصمیم", requester_customer: "درخواست‌دهنده ضمانت", document_type: "نوع سند", file: "فایل سند", note: "شرح / توضیح", reason: "دلیل تصمیم",
 };
 function getApiErrorMessage(payload: any): string {
  if (typeof payload?.detail === "string") return payload.detail;
@@ -480,7 +480,7 @@ function App(){
     {!["system_admin","intake","case_worker"].includes(authUser?.role||"")&&<p className="note">دسترسی این نقش فقط برای مشاهده تاریخچه پرونده مجاز است.</p>}
    </section>}
    {selected&&<ApplicationDocuments selected={selected} authUser={authUser}/>}
-   {selected&&<ApplicationGuarantees selected={selected} authUser={authUser}/ >}
+   {selected&&<ApplicationGuarantees selected={selected} authUser={authUser}/>}
    {page==="customers"&&!selected&&showCustomerForm&&<section className="card" style={{marginBottom:18,padding:22}}>
     <div className="card-head"><div><h2>ثبت مشتری جدید</h2><p>اطلاعات در بک‌اند ذخیره و شماره مشتری به‌صورت خودکار تولید می‌شود.</p></div><button type="button" className="btn secondary" onClick={()=>setShowCustomerForm(false)}>بستن</button></div>
     {customerFormError&&<p role="alert" className="notice">{customerFormError}</p>}
