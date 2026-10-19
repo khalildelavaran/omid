@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import "./style.css";
 
-type NavKey = "dashboard" | "applications" | "customers" | "tasks" | "reports" | "settings";
+type NavKey = "dashboard" | "applications" | "customers" | "tasks" | "services" | "reports" | "settings";
 type Application = { uuid: string; id: string; customer: string; type: string; amount: string; stage: string; status: string; statusKey: string; date: string };
 type ApplicationStatusAction = { status: string; label: string; variant: "primary" | "secondary"; requiresReason?: boolean };
 type ApplicationEventRow = { id: string | number; event_type: string; previous_status: string | null; new_status: string | null; note: string; actor_username: string | null; created_at: string };
 type ApplicationDocumentRow = { id:string; document_number:string; application:string; application_number:string; document_type:string; replaces_document:string|null; replaces_document_number:string|null; original_filename:string; content_type:string; size_bytes:number; sha256:string; status:string; review_note:string; uploaded_by:string; uploaded_by_username:string; reviewed_by:string|null; reviewed_by_username:string|null; reviewed_at:string|null; created_at:string; updated_at:string };
 type GuaranteeRequestRow = { id:string; request_number:string; application:string; application_number:string; loan_customer_name:string; requester_customer:string|null; requester_customer_name:string; status:string; note:string; created_by:string; created_by_username:string; created_at:string; updated_at:string };
 type GuaranteeRequestEventRow = { id:string; guarantee_request:string; event_type:string; previous_status:string; new_status:string; note:string; actor_username:string|null; created_at:string };
+type ServiceCatalogRow = { id:string; code:string; name:string; description:string; price:string; online_cost:string; active:boolean };
+type ServiceReceiptRow = { id:string; receipt_number:string; customer:string; customer_name:string; service:string; service_code:string; service_name:string; service_description_snapshot:string; price:string; discount:string; total:string; online_cost:string; company_commission:string; paid:string; amount_due:string; payment_method:string; performed_by:string; performed_by_name:string; note:string; created_by:string; created_by_username:string; created_at:string };
 type GuaranteeStatusAction = { status:string; label:string; variant:"primary"|"secondary"; requiresReason?:boolean };
 const workflowStages = [
  {key:"under_review",label:"بررسی اولیه"},
@@ -52,6 +54,7 @@ const nav: {key:NavKey;label:string;icon:string;group:string}[] = [
  {key:"applications",label:"پرونده‌های تسهیلاتی",icon:"▤",group:"فضای کاری"},
  {key:"customers",label:"مشتریان",icon:"♙",group:"فضای کاری"},
  {key:"tasks",label:"وظایف و پیگیری",icon:"◷",group:"عملیات"},
+ {key:"services",label:"خدمات و رسیدها",icon:"◉",group:"عملیات"},
  {key:"reports",label:"گزارش‌ها",icon:"▥",group:"عملیات"},
  {key:"settings",label:"تنظیمات",icon:"⚙",group:"مدیریت"},
 ];
@@ -70,6 +73,16 @@ const documentTypeLabels: Record<string,string> = { identity:"مدرک هویت�
 const documentStatusLabels: Record<string,string> = { pending_review:"در انتظار بررسی", accepted:"پذیرفته‌شده", rejected:"نیازمند اصلاح" };
 const guaranteeStatusLabels: Record<string,string> = { registered:"ثبت‌شده", under_review:"در حال بررسی", approved:"تأیید شده", rejected:"رد شده", fulfilled:"انجام‌شده", cancelled:"لغو شده" };
 const guaranteeEventLabels: Record<string,string> = { created:"ثبت درخواست ضمانت", status_changed:"تغییر وضعیت", note_added:"یادداشت پیگیری" };
+const paymentMethodLabels: Record<string,string> = { pos:"کارت‌خوان", cash:"نقدی", bank_transfer:"واریز بانکی", other:"سایر" };
+function parseIntegerMoney(value:string):bigint|null {
+ const normalized=String(value||"").trim();
+ if(!/^\\d+$/.test(normalized))return null;
+ try{return BigInt(normalized);}catch{return null;}
+}
+function createReceiptIdempotencyKey():string {
+ if(typeof crypto!=="undefined"&&typeof crypto.randomUUID==="function")return crypto.randomUUID();
+ return "receipt-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2);
+}
 function getGuaranteeStatusActions(request:GuaranteeRequestRow,role:string|null):GuaranteeStatusAction[]{
  if(["system_admin","intake","case_worker"].includes(role||"")){
   if(request.status==="registered")return [{status:"under_review",label:"شروع بررسی",variant:"primary"},{status:"cancelled",label:"لغو درخواست",variant:"secondary",requiresReason:true}];
@@ -181,6 +194,18 @@ async function getApplicationDocuments(applicationId: string): Promise<Applicati
  const rows = Array.isArray(payload) ? payload : payload.results;
  if (!Array.isArray(rows)) throw new Error("ساختار پاسخ اسناد پرونده معتبر نیست.");
  return rows as ApplicationDocumentRow[];
+}
+async function getServiceCatalog():Promise<ServiceCatalogRow[]> {
+ const payload=await apiRequest("/api/v1/services/catalog/?active=true");
+ const rows=Array.isArray(payload)?payload:payload.results;
+ if(!Array.isArray(rows))throw new Error("ساختار فهرست خدمات معتبر نیست.");
+ return rows as ServiceCatalogRow[];
+}
+async function getServiceReceipts():Promise<ServiceReceiptRow[]> {
+ const payload=await apiRequest("/api/v1/services/receipts/");
+ const rows=Array.isArray(payload)?payload:payload.results;
+ if(!Array.isArray(rows))throw new Error("ساختار فهرست رسیدهای خدمات معتبر نیست.");
+ return rows as ServiceReceiptRow[];
 }
 function displayDateTime(value: unknown): string {
  if (!value) return "—";
@@ -398,8 +423,8 @@ function App(){
  const maxStatusCount=Math.max(1,...applicationStatusMetrics.map(item=>item.count));
  const followUpTasks=tasks.filter(task=>task.status==="open"||task.status==="in_progress").slice(0,3);
  const activeTaskCount=report?report.tasks.open+report.tasks.in_progress:null;
- const title:Record<NavKey,string>={dashboard:"داشبورد مدیریتی",applications:"پرونده‌های تسهیلاتی",customers:"مشتریان",tasks:"وظایف و پیگیری",reports:"گزارش‌ها",settings:"تنظیمات سامانه"};
- const description:Record<NavKey,string>={dashboard:"نمای کلی عملکرد و وضعیت پرونده‌های تسهیلاتی سامانه امید",applications:"مدیریت و پیگیری پرونده‌ها از ثبت درخواست تا پرداخت تسهیلات",customers:"فهرست مشتریان حقیقی و حقوقی و اطلاعات ارتباطی آن‌ها",tasks:"پیگیری اقدامات معوق و وظایف محول‌شده به کارشناسان",reports:"گزارش‌های مدیریتی و عملیاتی پرونده‌ها",settings:"تنظیمات عمومی و اتصال رابط کاربری به سرویس سامانه"};
+ const title:Record<NavKey,string>={dashboard:"داشبورد مدیریتی",applications:"پرونده‌های تسهیلاتی",customers:"مشتریان",tasks:"وظایف و پیگیری",services:"خدمات و رسیدها",reports:"گزارش‌ها",settings:"تنظیمات سامانه"};
+ const description:Record<NavKey,string>={dashboard:"نمای کلی عملکرد و وضعیت پرونده‌های تسهیلاتی سامانه امید",applications:"مدیریت و پیگیری پرونده‌ها از ثبت درخواست تا پرداخت تسهیلات",customers:"فهرست مشتریان حقیقی و حقوقی و اطلاعات ارتباطی آن‌ها",tasks:"پیگیری اقدامات معوق و وظایف محول‌شده به کارشناسان",services:"ثبت و پیگیری رسیدهای خدمات، مبالغ دریافتی و مانده حساب",reports:"گزارش‌های مدیریتی و عملیاتی پرونده‌ها",settings:"تنظیمات عمومی و اتصال رابط کاربری به سرویس سامانه"};
  if(authChecking) return <div dir="rtl" style={{minHeight:"100vh",display:"grid",placeItems:"center",background:"#f5f7fb",fontFamily:"Vazirmatn,Tahoma,sans-serif",color:"#526176"}}>در حال بررسی اتصال امن به سامانه امید…</div>;
  if(!authUser) return <div dir="rtl" style={{minHeight:"100vh",display:"grid",placeItems:"center",padding:20,background:"#f5f7fb",fontFamily:"Vazirmatn,Tahoma,sans-serif"}}>
   <form onSubmit={async event=>{
@@ -568,6 +593,7 @@ function App(){
    </section>}
    {page==="tasks"&&!selected&&<section className="card list-card"><div className="card-head"><div><h2>وظایف و پیگیری</h2><p>{tasks.length.toLocaleString("fa-IR")} وظیفه در محدوده دسترسی شما</p></div><button className="btn secondary" onClick={()=>setPage("applications")}>پرونده‌ها</button></div>{sectionLoading?<p className="empty">در حال دریافت وظایف…</p>:sectionError?<p className="empty" role="alert">{sectionError}</p>:<div className="table-wrap"><table><thead><tr><th>شماره وظیفه</th><th>عنوان</th><th>پرونده</th><th>مسئول</th><th>اولویت</th><th>موعد</th><th>وضعیت</th><th>اقدام</th></tr></thead><tbody>{tasks.map(task=><tr key={task.id}><td><b className="case-id">{task.task_number}</b></td><td>{task.title}</td><td>{task.application_number||"—"}</td><td>{task.assigned_to_username||"—"}</td><td>{task.priority==="urgent"?"فوری":task.priority==="high"?"زیاد":task.priority==="low"?"کم":"عادی"}</td><td>{displayDate(task.due_at)}</td><td><Status value={task.is_overdue?"عقب‌افتاده":task.status==="open"?"باز":task.status==="in_progress"?"در حال انجام":task.status==="completed"?"انجام‌شده":"لغوشده"}/></td><td>{task.status==="open"?<button className="btn secondary" onClick={()=>void changeTaskStatus(task,"in_progress")}>شروع</button>:task.status==="in_progress"?<button className="btn secondary" onClick={()=>void changeTaskStatus(task,"completed")}>تکمیل</button>:<span>—</span>}</td></tr>)}{!tasks.length&&<tr><td colSpan={8} className="empty">وظیفه‌ای برای نمایش وجود ندارد.</td></tr>}</tbody></table></div>}</section>}
    {page==="reports"&&!selected&&<section className="card list-card"><div className="card-head"><div><h2>گزارش عملیاتی</h2><p>{report?"آخرین تولید: "+displayDate(report.generated_at):"گزارش زنده از بک‌اند"}</p></div><button className="btn secondary" onClick={()=>setPage("dashboard")}>بازگشت به داشبورد</button></div>{sectionLoading?<p className="empty">در حال دریافت گزارش…</p>:sectionError?<p className="empty" role="alert">{sectionError}</p>:report?<><div className="stat-grid"><Stat icon="♙" label="مشتریان" value={report.customers.total.toLocaleString("fa-IR")} delta={"فعال: "+report.customers.active.toLocaleString("fa-IR")} tone="blue"/><Stat icon="▤" label="پرونده‌های تسهیلاتی" value={report.applications.total.toLocaleString("fa-IR")} delta="طبق محدوده دسترسی کاربر" tone="violet"/><Stat icon="◷" label="وظایف عقب‌افتاده" value={report.tasks.overdue.toLocaleString("fa-IR")} delta={"امروز: "+report.tasks.due_today.toLocaleString("fa-IR")} tone="amber"/><Stat icon="✓" label="رسیدهای خدمات" value={report.service_receipts.count.toLocaleString("fa-IR")} delta={"مانده: "+formatMoney(report.service_receipts.outstanding_total)+" تومان"} tone="green"/></div><p className="note">این گزارش فقط داده‌هایی را نمایش می‌دهد که بک‌اند برای نقش و محدوده دسترسی شما مجاز دانسته است.</p></>:<p className="empty">گزارشی در دسترس نیست.</p>}</section>}
+   {page==="services"&&!selected&&<ServiceReceiptsPage authUser={authUser}/>}
    {page==="settings"&&!selected&&<PasswordChangeForm required={false} onSuccess={()=>setAuthUser(current=>current?{...current,must_change_password:false}:current)}/>}
    <footer><span>© ۱۴۰۵ سامانه امید</span><span className="connection"><i className={apiState==="connected"?"connected":""}></i>{apiState==="connected"?"متصل به API":apiState==="error"?"خطا در اتصال API":"در حال اتصال به API"}</span><span>نسخه رابط کاربری ۱.۰</span></footer>
    </div></main>
@@ -882,6 +908,124 @@ function ApplicationGuarantees({selected,authUser}:{selected:Application;authUse
    })}
   </div>}
   {!canCreate&&<p className="note">دسترسی این نقش فقط مطابق مجوزهای بک‌اند برای مشاهده و انتقال وضعیت‌های مجاز است.</p>}
+ </section>;
+}
+
+function ServiceReceiptsPage({authUser}:{authUser:ApiUser|null}){
+ const [catalogue,setCatalogue]=useState<ServiceCatalogRow[]>([]);
+ const [customers,setCustomers]=useState<CustomerRow[]>([]);
+ const [receipts,setReceipts]=useState<ServiceReceiptRow[]>([]);
+ const [loading,setLoading]=useState(true);
+ const [loadError,setLoadError]=useState("");
+ const [customerError,setCustomerError]=useState("");
+ const [query,setQuery]=useState("");
+ const [paymentFilter,setPaymentFilter]=useState("all");
+ const [createOpen,setCreateOpen]=useState(false);
+ const [customerId,setCustomerId]=useState("");
+ const [serviceId,setServiceId]=useState("");
+ const [discount,setDiscount]=useState("0");
+ const [paid,setPaid]=useState("0");
+ const [paymentMethod,setPaymentMethod]=useState("pos");
+ const [receiptNote,setReceiptNote]=useState("");
+ const [saving,setSaving]=useState(false);
+ const [createError,setCreateError]=useState("");
+ const [createSuccess,setCreateSuccess]=useState("");
+ const [receiptAttempt,setReceiptAttempt]=useState<{fingerprint:string;key:string}|null>(null);
+ const canCreate=["system_admin","intake","case_worker","finance"].includes(authUser?.role||"");
+
+ useEffect(()=>{
+  let active=true;
+  setLoading(true);setLoadError("");
+  void Promise.all([getServiceCatalog(),getServiceReceipts()]).then(([items,rows])=>{
+   if(active){setCatalogue(items);setReceipts(rows);}
+  }).catch(failure=>{
+   if(active)setLoadError((failure as Error).message||"دریافت فهرست خدمات و رسیدها ناموفق بود.");
+  }).finally(()=>{if(active)setLoading(false);});
+  if(canCreate){
+   setCustomerError("");
+   void getCustomers().then(rows=>{if(active)setCustomers(rows);}).catch(failure=>{
+    if(active)setCustomerError((failure as Error).message||"دریافت فهرست مشتریان ناموفق بود.");
+   });
+  }else{setCustomers([]);setCustomerError("");}
+  return ()=>{active=false;};
+ },[canCreate]);
+
+ const selectedService=catalogue.find(item=>item.id===serviceId)||null;
+ const priceValue=selectedService?parseIntegerMoney(selectedService.price):null;
+ const discountValue=parseIntegerMoney(discount||"0");
+ const paidValue=parseIntegerMoney(paid);
+ const onlineCostValue=selectedService?parseIntegerMoney(selectedService.online_cost):null;
+ const totalValue=priceValue!==null&&discountValue!==null?priceValue-discountValue:null;
+ let financialError="";
+ if(selectedService&&priceValue!==null&&discountValue!==null){
+  if(discountValue>priceValue)financialError="تخفیف نمی‌تواند از تعرفه خدمت بیشتر باشد.";
+  else if(totalValue!==null&&onlineCostValue!==null&&totalValue<onlineCostValue)financialError="مبلغ نهایی نمی‌تواند از هزینه پرداخت آنلاین کمتر باشد.";
+  else if(totalValue!==null&&paidValue!==null&&paidValue>totalValue)financialError="مبلغ دریافتی نمی‌تواند از مبلغ نهایی خدمت بیشتر باشد.";
+ }
+ const commissionValue=totalValue!==null&&onlineCostValue!==null?totalValue-onlineCostValue:null;
+ const dueValue=totalValue!==null&&paidValue!==null?totalValue-paidValue:null;
+ const filteredReceipts=receipts.filter(row=>{
+  const haystack=[row.receipt_number,row.customer_name,row.service_name,row.service_code,row.created_by_username].join(" ").toLocaleLowerCase();
+  return haystack.includes(query.trim().toLocaleLowerCase())&&(paymentFilter==="all"||row.payment_method===paymentFilter);
+ });
+
+ async function createReceipt(){
+  if(!authUser)return;
+  if(!customerId||!serviceId){setCreateError("مشتری و خدمت را انتخاب کنید.");return;}
+  if(financialError){setCreateError(financialError);return;}
+  if(paidValue===null){setCreateError("مبلغ دریافتی را به‌صورت عدد صحیح وارد کنید.");return;}
+  const payload={
+   customer:customerId,
+   service:serviceId,
+   performed_by:String(authUser.id),
+   discount:discount||"0",
+   paid:paid||"0",
+   payment_method:paymentMethod,
+   note:receiptNote.trim()
+  };
+  const fingerprint=JSON.stringify(payload);
+  const key=receiptAttempt?.fingerprint===fingerprint?receiptAttempt.key:createReceiptIdempotencyKey();
+  setReceiptAttempt({fingerprint,key});
+  setSaving(true);setCreateError("");setCreateSuccess("");
+  try{
+   const csrf=await apiRequest("/api/v1/auth/csrf/");
+   const created=await apiRequest("/api/v1/services/receipts/",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":String(csrf.csrfToken||""),"Idempotency-Key":key},body:JSON.stringify(payload)}) as ServiceReceiptRow;
+   setReceipts(current=>[created,...current.filter(item=>item.id!==created.id)]);
+   setCreateOpen(false);
+   setCustomerId("");setServiceId("");setDiscount("0");setPaid("0");setPaymentMethod("pos");setReceiptNote("");
+   setReceiptAttempt(null);
+   setCreateSuccess("رسید با شماره «"+created.receipt_number+"» ثبت شد. مبلغ نهایی: "+formatMoney(created.total)+" تومان.");
+  }catch(failure){
+   setCreateError((failure as Error).message||"ثبت رسید خدمات ناموفق بود. تلاش دوباره با همان اطلاعات از کلید جلوگیری از ثبت تکراری استفاده می‌کند.");
+  }finally{setSaving(false);}
+ }
+
+ return <section className="card list-card">
+  <div className="card-head list-head"><div><h2>رسیدهای خدمات</h2><p>اطلاعات از سرویس واقعی دریافت می‌شود؛ رسید صادرشده immutable است و حذف یا ویرایش نمی‌شود.</p></div><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><span style={{fontSize:10,color:"#8492a5"}}>{receipts.length.toLocaleString("fa-IR")} رسید در محدوده دسترسی</span>{canCreate&&<button type="button" className="btn primary" onClick={()=>{setCreateOpen(current=>!current);setCreateError("");setCreateSuccess("");}}>＋ ثبت رسید</button>}</div></div>
+  {createOpen&&canCreate&&<section style={{margin:"0 20px 18px",padding:18,border:"1px solid #edf1f6",borderRadius:9,background:"#fcfdff"}}>
+   <div className="card-head"><div><h2>ثبت رسید خدمات</h2><p>مبالغ قطعی و سهم شرکت در سرور محاسبه می‌شود.</p></div><button type="button" className="btn secondary" disabled={saving} onClick={()=>setCreateOpen(false)}>بستن</button></div>
+   <form onSubmit={event=>{event.preventDefault();void createReceipt();}}>
+    <div className="form-grid">
+     <div className="form-row"><label htmlFor="receipt-customer">مشتری *</label><select id="receipt-customer" className="field" required value={customerId} onChange={event=>setCustomerId(event.target.value)}><option value="">انتخاب مشتری</option>{customers.filter(customer=>customer.status==="active").map(customer=><option key={customer.id} value={customer.id}>{customer.customer_number+" — "+(customer.customer_type==="organization"?customer.organization_name:[customer.first_name,customer.last_name].filter(Boolean).join(" ")||"مشتری")}</option>)}</select>{customerError&&<small role="alert" style={{color:"#b42318"}}>{customerError}</small>}</div>
+     <div className="form-row"><label htmlFor="receipt-service">خدمت *</label><select id="receipt-service" className="field" required value={serviceId} onChange={event=>setServiceId(event.target.value)}><option value="">انتخاب خدمت فعال</option>{catalogue.filter(item=>item.active).map(item=><option key={item.id} value={item.id}>{item.name+" — "+formatMoney(item.price)+" تومان"}</option>)}</select>{!catalogue.length&&!loading&&<small style={{color:"#a66b1f"}}>خدمت فعالی در کاتالوگ ثبت نشده است.</small>}</div>
+     <div className="form-row"><label htmlFor="receipt-discount">تخفیف (تومان)</label><input id="receipt-discount" className="field" type="number" min="0" step="1" required value={discount} onChange={event=>setDiscount(event.target.value)}/></div>
+     <div className="form-row"><label htmlFor="receipt-paid">مبلغ دریافتی (تومان) *</label><input id="receipt-paid" className="field" type="number" min="0" step="1" required value={paid} onChange={event=>setPaid(event.target.value)}/></div>
+     <div className="form-row"><label htmlFor="receipt-method">روش پرداخت *</label><select id="receipt-method" className="field" required value={paymentMethod} onChange={event=>setPaymentMethod(event.target.value)}><option value="pos">کارت‌خوان</option><option value="cash">نقدی</option><option value="bank_transfer">واریز بانکی</option><option value="other">سایر</option></select></div>
+     <div className="form-row"><label htmlFor="receipt-note">توضیح (اختیاری)</label><input id="receipt-note" className="field" maxLength={500} value={receiptNote} onChange={event=>setReceiptNote(event.target.value)} /></div>
+    </div>
+    {selectedService&&<div className="note" style={{marginTop:14}}>
+     <b>پیش‌نمایش محاسبه</b>
+     <div style={{display:"flex",gap:14,flexWrap:"wrap",marginTop:8,fontSize:10,color:"#526176"}}><span>تعرفه: {formatMoney(selectedService.price)} تومان</span><span>هزینه آنلاین: {formatMoney(selectedService.online_cost)} تومان</span><span>مبلغ نهایی: {totalValue!==null&&totalValue>=0n?formatMoney(totalValue.toString()):"—"} تومان</span><span>سهم شرکت: {commissionValue!==null&&commissionValue>=0n?formatMoney(commissionValue.toString()):"—"} تومان</span><span>مانده: {dueValue!==null&&dueValue>=0n?formatMoney(dueValue.toString()):"—"} تومان</span></div>
+    </div>}
+    {financialError&&<p role="alert" className="notice">{financialError}</p>}
+    {createError&&<p role="alert" className="notice">{createError}</p>}
+    <div style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}><button type="submit" className="btn primary" disabled={saving||!customerId||!serviceId||!catalogue.length||Boolean(financialError)||paidValue===null}>{saving?"در حال ثبت…":"ثبت نهایی رسید"}</button><button type="button" className="btn secondary" disabled={saving} onClick={()=>setCreateOpen(false)}>انصراف</button><small style={{alignSelf:"center",fontSize:9,color:"#8492a5"}}>ثبت‌کننده و ارائه‌دهنده خدمت: {[authUser?.first_name,authUser?.last_name].filter(Boolean).join(" ")||authUser?.username}</small></div>
+   </form>
+  </section>}
+  {createSuccess&&<p role="status" className="note" style={{margin:"0 20px 16px"}}>{createSuccess}</p>}
+  <div className="filters"><label className="search-field">⌕ <input placeholder="جستجو بر اساس شماره رسید، مشتری، خدمت..." value={query} onChange={event=>setQuery(event.target.value)}/></label><select aria-label="فیلتر روش پرداخت" value={paymentFilter} onChange={event=>setPaymentFilter(event.target.value)}><option value="all">همه روش‌های پرداخت</option><option value="pos">کارت‌خوان</option><option value="cash">نقدی</option><option value="bank_transfer">واریز بانکی</option><option value="other">سایر</option></select></div>
+  {loading?<p className="empty">در حال دریافت رسیدها…</p>:loadError?<p className="empty" role="alert">{loadError}</p>:<div className="table-wrap"><table><thead><tr><th>شماره رسید</th><th>مشتری</th><th>خدمت</th><th>مبلغ نهایی</th><th>دریافتی</th><th>مانده</th><th>روش پرداخت</th><th>تاریخ ثبت</th><th>ثبت‌کننده</th></tr></thead><tbody>{filteredReceipts.map(receipt=><tr key={receipt.id}><td><b className="case-id">{receipt.receipt_number}</b></td><td>{receipt.customer_name}</td><td><b>{receipt.service_name}</b><small style={{display:"block",fontSize:9,color:"#91a0b2",marginTop:4}}>{receipt.service_code}</small></td><td className="amount">{formatMoney(receipt.total)} <small>تومان</small></td><td>{formatMoney(receipt.paid)} تومان</td><td>{formatMoney(receipt.amount_due)} تومان</td><td>{paymentMethodLabels[receipt.payment_method]||receipt.payment_method}</td><td>{displayDateTime(receipt.created_at)}</td><td>{receipt.created_by_username||"—"}</td></tr>)}{!filteredReceipts.length&&<tr><td colSpan={9} className="empty">{receipts.length?"رسیدی مطابق فیلترها پیدا نشد.":"رسیدی برای نمایش وجود ندارد."}</td></tr>}</tbody></table></div>}
+  {!canCreate&&<p className="note" style={{margin:16}}>دسترسی این نقش فقط برای مشاهده رسیدهای موجود است؛ تغییر یا حذف رسید صادرشده مجاز نیست.</p>}
  </section>;
 }
 
