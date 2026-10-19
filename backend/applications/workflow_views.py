@@ -217,6 +217,8 @@ class StageInstanceViewSet(viewsets.ModelViewSet):
             if not reason:
                 raise ValidationError({"reason": "برای عبور از مرحله، دلیل مستند الزامی است."})
             _ensure_case_stage_prerequisite(stage)
+            if stage.code == StageInstance.Code.LOAN_SUBMISSION:
+                _ensure_submission_ready(stage.application)
             if stage.code == StageInstance.Code.ACCOUNT and stage.party_id:
                 if stage.party.account_status != CaseParty.AccountStatus.EXISTING_VERIFIED:
                     raise ValidationError({"action": "عبور از مرحله حساب فقط برای حساب موجودِ تأییدشده مجاز است."})
