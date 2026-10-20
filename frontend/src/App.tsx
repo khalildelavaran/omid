@@ -393,6 +393,10 @@ function App(){
     if(page==="customers" || page==="applications"){
      const rows=await getCustomers();
      if(active)setCustomers(rows);
+     if(page==="applications"){
+      const applicationRows=await getApplications();
+      if(active)setApps(applicationRows);
+     }
     }
     if(page==="tasks"){
      const rows=await getTasks();
