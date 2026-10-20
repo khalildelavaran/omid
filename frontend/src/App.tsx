@@ -221,28 +221,16 @@ async function getApplications(): Promise<Application[]> {
  return rows.map(mapApplication);
 }
 async function getApplicationEvents(applicationId: string): Promise<ApplicationEventRow[]> {
- const payload = await apiRequest("/api/v1/applications/" + applicationId + "/events/");
- const rows = Array.isArray(payload) ? payload : payload.results;
- if (!Array.isArray(rows)) throw new Error("ساختار پاسخ تاریخچه پرونده معتبر نیست.");
- return rows as ApplicationEventRow[];
+ return await getAllApiRows("/api/v1/applications/" + encodeURIComponent(applicationId) + "/events/", "تاریخچه پرونده") as ApplicationEventRow[];
 }
 async function getApplicationDocuments(applicationId: string): Promise<ApplicationDocumentRow[]> {
- const payload = await apiRequest("/api/v1/documents/?application=" + encodeURIComponent(applicationId));
- const rows = Array.isArray(payload) ? payload : payload.results;
- if (!Array.isArray(rows)) throw new Error("ساختار پاسخ اسناد پرونده معتبر نیست.");
- return rows as ApplicationDocumentRow[];
+ return await getAllApiRows("/api/v1/documents/?application=" + encodeURIComponent(applicationId), "اسناد پرونده") as ApplicationDocumentRow[];
 }
 async function getServiceCatalog(activeOnly=true):Promise<ServiceCatalogRow[]> {
- const payload=await apiRequest("/api/v1/services/catalog/"+(activeOnly?"?active=true":""));
- const rows=Array.isArray(payload)?payload:payload.results;
- if(!Array.isArray(rows))throw new Error("ساختار فهرست خدمات معتبر نیست.");
- return rows as ServiceCatalogRow[];
+ return await getAllApiRows("/api/v1/services/catalog/"+(activeOnly?"?active=true":""), "فهرست خدمات") as ServiceCatalogRow[];
 }
 async function getServiceReceipts():Promise<ServiceReceiptRow[]> {
- const payload=await apiRequest("/api/v1/services/receipts/");
- const rows=Array.isArray(payload)?payload:payload.results;
- if(!Array.isArray(rows))throw new Error("ساختار فهرست رسیدهای خدمات معتبر نیست.");
- return rows as ServiceReceiptRow[];
+ return await getAllApiRows("/api/v1/services/receipts/", "فهرست رسیدهای خدمات") as ServiceReceiptRow[];
 }
 function displayDateTime(value: unknown): string {
  if (!value) return "—";
@@ -256,16 +244,10 @@ async function getTasks(): Promise<TaskRow[]> {
  return await getAllApiRows("/api/v1/tasks/", "فهرست وظایف") as TaskRow[];
 }
 async function getApplicationTasks(applicationId:string):Promise<TaskRow[]> {
- const payload=await apiRequest("/api/v1/tasks/?application="+encodeURIComponent(applicationId));
- const rows=Array.isArray(payload)?payload:payload.results;
- if(!Array.isArray(rows))throw new Error("ساختار وظایف پرونده معتبر نیست.");
- return rows as TaskRow[];
+ return await getAllApiRows("/api/v1/tasks/?application="+encodeURIComponent(applicationId), "وظایف پرونده") as TaskRow[];
 }
 async function getApplicationGuarantees(applicationId:string):Promise<GuaranteeRequestRow[]> {
- const payload=await apiRequest("/api/v1/guarantees/?application="+encodeURIComponent(applicationId));
- const rows=Array.isArray(payload)?payload:payload.results;
- if(!Array.isArray(rows))throw new Error("ساختار درخواست‌های ضمانت پرونده معتبر نیست.");
- return rows as GuaranteeRequestRow[];
+ return await getAllApiRows("/api/v1/guarantees/?application="+encodeURIComponent(applicationId), "درخواست‌های ضمانت پرونده") as GuaranteeRequestRow[];
 }
 async function getOperationsReport(): Promise<OperationsReport> {
  const payload = await apiRequest("/api/v1/reports/operations/");
