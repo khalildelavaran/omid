@@ -948,17 +948,13 @@ function MeratDisbursementPanel({stage,selected,parties,authUser}:{stage:StageIn
   setError("");
   try{
    if(stage.code==="merat"){
-    const payload=await apiRequest("/api/v1/applications/merat-assessments/?application="+encodeURIComponent(selected.uuid));
-    const rows=Array.isArray(payload)?payload:payload.results;
-    if(!Array.isArray(rows))throw new Error("ساختار پاسخ سوابق مرآت معتبر نیست.");
+    const rows=await getAllApiRows("/api/v1/applications/merat-assessments/?application="+encodeURIComponent(selected.uuid), "سوابق مرآت");
     const own=(rows as MeratAssessmentRow[]).filter(row=>row.stage===stage.id);
     setAssessments(own);
     const latest=own[0];
     if(latest){setExternalReference(latest.external_reference||"");setResult(latest.result||"pending");setResultReason(latest.result_reason||"");setReportedLimit(latest.reported_limit_rial==null?"":String(latest.reported_limit_rial));setEvidenceReference(latest.evidence_reference||"");}
    }else{
-    const payload=await apiRequest("/api/v1/applications/disbursements/?application="+encodeURIComponent(selected.uuid));
-    const rows=Array.isArray(payload)?payload:payload.results;
-    if(!Array.isArray(rows))throw new Error("ساختار پاسخ سوابق واریز معتبر نیست.");
+    const rows=await getAllApiRows("/api/v1/applications/disbursements/?application="+encodeURIComponent(selected.uuid), "سوابق واریز");
     setDisbursements(rows as DisbursementRow[]);
    }
   }catch(failure){setError((failure as Error).message||"دریافت اطلاعات ناموفق بود.");}
@@ -1228,9 +1224,7 @@ function ApplicationGuarantees({selected,authUser}:{selected:Application;authUse
  useEffect(()=>{
   let active=true;
   setLoading(true);setLoadError("");setRequests([]);
-  void apiRequest("/api/v1/guarantees/?application="+encodeURIComponent(selected.uuid)).then(payload=>{
-   const rows=Array.isArray(payload)?payload:payload.results;
-   if(!Array.isArray(rows))throw new Error("ساختار پاسخ درخواست‌های ضمانت معتبر نیست.");
+  void getAllApiRows("/api/v1/guarantees/?application="+encodeURIComponent(selected.uuid), "درخواست‌های ضمانت").then(rows=>{
    if(active)setRequests(rows as GuaranteeRequestRow[]);
   }).catch(failure=>{
    if(active)setLoadError((failure as Error).message||"دریافت درخواست‌های ضمانت ناموفق بود.");
@@ -1290,9 +1284,7 @@ function ApplicationGuarantees({selected,authUser}:{selected:Application;authUse
   setLoadingEventsId(request.id);
   setEventErrors(current=>({...current,[request.id]:""}));
   try{
-   const payload=await apiRequest("/api/v1/guarantees/"+request.id+"/events/");
-   const rows=Array.isArray(payload)?payload:payload.results;
-   if(!Array.isArray(rows))throw new Error("ساختار پاسخ تاریخچه درخواست ضمانت معتبر نیست.");
+   const rows=await getAllApiRows("/api/v1/guarantees/"+encodeURIComponent(request.id)+"/events/", "تاریخچه درخواست ضمانت");
    setEventsById(current=>({...current,[request.id]:rows as GuaranteeRequestEventRow[]}));
   }catch(failure){
    setEventErrors(current=>({...current,[request.id]:(failure as Error).message||"دریافت تاریخچه درخواست ضمانت ناموفق بود."}));
@@ -1479,9 +1471,7 @@ function ApplicationFollowUps({selected,authUser}:{selected:Application;authUser
   if(eventsByTask[task.id])return;
   setEventsLoadingId(task.id);setEventErrors(current=>({...current,[task.id]:""}));
   try{
-   const payload=await apiRequest("/api/v1/tasks/"+task.id+"/events/");
-   const rows=Array.isArray(payload)?payload:payload.results;
-   if(!Array.isArray(rows))throw new Error("ساختار پاسخ تاریخچه وظیفه معتبر نیست.");
+   const rows=await getAllApiRows("/api/v1/tasks/"+encodeURIComponent(task.id)+"/events/", "تاریخچه وظیفه");
    setEventsByTask(current=>({...current,[task.id]:rows as TaskEventRow[]}));
   }catch(failure){
    setEventErrors(current=>({...current,[task.id]:(failure as Error).message||"دریافت تاریخچه وظیفه ناموفق بود."}));
