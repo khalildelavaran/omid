@@ -23,6 +23,8 @@ concurrency:
 
 jobs:
   deploy:
+    # Deployment is deliberately manual until the application is ready for release.
+    if: github.event_name == 'workflow_dispatch'
     name: Build frontend and deploy Omid
     runs-on: ubuntu-latest
     timeout-minutes: 20
