@@ -69,7 +69,7 @@ const apiBase = ""; // Same-origin only: Vite proxies /api locally and Cloudflar
 const statusLabels: Record<string, string> = {
  under_review: "در حال بررسی",
  awaiting_documents: "نیازمند مدارک",
- awaiting_approval: "در انتظار",
+ awaiting_approval: "در انتظار تأیید",
  approved: "تأیید شده",
  rejected: "رد شده",
  cancelled: "لغو شده",
