@@ -68,7 +68,7 @@ const nav: {key:NavKey;label:string;icon:string;group:string}[] = [
 const apiBase = ""; // Same-origin only: Vite proxies /api locally and Cloudflare Worker proxies it in production.
 const statusLabels: Record<string, string> = {
  under_review: "در حال بررسی",
- awaiting_documents: "نیازمند اقدام",
+ awaiting_documents: "نیازمند مدارک",
  awaiting_approval: "در انتظار",
  approved: "تأیید شده",
  rejected: "رد شده",
