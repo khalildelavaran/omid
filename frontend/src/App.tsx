@@ -181,6 +181,27 @@ function displayDate(value: unknown): string {
  const date = new Date(String(value));
  return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat("fa-IR", {year:"numeric", month:"2-digit", day:"2-digit"}).format(date);
 }
+async function getAllApiRows(path: string, errorLabel: string): Promise<any[]> {
+ const rows: any[] = [];
+ let page = 1;
+ let hasNext = true;
+ while (hasNext) {
+  const separator = path.includes("?") ? "&" : "?";
+  const payload = await apiRequest(page === 1 ? path : path + separator + "page=" + page);
+  if (Array.isArray(payload)) {
+   if (page > 1) throw new Error("ساختار صفحه‌بندی پاسخ " + errorLabel + " معتبر نیست.");
+   return payload;
+  }
+  if (!payload || !Array.isArray(payload.results)) {
+   throw new Error("ساختار پاسخ " + errorLabel + " معتبر نیست.");
+  }
+  rows.push(...payload.results);
+  hasNext = Boolean(payload.next);
+  page += 1;
+  if (page > 1001) throw new Error("تعداد صفحات " + errorLabel + " از حد مجاز بیشتر است.");
+ }
+ return rows;
+}
 function mapApplication(x: any): Application {
  return {
   uuid: String(x.id ?? ""),
@@ -196,9 +217,7 @@ function mapApplication(x: any): Application {
  };
 }
 async function getApplications(): Promise<Application[]> {
- const payload = await apiRequest("/api/v1/applications/");
- const rows = Array.isArray(payload) ? payload : payload.results;
- if (!Array.isArray(rows)) throw new Error("ساختار پاسخ فهرست پرونده‌ها معتبر نیست.");
+ const rows = await getAllApiRows("/api/v1/applications/", "فهرست پرونده‌ها");
  return rows.map(mapApplication);
 }
 async function getApplicationEvents(applicationId: string): Promise<ApplicationEventRow[]> {
@@ -231,16 +250,10 @@ function displayDateTime(value: unknown): string {
  return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat("fa-IR", {year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit"}).format(date);
 }
 async function getCustomers(): Promise<CustomerRow[]> {
- const payload = await apiRequest("/api/v1/customers/");
- const rows = Array.isArray(payload) ? payload : payload.results;
- if (!Array.isArray(rows)) throw new Error("ساختار پاسخ فهرست مشتریان معتبر نیست.");
- return rows as CustomerRow[];
+ return await getAllApiRows("/api/v1/customers/", "فهرست مشتریان") as CustomerRow[];
 }
 async function getTasks(): Promise<TaskRow[]> {
- const payload = await apiRequest("/api/v1/tasks/");
- const rows = Array.isArray(payload) ? payload : payload.results;
- if (!Array.isArray(rows)) throw new Error("ساختار پاسخ فهرست وظایف معتبر نیست.");
- return rows as TaskRow[];
+ return await getAllApiRows("/api/v1/tasks/", "فهرست وظایف") as TaskRow[];
 }
 async function getApplicationTasks(applicationId:string):Promise<TaskRow[]> {
  const payload=await apiRequest("/api/v1/tasks/?application="+encodeURIComponent(applicationId));
