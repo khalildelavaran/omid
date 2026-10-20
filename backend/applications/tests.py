@@ -365,3 +365,9 @@ class LoanApplicationApiTests(TestCase):
         self.client.force_authenticate(self.staff)
         response = self.client.get("/api/v1/applications/?include_archived=maybe")
         self.assertEqual(response.status_code, 400)
+
+    def test_application_cannot_be_hard_deleted(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.delete(f"/api/v1/applications/{self.application.pk}/")
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(LoanApplication.objects.filter(pk=self.application.pk).exists())
