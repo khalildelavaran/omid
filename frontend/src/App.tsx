@@ -435,7 +435,7 @@ function App(){
    } catch(historyError) {
     setApplicationEventsError("وضعیت تغییر کرد، اما تاریخچه تازه نشد: "+((historyError as Error).message||"خطای نامشخص"));
    }
-   setApplicationStatusSuccess("وضعیت پرونده با موفقیت به «"+mapped.status+"» تغییر کرد.");
+   setApplicationStatusSuccess("وضعیت پرونده با موفقیت به «"+(statusLabels[mapped.status]||mapped.status)+"» تغییر کرد.");
    setApiState("connected");setApiError("");
   }catch(error){
    setApplicationStatusError((error as Error).message||"تغییر وضعیت پرونده ناموفق بود.");
