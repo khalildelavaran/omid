@@ -198,6 +198,22 @@ class GuaranteeRequestApiTests(TestCase):
             format="json",
         )
         self.assertEqual(bypass.status_code, 400)
+        guarantee = GuaranteeRequest.objects.get(pk=guarantee_id)
+        self.assertEqual(guarantee.status, GuaranteeRequest.Status.UNDER_REVIEW)
+        self.assertFalse(
+            GuaranteeRequestEvent.objects.filter(
+                guarantee_request=guarantee,
+                event_type=GuaranteeRequestEvent.EventType.STATUS_CHANGED,
+                new_status=GuaranteeRequest.Status.APPROVED,
+            ).exists()
+        )
+        self.assertFalse(
+            AuditEvent.objects.filter(
+                action="guarantee_request.status_changed",
+                entity_id=guarantee_id,
+                metadata__new_status=GuaranteeRequest.Status.APPROVED,
+            ).exists()
+        )
 
         approver = User.objects.create_user(
             username="guarantee-approver", password="test-password-123", is_staff=True
