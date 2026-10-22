@@ -52,6 +52,43 @@ class LoanApplicationApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], 0)
 
+    def test_archived_customer_cannot_be_selected_for_new_application(self):
+        self.customer.status = Customer.Status.ARCHIVED
+        self.customer.save(update_fields=["status"])
+        self.client.force_authenticate(self.staff)
+        response = self.client.post(
+            "/api/v1/applications/",
+            {
+                "customer": str(self.customer.pk),
+                "product_type": "personal",
+                "requested_amount": 100000,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("customer", response.data)
+        self.assertEqual(LoanApplication.objects.count(), 1)
+
+    def test_application_cannot_be_reassigned_to_archived_customer(self):
+        archived_customer = Customer.objects.create(
+            customer_number="OM-CUST-ARCHIVED",
+            customer_type=Customer.CustomerType.INDIVIDUAL,
+            first_name="بایگانی",
+            last_name="شده",
+            assigned_to=self.staff,
+            status=Customer.Status.ARCHIVED,
+        )
+        self.client.force_authenticate(self.staff)
+        response = self.client.patch(
+            f"/api/v1/applications/{self.application.pk}/",
+            {"customer": str(archived_customer.pk)},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("customer", response.data)
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.customer_id, self.customer.pk)
+
     def test_non_positive_amount_is_rejected(self):
         self.client.force_authenticate(self.staff)
         response = self.client.post("/api/v1/applications/", {
