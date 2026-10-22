@@ -256,6 +256,24 @@ async function getOperationsReport(): Promise<OperationsReport> {
  }
  return payload as OperationsReport;
 }
+// TEMPORARY DESIGN PREVIEW: bypass only the frontend login screen while dashboard UI is being designed.
+// Backend API endpoints remain authenticated. Set to false to restore the normal login flow.
+const DESIGN_PREVIEW_MODE = true;
+const PREVIEW_USER: ApiUser = {id:0,username:"design.preview",first_name:"کاربر",last_name:"پیش‌نمایش",role:"system_admin",role_label:"پیش‌نمایش طراحی",must_change_password:false};
+const PREVIEW_REPORT: OperationsReport = {
+ generated_at:"2026-10-22T08:00:00Z",scope:"organization",
+ customers:{total:1284,active:1176,inactive:72,archived:36},
+ applications:{total:246,by_status:{under_review:68,awaiting_documents:54,awaiting_approval:39,approved:62,rejected:17,cancelled:6}},
+ tasks:{total:93,open:24,in_progress:31,completed:32,cancelled:6,overdue:8,due_today:12},
+ guarantees:{total:44,by_status:{registered:9,under_review:14,approved:15,rejected:4,fulfilled:2}},
+ service_receipts:{count:316,gross_total:"824000000",paid_total:"712000000",outstanding_total:"112000000"}
+};
+const PREVIEW_APPLICATIONS: Application[] = [
+ {uuid:"preview-1",id:"OM-1405-0318",customerId:"preview-c1",customer:"شرکت توسعه آریا",type:"سرمایه در گردش",amount:"850000000",stage:"بررسی اولیه",status:"در حال بررسی",statusKey:"under_review",date:"2026-10-21"},
+ {uuid:"preview-2",id:"OM-1405-0317",customerId:"preview-c2",customer:"مریم احمدی",type:"تسهیلات شخصی",amount:"250000000",stage:"تکمیل مدارک",status:"نیازمند مدارک",statusKey:"awaiting_documents",date:"2026-10-20"},
+ {uuid:"preview-3",id:"OM-1405-0316",customerId:"preview-c3",customer:"بازرگانی سپهر",type:"اعتباری شرکتی",amount:"1200000000",stage:"تصمیم اعتباری",status:"در انتظار تأیید",statusKey:"awaiting_approval",date:"2026-10-19"},
+ {uuid:"preview-4",id:"OM-1405-0315",customerId:"preview-c4",customer:"علی رضایی",type:"تسهیلات شخصی",amount:"180000000",stage:"تأیید اعتباری",status:"تأیید شده",statusKey:"approved",date:"2026-10-18"}
+];
 function App(){
  const [page,setPage]=useState<NavKey>("dashboard");
  const [customers,setCustomers]=useState<CustomerRow[]>([]);
@@ -345,6 +363,14 @@ function App(){
  const [taskPriority,setTaskPriority]=useState("normal");
  const [taskDueAt,setTaskDueAt]=useState("");
  useEffect(()=>{
+  if(DESIGN_PREVIEW_MODE){
+   setAuthUser(PREVIEW_USER);
+   setReport(PREVIEW_REPORT);
+   setApps(PREVIEW_APPLICATIONS);
+   setApiState("connecting");
+   setAuthChecking(false);
+   return;
+  }
   let active=true;
   apiRequest("/api/v1/auth/me/").then(async payload=>{
    if(!active) return;
@@ -380,6 +406,12 @@ function App(){
   return ()=>{active=false;};
  },[selected?.uuid]);
  useEffect(()=>{
+  if(DESIGN_PREVIEW_MODE){
+   setSectionLoading(false);
+   setSectionError("");
+   setTasks([]);
+   return;
+  }
   if(!authUser || !["dashboard","applications","customers","tasks","reports"].includes(page)) return;
   let active=true;
   setSectionLoading(true);setSectionError("");
@@ -516,7 +548,8 @@ function App(){
  </div>;
  if(authUser.must_change_password) return <PasswordChangeForm required onSuccess={()=>setAuthUser(current=>current?{...current,must_change_password:false}:current)}/>;
  return <div className="app" dir="rtl">
-  <aside className={"sidebar "+(mobileOpen?"open":"")}><div className="brand"><div className="brand-mark">ا</div><div><b>سامانه امید</b><small>مدیریت مالی و تسهیلات</small></div><button className="mobile-close" onClick={()=>setMobileOpen(false)}>×</button></div>
+  {DESIGN_PREVIEW_MODE&&<div role="status" style={{position:"fixed",top:0,left:0,right:0,zIndex:1000,background:"#fff4d6",borderBottom:"1px solid #f0d58a",color:"#704d00",padding:"8px 16px",fontSize:12,textAlign:"center"}}>حالت پیش‌نمایش طراحی فعال است؛ اطلاعات داشبورد نمایشی‌اند و عملیات نیازمند سرور در این حالت کار نمی‌کنند.</div>}
+  <aside className={"sidebar "+(mobileOpen?"open":"")} style={DESIGN_PREVIEW_MODE?{paddingTop:40}:undefined}><div className="brand"><div className="brand-mark">ا</div><div><b>سامانه امید</b><small>مدیریت مالی و تسهیلات</small></div><button className="mobile-close" onClick={()=>setMobileOpen(false)}>×</button></div>
    <div className="workspace"><span className="workspace-dot"></span><div><b>شرکت خدمات مالی امید</b><small>فضای کاری سازمانی</small></div><span className="down">⌄</span></div>
    {["فضای کاری","عملیات","مدیریت"].map(group=><div className="nav-group" key={group}><label>{group}</label>{nav.filter(n=>n.group===group).map(n=><button key={n.key} className={"nav-item "+(page===n.key?"active":"")} onClick={()=>{setPage(n.key);setSelected(null);setMobileOpen(false)}}><span className="nav-icon">{n.icon}</span>{n.label}{n.key==="tasks"&&activeTaskCount!==null&&activeTaskCount>0&&<i>{activeTaskCount.toLocaleString("fa-IR")}</i>}</button>)}</div>)}
    <div className="sidebar-bottom"><div className="help-icon">?</div><div><b>به راهنمایی نیاز دارید؟</b><small>راهنمای استفاده از سامانه</small></div><span>›</span></div>
