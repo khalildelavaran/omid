@@ -82,3 +82,95 @@ th{font-size:11px}td{font-size:12px}.case-id{font-size:12px}.customer-cell>b{fon
 @media(max-width:1100px){.customer-form-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 13px}}
 @media(max-width:780px){.customer-form-card{padding:18px}.customer-form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 12px}.customer-form-card>.card-head h2{font-size:16px}}
 @media(max-width:520px){.customer-form-card{padding:14px}.customer-form-card>.card-head{gap:10px}.customer-form-card>.card-head p{font-size:11px}.customer-form-grid{grid-template-columns:minmax(0,1fr);gap:13px}.customer-form-grid>.customer-form-row:has(input[maxlength="2000"]),.customer-sana-field{grid-column:span 1}.customer-form-card .customer-form-actions{margin-top:18px}.customer-form-card .customer-form-actions .btn{flex:1;min-width:0}}
+
+/* Unified, responsive styling for all application forms and text controls */
+.form-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  align-items:start;
+  gap:18px 16px;
+  width:100%;
+}
+.form-row{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:8px;
+  min-width:0;
+  color:#34465d;
+  font-size:12px;
+}
+.form-row>label,
+form label{
+  display:block;
+  color:#53657c;
+  font-size:12px;
+  font-weight:600;
+  line-height:1.75;
+}
+.field,
+form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+form select,
+form textarea{
+  display:block;
+  width:100%;
+  min-width:0;
+  min-height:43px;
+  padding:10px 12px;
+  border:1px solid #d8e2ed;
+  border-radius:9px;
+  background:#fff;
+  color:#26384f;
+  font-family:inherit;
+  font-size:13px;
+  font-weight:400;
+  line-height:1.6;
+  outline:none;
+  box-shadow:0 1px 2px rgba(22,43,68,.025);
+  transition:border-color .16s ease,box-shadow .16s ease,background-color .16s ease;
+}
+.field:hover,
+form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover,
+form select:hover,
+form textarea:hover{border-color:#b9c9db}
+.field:focus,
+form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+form select:focus,
+form textarea:focus{
+  border-color:#4d86bd;
+  box-shadow:0 0 0 3px rgba(65,125,184,.12);
+  background:#fff;
+}
+.field::placeholder,
+form input::placeholder,
+form textarea::placeholder{color:#a0adbd;opacity:1}
+.field:disabled,
+form input:disabled,
+form select:disabled,
+form textarea:disabled{background:#f2f5f8;color:#8b98a9;cursor:not-allowed}
+form textarea,.field[type="textarea"]{min-height:100px;resize:vertical}
+form select,.field:is(select){cursor:pointer;padding-inline:11px}
+form input[type="number"]{direction:ltr;text-align:right;font-variant-numeric:tabular-nums}
+form input[type="date"],form input[type="datetime-local"]{direction:ltr;text-align:right}
+form input[type="checkbox"],form input[type="radio"]{width:17px;height:17px;accent-color:#187f74;flex:0 0 auto}
+form input[type="file"]{max-width:100%;padding:10px;border:1px dashed #cbd8e6;border-radius:9px;background:#f8fafc;color:#586b82;font:inherit}
+form .form-grid+.form-row{margin-top:16px}
+form .actions,form .customer-form-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+form .actions .btn,form .customer-form-actions .btn{min-height:40px;border-radius:9px}
+form .muted,.muted{font-size:12px;line-height:1.9;color:#7f8da0}
+.notice,[role="alert"].notice{padding:12px 14px;border:1px solid #f0d4c9;border-radius:9px;background:#fff7f4;color:#9d4939;font-size:12px;line-height:1.9}
+.card>form{min-width:0}
+.card form .form-grid{margin-bottom:2px}
+.card:has(>.card-head) form{margin-top:4px}
+.card form>.actions{padding-top:4px}
+@media(max-width:1100px){
+  .form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 14px}
+}
+@media(max-width:650px){
+  .form-grid{grid-template-columns:minmax(0,1fr);gap:13px}
+  .form-row{gap:6px}
+  .field,form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),form select,form textarea{min-height:42px;font-size:13px}
+  form .actions,form .customer-form-actions{align-items:stretch}
+  form .actions .btn,form .customer-form-actions .btn{flex:1;min-width:0}
+}
+
