@@ -142,7 +142,7 @@ class WorkflowTaskApiTests(TestCase):
         self.assertEqual(event.new_status, WorkflowTask.Status.COMPLETED)
         self.assertEqual(event.actor, self.staff)
 
-    def test_completed_task_cannot_be_reopened(self):
+    def test_completed_task_cannot_be_reopened_or_write_history(self):
         task = WorkflowTask.objects.create(
             application=self.application,
             title="کار تمام‌شده",
@@ -150,6 +150,10 @@ class WorkflowTaskApiTests(TestCase):
             assigned_to=self.staff,
             created_by=self.staff,
         )
+        event_count = task.events.count()
+        audit_count = AuditEvent.objects.filter(
+            action="task.updated", entity_id=str(task.pk)
+        ).count()
         self.client.force_authenticate(self.staff)
         response = self.client.patch(
             f"/api/v1/tasks/{task.pk}/",
@@ -157,6 +161,13 @@ class WorkflowTaskApiTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 400)
+        task.refresh_from_db()
+        self.assertEqual(task.status, WorkflowTask.Status.COMPLETED)
+        self.assertEqual(task.events.count(), event_count)
+        self.assertEqual(
+            AuditEvent.objects.filter(action="task.updated", entity_id=str(task.pk)).count(),
+            audit_count,
+        )
 
     def test_worker_cannot_create_task_for_another_workers_application(self):
         other = User.objects.create_user(username="other-task-owner", password="test-password-123", is_staff=True)
