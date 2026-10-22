@@ -4,3 +4,30 @@
 @media(max-width:900px){.sidebar{transform:translateX(100%);transition:transform .2s ease}.sidebar.open{transform:translateX(0)}.mobile-close{display:block}.scrim{display:block;position:fixed;inset:0;background:#0b172a80;border:0;z-index:19}.main{margin-right:0}.hamburger{display:block;border:0;background:none;color:#52657d;font-size:19px}.topbar{gap:12px}.crumb{margin-left:auto}.dash-grid,.bottom-grid,.detail-layout{grid-template-columns:1fr}}
 @media(max-width:600px){.content{padding:22px 12px}.topbar{height:58px;padding:0 12px}.global-search{width:160px}.global-search kbd,.crumb{display:none}.page-heading{align-items:flex-start;flex-direction:column}.page-heading h1{font-size:19px}.stat-grid{grid-template-columns:1fr 1fr;gap:9px}.stat{padding:12px;min-height:104px;gap:8px}.stat-icon{width:31px;height:31px;font-size:16px}.stat-info>b{font-size:17px}.stat-info>span{font-size:9px}.stat-info small{font-size:8px}.stat-menu{display:none}.chart-card,.stage-card{padding:15px 12px}.donut-wrap{flex-direction:column;padding:8px}.legend{width:100%}.filters{flex-wrap:wrap;padding:12px}.search-field{max-width:none;flex-basis:100%}.filters select,.filters .btn{flex:1}.list-head{padding:15px 12px}.detail-main,.detail-aside{padding:15px}.detail-fields{grid-template-columns:repeat(2,1fr)}footer{flex-wrap:wrap;gap:10px}.top-actions{gap:8px}.global-search{width:145px}.top-avatar{display:none}.chart-area{height:175px}.bar-column small{font-size:7px}}
 @media print{.sidebar,.topbar,.heading-actions,.filters,footer,.detail-aside{display:none!important}.main{margin:0}.content{padding:0}.card{box-shadow:none}}
+
+/* Dashboard typography: improve readability without changing the layout. */
+.brand b{font-size:16px}.brand small{font-size:12px}
+.workspace b{font-size:12px}.workspace small{font-size:11px}
+.nav-group>label{font-size:12px}.nav-item{font-size:13px}
+.sidebar-bottom b{font-size:12px}.sidebar-bottom small{font-size:11px}
+.user-card b{font-size:12px}.user-card small{font-size:11px}
+.crumb{font-size:13px}.global-search input{font-size:12px}.global-search kbd{font-size:11px}
+.content .eyebrow{font-size:11px}.page-heading h1{font-size:24px}.page-heading p{font-size:13px}
+.btn{font-size:12px}.stat-info>span{font-size:12px}.stat-info>b{font-size:23px}.stat-info small{font-size:11px}
+.card-head h2{font-size:15px}.card-head p{font-size:11px}.subtle-btn{font-size:12px}
+.chart-labels{font-size:11px}.bar-column small{font-size:10px}.chart-legend{font-size:11px}
+.donut b{font-size:26px}.donut small{font-size:11px}.legend>div{font-size:11px}.legend b{font-size:12px}
+.count-pill{font-size:11px}.task-text b{font-size:12px}.task-text small{font-size:11px}
+th{font-size:11px}td{font-size:12px}.case-id{font-size:12px}.customer-cell>b{font-size:12px}
+.amount small{font-size:11px}.status{font-size:11px}
+.search-field input,.filters select{font-size:12px}
+.detail-id h2{font-size:21px}.detail-fields small{font-size:12px}.detail-fields b{font-size:13px}
+.workflow-step>span{font-size:12px}.workflow-step b{font-size:13px}.workflow-step small{font-size:11px}
+.detail-aside h3{font-size:15px}.detail-aside>p{font-size:12px}.note b{font-size:12px}.note p{font-size:11px}
+.placeholder h2{font-size:19px}.placeholder p{font-size:13px}footer{font-size:11px}
+@media(max-width:600px){
+  .page-heading h1{font-size:21px}
+  .stat-info>b{font-size:19px}.stat-info>span{font-size:11px}.stat-info small{font-size:10px}
+  .bar-column small{font-size:9px}
+}
+
