@@ -31,3 +31,30 @@ th{font-size:11px}td{font-size:12px}.case-id{font-size:12px}.customer-cell>b{fon
   .bar-column small{font-size:9px}
 }
 
+
+/* Settings page tabs and panels */
+.settings-page{padding:22px}
+.settings-tabs{display:flex;gap:7px;flex-wrap:wrap;margin:20px 0 18px;padding:6px;border:1px solid #e5ebf2;border-radius:13px;background:#f8fafc}
+.settings-tab{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:9px 14px;border:1px solid transparent;border-radius:9px;background:transparent;color:#5c6c80;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.settings-tab:hover{background:#edf3f8;color:#203650}
+.settings-tab.active,.settings-tab[aria-selected="true"]{background:#e7f5f2;border-color:#c4e8e0;color:#087c6e}
+.settings-panel{padding:4px 2px 10px}
+.settings-panel h3{margin:8px 0 7px;font-size:16px;color:#24364d}
+.settings-panel>.muted{margin:0 0 18px}
+.settings-info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0}
+.settings-info-item{display:flex;flex-direction:column;gap:8px;min-width:0;padding:15px;border:1px solid #e5ebf2;border-radius:11px;background:#fbfcfe}
+.settings-info-item span,.settings-info-item strong{overflow-wrap:anywhere}
+.settings-info-item span{font-size:12px;color:#75859a}
+.settings-info-item strong{font-size:14px;color:#273a52}
+.settings-info-item .settings-status{color:#087c6e}
+.settings-connection-row{display:flex;align-items:center;gap:12px;padding:16px;margin:16px 0;border:1px solid #e5ebf2;border-radius:12px;background:#fbfcfe}
+.settings-connection-row p{margin:5px 0 0}
+.settings-connection-dot{width:10px;height:10px;flex:0 0 10px;border-radius:50%;background:#d6a34a}
+.settings-connection-dot.ok{background:#239879}
+.settings-connection-dot.error{background:#c64b4b}
+.settings-feature-list{display:grid;gap:10px;margin:18px 0}
+.settings-feature-list>div{display:grid;grid-template-columns:1fr 2fr auto;align-items:center;gap:12px;padding:14px;border:1px solid #e5ebf2;border-radius:10px;background:#fbfcfe}
+.settings-feature-list strong{color:#273a52;font-size:13px}
+.settings-feature-list span{color:#64758a;font-size:12px}
+.settings-feature-list em{font-style:normal;color:#98691b;background:#fff4d9;border-radius:20px;padding:5px 9px;font-size:11px;white-space:nowrap}
+@media(max-width:650px){.settings-page{padding:15px}.settings-tabs{flex-wrap:nowrap;overflow-x:auto}.settings-tab{flex:0 0 auto;padding:9px 11px}.settings-info-grid{grid-template-columns:1fr}.settings-feature-list>div{grid-template-columns:1fr;gap:6px}}
