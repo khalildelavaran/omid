@@ -1790,11 +1790,13 @@ function ServiceReceiptsPage({authUser}:{authUser:ApiUser|null}){
 
 
 function SettingsPage({authUser,apiState,onPasswordChanged}:{authUser:ApiUser|null;apiState:"connecting"|"connected"|"error";onPasswordChanged:()=>void}){
- const [tab,setTab]=useState<"account"|"security"|"connection"|"management">("account");
+ const [tab,setTab]=useState<"account"|"company"|"employees"|"security"|"connection"|"management">("account");
  const [checking,setChecking]=useState(false);
  const [connectionResult,setConnectionResult]=useState<{ok:boolean;message:string}|null>(null);
  const tabs=[
   {key:"account" as const,label:"حساب کاربری",icon:"♙"},
+  {key:"company" as const,label:"مشخصات شرکت",icon:"▤"},
+  {key:"employees" as const,label:"کارمندان",icon:"♧"},
   {key:"security" as const,label:"امنیت و گذرواژه",icon:"▣"},
   {key:"connection" as const,label:"اتصال بک‌اند",icon:"⇄"},
   {key:"management" as const,label:"مدیریت و دسترسی",icon:"⚙"},
@@ -1826,6 +1828,26 @@ function SettingsPage({authUser,apiState,onPasswordChanged}:{authUser:ApiUser|nu
     <div className="settings-info-item"><span>وضعیت حساب</span><strong className="settings-status">نشست فعال</strong></div>
    </div>
    <p className="note">تغییر نام کاربری، نقش و وضعیت فعال‌بودن حساب باید از مسیر مدیریت مجاز و سمت سرور انجام شود.</p>
+  </section>}
+  {tab==="company"&&<section className="settings-panel" role="tabpanel">
+   <h3>مشخصات شرکت</h3>
+   <p className="muted">اطلاعات هویتی و تماس شرکت در این بخش نگهداری می‌شود.</p>
+   <div className="settings-feature-list">
+    <div><strong>اطلاعات ثبتی</strong><span>نام رسمی شرکت، شناسه ملی و شماره ثبت</span><em>نیازمند اتصال به تنظیمات سازمان در بک‌اند</em></div>
+    <div><strong>اطلاعات تماس</strong><span>نشانی، تلفن، ایمیل و وب‌سایت شرکت</span><em>نیازمند اتصال به تنظیمات سازمان در بک‌اند</em></div>
+    <div><strong>اطلاعات مالی</strong><span>اطلاعات بانکی و مشخصات موردنیاز اسناد و گزارش‌ها</span><em>نیازمند تعریف فیلدها و سطح دسترسی در بک‌اند</em></div>
+   </div>
+   <p className="note">بخش «مشخصات شرکت» در تنظیمات بازگردانده شده است. در نسخه فعلی API خواندن و ذخیره این اطلاعات در دسترس نیست؛ بنابراین برای جلوگیری از نمایش فرم غیرواقعی، ویرایش تا پیاده‌سازی ذخیره‌سازی امن فعال نشده است.</p>
+  </section>}
+  {tab==="employees"&&<section className="settings-panel" role="tabpanel">
+   <h3>کارمندان</h3>
+   <p className="muted">مدیریت حساب‌های کارکنان سامانه، نقش‌ها و وضعیت دسترسی آن‌ها.</p>
+   <div className="settings-feature-list">
+    <div><strong>فهرست کارمندان</strong><span>مشاهده نام، نام کاربری، نقش و وضعیت حساب</span><em>نیازمند API فهرست کاربران</em></div>
+    <div><strong>افزودن و ویرایش کارمند</strong><span>ایجاد حساب و تغییر اطلاعات یا نقش با کنترل دسترسی</span><em>نیازمند API مدیریتی امن</em></div>
+    <div><strong>وضعیت دسترسی</strong><span>فعال‌سازی، غیرفعال‌سازی و بازبینی دسترسی‌ها</span><em>نیازمند کنترل سمت سرور و ثبت رویداد</em></div>
+   </div>
+   <p className="note">بخش «کارمندان» در تنظیمات بازگردانده شده است. هنوز API مدیریتی برای فهرست و تغییر حساب‌ها در این نسخه وجود ندارد؛ پس عملیات ساختگی یا تغییر محلی که روی سرور ذخیره نشود ارائه نمی‌شود.</p>
   </section>}
   {tab==="security"&&<section className="settings-panel" role="tabpanel">
    <h3>امنیت و گذرواژه</h3>
