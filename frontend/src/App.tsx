@@ -548,8 +548,7 @@ function App(){
  </div>;
  if(authUser.must_change_password) return <PasswordChangeForm required onSuccess={()=>setAuthUser(current=>current?{...current,must_change_password:false}:current)}/>;
  return <div className="app" dir="rtl">
-  {DESIGN_PREVIEW_MODE&&<div role="status" style={{position:"fixed",top:0,left:0,right:0,zIndex:1000,background:"#fff4d6",borderBottom:"1px solid #f0d58a",color:"#704d00",padding:"8px 16px",fontSize:12,textAlign:"center"}}>حالت پیش‌نمایش طراحی فعال است؛ اطلاعات داشبورد نمایشی‌اند و عملیات نیازمند سرور در این حالت کار نمی‌کنند.</div>}
-  <aside className={"sidebar "+(mobileOpen?"open":"")} style={DESIGN_PREVIEW_MODE?{paddingTop:40}:undefined}><div className="brand"><div className="brand-mark">ا</div><div><b>سامانه امید</b><small>مدیریت مالی و تسهیلات</small></div><button className="mobile-close" onClick={()=>setMobileOpen(false)}>×</button></div>
+  <aside className={"sidebar "+(mobileOpen?"open":"")}><div className="brand"><div className="brand-mark">ا</div><div><b>سامانه امید</b><small>مدیریت مالی و تسهیلات</small></div><button className="mobile-close" onClick={()=>setMobileOpen(false)}>×</button></div>
    <div className="workspace"><span className="workspace-dot"></span><div><b>شرکت خدمات مالی امید</b><small>فضای کاری سازمانی</small></div><span className="down">⌄</span></div>
    {["فضای کاری","عملیات","مدیریت"].map(group=><div className="nav-group" key={group}><label>{group}</label>{nav.filter(n=>n.group===group).map(n=><button key={n.key} className={"nav-item "+(page===n.key?"active":"")} onClick={()=>{setPage(n.key);setSelected(null);setMobileOpen(false)}}><span className="nav-icon">{n.icon}</span>{n.label}{n.key==="tasks"&&activeTaskCount!==null&&activeTaskCount>0&&<i>{activeTaskCount.toLocaleString("fa-IR")}</i>}</button>)}</div>)}
    <div className="sidebar-bottom"><div className="help-icon">?</div><div><b>به راهنمایی نیاز دارید؟</b><small>راهنمای استفاده از سامانه</small></div><span>›</span></div>
