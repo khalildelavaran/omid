@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import DatePicker from "react-multi-date-picker";
 import persian from "react-date-object/calendars/persian";
+import DateObject from "react-date-object";
 import persian_fa from "react-date-object/locales/persian_fa";
 import "./style.css";
 
@@ -649,7 +650,7 @@ function App(){
       <div className="customer-form-row"><label>پست الکترونیکی</label><input className="field" type="email" maxLength={254} value={customerEmail} onChange={event=>setCustomerEmail(event.target.value)} autoComplete="email"/></div>
       <div className="customer-form-row"><label>کد ملی / شناسه ملی</label><input className="field" inputMode="numeric" maxLength={20} value={customerNationalId} onChange={event=>setCustomerNationalId(event.target.value)}/></div>
       {customerType==="individual"&&<>
-       <div className="customer-form-row"><label>تاریخ تولد (شمسی)</label><DatePicker inputClass="field" calendar={persian} locale={persian_fa} calendarPosition="bottom-right" format="YYYY/MM/DD" editable={false} value={customerBirthDate ? new Date(`${customerBirthDate}T12:00:00`) : ""} onChange={(date: any)=>{if(!date){setCustomerBirthDate("");return;}const selected=date.toDate();const year=selected.getFullYear();const month=String(selected.getMonth()+1).padStart(2,"0");const day=String(selected.getDate()).padStart(2,"0");setCustomerBirthDate(`${year}-${month}-${day}`);}}/></div>
+       <div className="customer-form-row"><label>تاریخ تولد (شمسی)</label><DatePicker inputClass="field" calendar={persian} locale={persian_fa} currentDate={new DateObject({ calendar: persian, locale: persian_fa }).subtract(18, "years")} calendarPosition="bottom-right" format="YYYY/MM/DD" editable={false} value={customerBirthDate ? new Date(`${customerBirthDate}T12:00:00`) : ""} onChange={(date: any)=>{if(!date){setCustomerBirthDate("");return;}const selected=date.toDate();const year=selected.getFullYear();const month=String(selected.getMonth()+1).padStart(2,"0");const day=String(selected.getDate()).padStart(2,"0");setCustomerBirthDate(`${year}-${month}-${day}`);}}/></div>
        <div className="customer-form-row"><label>نام پدر</label><input className="field" maxLength={100} value={customerFatherName} onChange={event=>setCustomerFatherName(event.target.value)}/></div>
        <div className="customer-form-row"><label>شغل</label><input className="field" maxLength={150} value={customerOccupation} onChange={event=>setCustomerOccupation(event.target.value)}/></div>
       </>}
