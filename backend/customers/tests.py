@@ -227,3 +227,20 @@ class CustomerApiTests(TestCase):
         unassigned = User.objects.create_user(username="unassigned", is_staff=True)
         self.client.force_authenticate(unassigned)
         self.assertEqual(self.client.get("/api/v1/customers/").status_code, 403)
+
+def test_customer_can_be_created_with_birth_date(self):
+        self.client.force_authenticate(self.staff_user)
+        response = self.client.post(
+            "/api/v1/customers/",
+            {
+                "customer_type": "individual",
+                "first_name": "مشتری",
+                "last_name": "جدید",
+                "birth_date": "1994-08-17",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["birth_date"], "1994-08-17")
+        customer = Customer.objects.get(pk=response.data["id"])
+        self.assertEqual(customer.birth_date.isoformat(), "1994-08-17")
