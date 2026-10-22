@@ -693,7 +693,7 @@ function App(){
    {page==="tasks"&&!selected&&<section className="card list-card"><div className="card-head"><div><h2>وظایف و پیگیری</h2><p>{filteredTasks.length.toLocaleString("fa-IR")} از {tasks.length.toLocaleString("fa-IR")} وظیفه در محدوده دسترسی شما</p></div><button className="btn secondary" onClick={()=>setPage("applications")}>پرونده‌ها</button></div>{sectionLoading?<p className="empty">در حال دریافت وظایف…</p>:sectionError?<p className="empty" role="alert">{sectionError}</p>:<div className="table-wrap"><table><thead><tr><th>شماره وظیفه</th><th>عنوان</th><th>پرونده</th><th>مسئول</th><th>اولویت</th><th>موعد</th><th>وضعیت</th><th>اقدام</th></tr></thead><tbody>{filteredTasks.map(task=><tr key={task.id}><td><b className="case-id">{task.task_number}</b></td><td>{task.title}</td><td>{task.application_number||"—"}</td><td>{task.assigned_to_username||"—"}</td><td>{task.priority==="urgent"?"فوری":task.priority==="high"?"زیاد":task.priority==="low"?"کم":"عادی"}</td><td>{displayDate(task.due_at)}</td><td><Status value={task.is_overdue?"عقب‌افتاده":task.status==="open"?"باز":task.status==="in_progress"?"در حال انجام":task.status==="completed"?"انجام‌شده":"لغوشده"}/></td><td>{task.status==="open"?<button className="btn secondary" onClick={()=>void changeTaskStatus(task,"in_progress")}>شروع</button>:task.status==="in_progress"?<button className="btn secondary" onClick={()=>void changeTaskStatus(task,"completed")}>تکمیل</button>:<span>—</span>}</td></tr>)}{!filteredTasks.length&&<tr><td colSpan={8} className="empty">{normalizedQuery?"وظیفه‌ای مطابق عبارت جستجو پیدا نشد.":"وظیفه‌ای برای نمایش وجود ندارد."}</td></tr>}</tbody></table></div>}</section>}
    {page==="reports"&&!selected&&<section className="card list-card"><div className="card-head"><div><h2>گزارش عملیاتی</h2><p>{report?"آخرین تولید: "+displayDate(report.generated_at):"گزارش زنده از بک‌اند"}</p></div><button className="btn secondary" onClick={()=>setPage("dashboard")}>بازگشت به داشبورد</button></div>{sectionLoading?<p className="empty">در حال دریافت گزارش…</p>:sectionError?<p className="empty" role="alert">{sectionError}</p>:report?<><div className="stat-grid"><Stat icon="♙" label="مشتریان" value={report.customers.total.toLocaleString("fa-IR")} delta={"فعال: "+report.customers.active.toLocaleString("fa-IR")} tone="blue"/><Stat icon="▤" label="پرونده‌های تسهیلاتی" value={report.applications.total.toLocaleString("fa-IR")} delta="طبق محدوده دسترسی کاربر" tone="violet"/><Stat icon="◷" label="وظایف عقب‌افتاده" value={report.tasks.overdue.toLocaleString("fa-IR")} delta={"امروز: "+report.tasks.due_today.toLocaleString("fa-IR")} tone="amber"/><Stat icon="✓" label="رسیدهای خدمات" value={report.service_receipts.count.toLocaleString("fa-IR")} delta={"مانده: "+formatMoney(report.service_receipts.outstanding_total)+" تومان"} tone="green"/></div><p className="note">این گزارش فقط داده‌هایی را نمایش می‌دهد که بک‌اند برای نقش و محدوده دسترسی شما مجاز دانسته است.</p></>:<p className="empty">گزارشی در دسترس نیست.</p>}</section>}
    {page==="services"&&!selected&&<ServiceReceiptsPage authUser={authUser}/>}
-   {page==="settings"&&!selected&&<PasswordChangeForm required={false} onSuccess={()=>setAuthUser(current=>current?{...current,must_change_password:false}:current)}/>}
+   {page==="settings"&&!selected&&<SettingsPage authUser={authUser} apiState={apiState} onPasswordChanged={()=>setAuthUser(current=>current?{...current,must_change_password:false}:current)}/>}
    <footer><span>© ۱۴۰۵ سامانه امید</span><span className="connection"><i className={apiState==="connected"?"connected":""}></i>{apiState==="connected"?"متصل به API":apiState==="error"?"خطا در اتصال API":"در حال اتصال به API"}</span><span>نسخه رابط کاربری ۱.۰</span></footer>
    </div></main>
  </div>
@@ -1785,6 +1785,70 @@ function ServiceReceiptsPage({authUser}:{authUser:ApiUser|null}){
   <div className="filters"><label className="search-field">⌕ <input placeholder="جستجو بر اساس شماره رسید، مشتری، خدمت..." value={query} onChange={event=>setQuery(event.target.value)}/></label><select aria-label="فیلتر روش پرداخت" value={paymentFilter} onChange={event=>setPaymentFilter(event.target.value)}><option value="all">همه روش‌های پرداخت</option><option value="pos">کارت‌خوان</option><option value="cash">نقدی</option><option value="bank_transfer">واریز بانکی</option><option value="other">سایر</option></select></div>
   {loading?<p className="empty">در حال دریافت رسیدها…</p>:loadError?<p className="empty" role="alert">{loadError}</p>:<div className="table-wrap"><table><thead><tr><th>شماره رسید</th><th>مشتری</th><th>خدمت</th><th>مبلغ نهایی</th><th>دریافتی</th><th>مانده</th><th>روش پرداخت</th><th>تاریخ ثبت</th><th>ثبت‌کننده</th></tr></thead><tbody>{filteredReceipts.map(receipt=><tr key={receipt.id}><td><b className="case-id">{receipt.receipt_number}</b></td><td>{receipt.customer_name}</td><td><b>{receipt.service_name}</b><small style={{display:"block",fontSize:9,color:"#91a0b2",marginTop:4}}>{receipt.service_code}</small></td><td className="amount">{formatMoney(receipt.total)} <small>تومان</small></td><td>{formatMoney(receipt.paid)} تومان</td><td>{formatMoney(receipt.amount_due)} تومان</td><td>{paymentMethodLabels[receipt.payment_method]||receipt.payment_method}</td><td>{displayDateTime(receipt.created_at)}</td><td>{receipt.created_by_username||"—"}</td></tr>)}{!filteredReceipts.length&&<tr><td colSpan={9} className="empty">{receipts.length?"رسیدی مطابق فیلترها پیدا نشد.":"رسیدی برای نمایش وجود ندارد."}</td></tr>}</tbody></table></div>}
   {!canCreate&&<p className="note" style={{margin:16}}>دسترسی این نقش فقط برای مشاهده رسیدهای موجود است؛ تغییر یا حذف رسید صادرشده مجاز نیست.</p>}
+ </section>;
+}
+
+
+function SettingsPage({authUser,apiState,onPasswordChanged}:{authUser:ApiUser|null;apiState:"connecting"|"connected"|"error";onPasswordChanged:()=>void}){
+ const [tab,setTab]=useState<"account"|"security"|"connection"|"management">("account");
+ const [checking,setChecking]=useState(false);
+ const [connectionResult,setConnectionResult]=useState<{ok:boolean;message:string}|null>(null);
+ const tabs=[
+  {key:"account" as const,label:"حساب کاربری",icon:"♙"},
+  {key:"security" as const,label:"امنیت و گذرواژه",icon:"▣"},
+  {key:"connection" as const,label:"اتصال بک‌اند",icon:"⇄"},
+  {key:"management" as const,label:"مدیریت و دسترسی",icon:"⚙"},
+ ];
+ async function checkConnection(){
+  setChecking(true);setConnectionResult(null);
+  try{
+   await apiRequest("/api/v1/auth/me/");
+   setConnectionResult({ok:true,message:"ارتباط با API برقرار است و نشست کاربری معتبر است."});
+  }catch(error){
+   const status=(error as ApiError).status;
+   setConnectionResult(status===401||status===403
+    ?{ok:false,message:"سرویس پاسخ می‌دهد، اما نشست یا مجوز این درخواست معتبر نیست. دوباره وارد سامانه شوید."}
+    :{ok:false,message:(error as Error).message||"بررسی اتصال ناموفق بود."});
+  }finally{setChecking(false);}
+ }
+ return <section className="card settings-page">
+  <div className="section-head"><div><h2>تنظیمات سامانه</h2><p className="muted">حساب کاربری، امنیت و وضعیت اتصال سامانه را مدیریت کنید.</p></div></div>
+  <div className="settings-tabs" role="tablist" aria-label="بخش‌های تنظیمات">
+   {tabs.map(item=><button key={item.key} type="button" role="tab" aria-selected={tab===item.key} className={"settings-tab "+(tab===item.key?"active":"")} onClick={()=>setTab(item.key)}><span aria-hidden="true">{item.icon}</span>{item.label}</button>)}
+  </div>
+  {tab==="account"&&<section className="settings-panel" role="tabpanel">
+   <h3>اطلاعات حساب کاربری</h3>
+   <p className="muted">اطلاعات حساب فعال شما از سرویس احراز هویت دریافت شده است.</p>
+   <div className="settings-info-grid">
+    <div className="settings-info-item"><span>نام نمایشی</span><strong>{[authUser?.first_name,authUser?.last_name].filter(Boolean).join(" ")||"—"}</strong></div>
+    <div className="settings-info-item"><span>نام کاربری</span><strong dir="ltr">{authUser?.username||"—"}</strong></div>
+    <div className="settings-info-item"><span>نقش کاربری</span><strong>{authUser?.role_label||"تعریف‌نشده"}</strong></div>
+    <div className="settings-info-item"><span>وضعیت حساب</span><strong className="settings-status">نشست فعال</strong></div>
+   </div>
+   <p className="note">تغییر نام کاربری، نقش و وضعیت فعال‌بودن حساب باید از مسیر مدیریت مجاز و سمت سرور انجام شود.</p>
+  </section>}
+  {tab==="security"&&<section className="settings-panel" role="tabpanel">
+   <h3>امنیت و گذرواژه</h3>
+   <p className="muted">برای حفظ امنیت حساب، گذرواژه فعلی را وارد و یک گذرواژه جدید تعیین کنید.</p>
+   <PasswordChangeForm required={false} onSuccess={onPasswordChanged}/>
+  </section>}
+  {tab==="connection"&&<section className="settings-panel" role="tabpanel">
+   <h3>وضعیت اتصال بک‌اند</h3>
+   <div className="settings-connection-row"><span className={"settings-connection-dot "+(apiState==="connected"?"ok":apiState==="error"?"error":"pending")}></span><div><strong>{apiState==="connected"?"اتصال برقرار":apiState==="error"?"خطا در اتصال":"در حال بررسی"}</strong><p className="muted">مسیر ارتباطی: API هم‌مبدأ سامانه امید</p></div></div>
+   <p className="note">آزمون زیر هم دسترسی API و هم اعتبار نشست جاری را بررسی می‌کند؛ خطای مجوز لزوماً به معنی خاموش‌بودن سرویس نیست.</p>
+   {connectionResult&&<p role="status" className={connectionResult.ok?"note":"notice"}>{connectionResult.message}</p>}
+   <button type="button" className="btn primary" disabled={checking} onClick={checkConnection}>{checking?"در حال بررسی…":"آزمون اتصال"}</button>
+  </section>}
+  {tab==="management"&&<section className="settings-panel" role="tabpanel">
+   <h3>مدیریت کاربران و دسترسی‌ها</h3>
+   <p>مدیریت کاربران، نقش‌ها و مجوزها باید با کنترل دسترسی سمت سرور پیاده‌سازی شود. این بخش در نسخه فعلی هنوز ابزار اجرایی مدیریت کاربران ندارد.</p>
+   <div className="settings-feature-list">
+    <div><strong>کاربران</strong><span>ایجاد، غیرفعال‌سازی و مشاهده حساب‌ها</span><em>در انتظار پیاده‌سازی</em></div>
+    <div><strong>نقش‌ها و مجوزها</strong><span>تخصیص نقش و کنترل دسترسی بر اساس مسئولیت</span><em>در انتظار پیاده‌سازی</em></div>
+    <div><strong>سوابق امنیتی</strong><span>ثبت رویدادهای ورود و تغییرات مدیریتی</span><em>در انتظار پیاده‌سازی</em></div>
+   </div>
+   <p className="note">این موارد صرفاً وضعیت قابلیت‌ها را نشان می‌دهند و دکمه یا عملیات نمایشیِ بدون اتصال ایجاد نمی‌کنند.</p>
+  </section>}
  </section>;
 }
 
