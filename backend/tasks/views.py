@@ -25,6 +25,10 @@ class WorkflowTaskViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        # Lock status transitions so concurrent PATCH requests validate against
+        # the latest committed task state instead of racing on a stale read.
+        if self.request.method == "PATCH" and "status" in self.request.data:
+            queryset = queryset.select_for_update()
         user = self.request.user
         role = "system_admin" if user.is_superuser else getattr(getattr(user, "profile", None), "role", None)
         if role in {"intake", "case_worker"}:
@@ -60,6 +64,12 @@ class WorkflowTaskViewSet(viewsets.ModelViewSet):
                 | Q(status__in=terminal_statuses)
             )
         return queryset
+
+    @transaction.atomic
+    def partial_update(self, request, *args, **kwargs):
+        # The transaction must cover object lookup, serializer validation, save,
+        # and event/audit creation as one operation.
+        return super().partial_update(request, *args, **kwargs)
 
     @action(detail=False, methods=["get"], url_path="summary")
     def summary(self, request):
