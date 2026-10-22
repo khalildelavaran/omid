@@ -604,10 +604,10 @@ function App(){
    {selected&&<ApplicationGuarantees selected={selected} authUser={authUser}/>}
    {selected&&<ApplicationFollowUps selected={selected} authUser={authUser}/>}
    {selected&&<ApplicationStageWorkflow selected={selected} authUser={authUser}/>}  
-   {page==="customers"&&!selected&&showCustomerForm&&<section className="card" style={{marginBottom:18,padding:22}}>
+   {page==="customers"&&!selected&&showCustomerForm&&<section className="card customer-form-card">
     <div className="card-head"><div><h2>{editingCustomerId?"ویرایش پروفایل مشتری":"ثبت مشتری جدید"}</h2><p>{editingCustomerId?"تغییرات در پرونده مشتری ذخیره و در سوابق سامانه ثبت می‌شود.":"اطلاعات در بک‌اند ذخیره و شماره مشتری به‌صورت خودکار تولید می‌شود."}</p></div><button type="button" className="btn secondary" onClick={resetCustomerForm}>بستن</button></div>
     {customerFormError&&<p role="alert" className="notice">{customerFormError}</p>}
-    <form onSubmit={async event=>{
+    <form className="customer-form" onSubmit={async event=>{
      event.preventDefault();setCustomerSaving(true);setCustomerFormError("");
      try{
       const csrf=await apiRequest("/api/v1/auth/csrf/");
@@ -636,24 +636,24 @@ function App(){
      }catch(error){setCustomerFormError((error as Error).message||"ثبت مشتری ناموفق بود.");}
      finally{setCustomerSaving(false);}
     }}>
-     <div className="form-grid">
-      <div className="form-row"><label>نوع مشتری *</label><select className="field" required value={customerType} onChange={event=>setCustomerType(event.target.value as "individual"|"organization")}><option value="individual">حقیقی</option><option value="organization">حقوقی</option></select></div>
+     <div className="customer-form-grid">
+      <div className="customer-form-row"><label>نوع مشتری *</label><select className="field" required value={customerType} onChange={event=>setCustomerType(event.target.value as "individual"|"organization")}><option value="individual">حقیقی</option><option value="organization">حقوقی</option></select></div>
       {customerType==="individual"?<>
-       <div className="form-row"><label>نام *</label><input className="field" required maxLength={100} value={customerFirstName} onChange={event=>setCustomerFirstName(event.target.value)} autoComplete="given-name"/></div>
-       <div className="form-row"><label>نام خانوادگی *</label><input className="field" required maxLength={100} value={customerLastName} onChange={event=>setCustomerLastName(event.target.value)} autoComplete="family-name"/></div>
-      </>:<div className="form-row"><label>نام سازمان / شرکت *</label><input className="field" required maxLength={200} value={customerOrganizationName} onChange={event=>setCustomerOrganizationName(event.target.value)}/></div>}
-      <div className="form-row"><label>شماره تلفن</label><input className="field" type="tel" maxLength={32} value={customerPhone} onChange={event=>setCustomerPhone(event.target.value)} autoComplete="tel"/></div>
-      <div className="form-row"><label>پست الکترونیکی</label><input className="field" type="email" maxLength={254} value={customerEmail} onChange={event=>setCustomerEmail(event.target.value)} autoComplete="email"/></div>
-      <div className="form-row"><label>کد ملی / شناسه ملی</label><input className="field" inputMode="numeric" maxLength={20} value={customerNationalId} onChange={event=>setCustomerNationalId(event.target.value)}/></div>
+       <div className="customer-form-row"><label>نام *</label><input className="field" required maxLength={100} value={customerFirstName} onChange={event=>setCustomerFirstName(event.target.value)} autoComplete="given-name"/></div>
+       <div className="customer-form-row"><label>نام خانوادگی *</label><input className="field" required maxLength={100} value={customerLastName} onChange={event=>setCustomerLastName(event.target.value)} autoComplete="family-name"/></div>
+      </>:<div className="customer-form-row"><label>نام سازمان / شرکت *</label><input className="field" required maxLength={200} value={customerOrganizationName} onChange={event=>setCustomerOrganizationName(event.target.value)}/></div>}
+      <div className="customer-form-row"><label>شماره تلفن</label><input className="field" type="tel" maxLength={32} value={customerPhone} onChange={event=>setCustomerPhone(event.target.value)} autoComplete="tel"/></div>
+      <div className="customer-form-row"><label>پست الکترونیکی</label><input className="field" type="email" maxLength={254} value={customerEmail} onChange={event=>setCustomerEmail(event.target.value)} autoComplete="email"/></div>
+      <div className="customer-form-row"><label>کد ملی / شناسه ملی</label><input className="field" inputMode="numeric" maxLength={20} value={customerNationalId} onChange={event=>setCustomerNationalId(event.target.value)}/></div>
       {customerType==="individual"&&<>
-       <div className="form-row"><label>تاریخ تولد</label><input className="field" type="date" value={customerBirthDate} onChange={event=>setCustomerBirthDate(event.target.value)}/></div>
-       <div className="form-row"><label>نام پدر</label><input className="field" maxLength={100} value={customerFatherName} onChange={event=>setCustomerFatherName(event.target.value)}/></div>
-       <div className="form-row"><label>شغل</label><input className="field" maxLength={150} value={customerOccupation} onChange={event=>setCustomerOccupation(event.target.value)}/></div>
+       <div className="customer-form-row"><label>تاریخ تولد</label><input className="field" type="date" value={customerBirthDate} onChange={event=>setCustomerBirthDate(event.target.value)}/></div>
+       <div className="customer-form-row"><label>نام پدر</label><input className="field" maxLength={100} value={customerFatherName} onChange={event=>setCustomerFatherName(event.target.value)}/></div>
+       <div className="customer-form-row"><label>شغل</label><input className="field" maxLength={150} value={customerOccupation} onChange={event=>setCustomerOccupation(event.target.value)}/></div>
       </>}
-      <div className="form-row"><label>کدپستی</label><input className="field" inputMode="numeric" maxLength={20} value={customerPostalCode} onChange={event=>setCustomerPostalCode(event.target.value)}/></div>
-      <div className="form-row"><label>وضعیت مشتری</label><select className="field" value={customerStatus} onChange={event=>setCustomerStatus(event.target.value)}><option value="active">فعال</option><option value="needs_review">نیازمند بررسی</option><option value="inactive">غیرفعال</option>{customerStatus==="archived"&&<option value="archived">بایگانی‌شده</option>}</select></div>
-      <div className="form-row"><label>یادداشت</label><input className="field" maxLength={2000} value={customerNotes} onChange={event=>setCustomerNotes(event.target.value)}/></div>
-      <label className="form-row" style={{display:"flex",alignItems:"center",gap:8}}><input type="checkbox" checked={customerSanaVerified} onChange={event=>setCustomerSanaVerified(event.target.checked)}/> احراز ثنا انجام شده است</label>
+      <div className="customer-form-row"><label>کدپستی</label><input className="field" inputMode="numeric" maxLength={20} value={customerPostalCode} onChange={event=>setCustomerPostalCode(event.target.value)}/></div>
+      <div className="customer-form-row"><label>وضعیت مشتری</label><select className="field" value={customerStatus} onChange={event=>setCustomerStatus(event.target.value)}><option value="active">فعال</option><option value="needs_review">نیازمند بررسی</option><option value="inactive">غیرفعال</option>{customerStatus==="archived"&&<option value="archived">بایگانی‌شده</option>}</select></div>
+      <div className="customer-form-row"><label>یادداشت</label><input className="field" maxLength={2000} value={customerNotes} onChange={event=>setCustomerNotes(event.target.value)}/></div>
+      <label className="customer-sana-field"><input type="checkbox" checked={customerSanaVerified} onChange={event=>setCustomerSanaVerified(event.target.checked)}/> احراز ثنا انجام شده است</label>
      </div>
      <div style={{display:"flex",justifyContent:"flex-start",gap:8,marginTop:18}}><button className="btn primary" type="submit" disabled={customerSaving}>{customerSaving?"در حال ذخیره…":editingCustomerId?"ذخیره تغییرات":"ثبت مشتری"}</button><button className="btn secondary" type="button" disabled={customerSaving} onClick={resetCustomerForm}>انصراف</button></div>
     </form>
