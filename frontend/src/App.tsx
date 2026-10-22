@@ -262,7 +262,7 @@ async function getOperationsReport(): Promise<OperationsReport> {
 }
 // TEMPORARY DESIGN PREVIEW: bypass only the frontend login screen while dashboard UI is being designed.
 // Backend API endpoints remain authenticated. Set to false to restore the normal login flow.
-const DESIGN_PREVIEW_MODE = true;
+const DESIGN_PREVIEW_MODE = import.meta.env.DEV;
 const PREVIEW_USER: ApiUser = {id:0,username:"design.preview",first_name:"کاربر",last_name:"پیش‌نمایش",role:"system_admin",role_label:"پیش‌نمایش طراحی",must_change_password:false};
 const PREVIEW_REPORT: OperationsReport = {
  generated_at:"2026-10-22T08:00:00Z",scope:"organization",
