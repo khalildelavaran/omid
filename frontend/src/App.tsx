@@ -278,8 +278,46 @@ const PREVIEW_APPLICATIONS: Application[] = [
  {uuid:"preview-3",id:"OM-1405-0316",customerId:"preview-c3",customer:"بازرگانی سپهر",type:"اعتباری شرکتی",amount:"1200000000",stage:"تصمیم اعتباری",status:"در انتظار تأیید",statusKey:"awaiting_approval",date:"2026-10-19"},
  {uuid:"preview-4",id:"OM-1405-0315",customerId:"preview-c4",customer:"علی رضایی",type:"تسهیلات شخصی",amount:"180000000",stage:"تأیید اعتباری",status:"تأیید شده",statusKey:"approved",date:"2026-10-18"}
 ];
+function toPersianDigits(value:string):string {
+ return value.replace(/[0-9]/g, digit => "۰۱۲۳۴۵۶۷۸۹"[Number(digit)]);
+}
+function localizeNumericText(root:HTMLElement):void {
+ const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+ const textNodes:Text[]=[];
+ while(walker.nextNode()) {
+  const node=walker.currentNode as Text;
+  const parent=node.parentElement;
+  if(!parent||parent.closest("script,style,code,pre,[contenteditable='true']"))continue;
+  textNodes.push(node);
+ }
+ for(const node of textNodes) {
+  const localized=toPersianDigits(node.nodeValue||"");
+  if(localized!==node.nodeValue)node.nodeValue=localized;
+ }
+ root.querySelectorAll<HTMLElement>("input[placeholder],textarea[placeholder], [title], [aria-label]").forEach(element=>{
+  for(const attribute of ["placeholder","title","aria-label"]) {
+   const value=element.getAttribute(attribute);
+   if(value!==null) {
+    const localized=toPersianDigits(value);
+    if(localized!==value)element.setAttribute(attribute,localized);
+   }
+  }
+ });
+ root.querySelectorAll<HTMLInputElement>("input[readonly],input[aria-readonly='true']").forEach(input=>{
+  const localized=toPersianDigits(input.value);
+  if(localized!==input.value)input.value=localized;
+ });
+}
 function App(){
  const [page,setPage]=useState<NavKey>("dashboard");
+ useEffect(()=>{
+  const root=document.getElementById("root");
+  if(!root)return;
+  localizeNumericText(root);
+  const observer=new MutationObserver(()=>localizeNumericText(root));
+  observer.observe(root,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:["placeholder","title","aria-label"]});
+  return ()=>observer.disconnect();
+ },[]);
  const [customers,setCustomers]=useState<CustomerRow[]>([]);
  const [tasks,setTasks]=useState<TaskRow[]>([]);
  const [report,setReport]=useState<OperationsReport|null>(null);
