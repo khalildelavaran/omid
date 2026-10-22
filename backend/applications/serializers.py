@@ -51,6 +51,10 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             if not Customer.objects.filter(pk=value.pk).exists():
                 raise serializers.ValidationError("مشتری انتخاب‌شده معتبر نیست.")
+            if value.status == Customer.Status.ARCHIVED:
+                raise serializers.ValidationError(
+                    "برای پرونده جدید یا تغییر مشتری پرونده، انتخاب مشتری بایگانی‌شده مجاز نیست."
+                )
             user = request.user
             if not user.is_superuser:
                 profile = getattr(user, "profile", None)
